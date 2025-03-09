@@ -11,6 +11,9 @@ dependencies:
     sdk: flutter
   strava_client: ^2.1.2
   intl: ^0.18.0 
+  sqflite: ^2.2.2
+  path: ^1.9.0
+  fluttertoast: ^8.2.12
 
 dev_dependencies:
   flutter_test:
