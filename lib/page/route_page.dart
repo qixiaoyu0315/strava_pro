@@ -22,7 +22,7 @@ class _RoutePageState extends State<RoutePage> {
   late final StravaClient stravaClient;
   TokenResponse? token;
   DetailedAthlete? athlete;
-  List<Map<String, String>> routeList = [];
+  List<Map<String, dynamic>> routeList = [];
 
   @override
   void initState() {
@@ -57,6 +57,9 @@ class _RoutePageState extends State<RoutePage> {
           'idStr': route.idStr ?? '未知',
           'name': route.name ?? '未知',
           'mapUrl': route.mapUrls?.url ?? '无地图链接',
+          'distance': (route.distance ?? 0) / 1000, // 转换为公里
+          'elevationGain': route.elevationGain ?? 0, // 高度
+          'estimatedMovingTime': (route.estimatedMovingTime ?? 0) / 3600, // 转换为小时
         });
       }
       setState(() {});
@@ -131,22 +134,74 @@ class _RoutePageState extends State<RoutePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            const Divider(),
             Expanded(
               child: ListView.builder(
                 itemCount: routeList.length,
                 itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text('ID: ${routeList[index]['idStr']}'),
-                    subtitle: Text('Name: ${routeList[index]['name']}'),
-                    trailing: routeList[index]['mapUrl'] != '无地图链接'
-                        ? Image.network(
-                            routeList[index]['mapUrl']!,
-                            width: 50, // 设置图片宽度
-                            height: 50, // 设置图片高度
-                            fit: BoxFit.cover, // 设置图片适应方式
-                          )
-                        : Text('无地图链接'), // 如果没有地图链接则显示文本
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8.0), // 每个卡片之间的垂直间距
+                    elevation: 4, // 卡片阴影
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10), // 圆角边框
+                    ),
+                    child: ListTile(
+                      title: Text(
+                        '名称: ${routeList[index]['name']}',
+                        style: TextStyle(fontWeight: FontWeight.bold), // 加粗名称
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 距离和高度放在同一行
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween, // 在水平方向上均匀分配空间
+                            children: [
+                              // 距离
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.directions_bike), // 使用自行车图标
+                                    SizedBox(width: 4), // 图标与文本之间的间距
+                                    Text('${routeList[index]['distance']?.toStringAsFixed(2)} km'),
+                                  ],
+                                ),
+                              ),
+                              // 高度
+                              Expanded(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.start, // 右对齐
+                                  children: [
+                                    Icon(Icons.landscape_outlined), // 使用地形图标
+                                    SizedBox(width: 4),
+                                    Text('${routeList[index]['elevationGain']?.toInt()} m'), // 只保留整数部分
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8), // 图标与下一个信息之间的间距
+                          // 预计时间放在下一行
+                          Row(
+                            children: [
+                              Icon(Icons.access_time), // 使用时间图标
+                              SizedBox(width: 4),
+                              Text('${routeList[index]['estimatedMovingTime']?.toStringAsFixed(2)} h'), // 显示预计时间
+                            ],
+                          ),
+                        ],
+                      ),
+                      trailing: routeList[index]['mapUrl'] != '无地图链接'
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(10), // 设置圆角半径
+                              child: Image.network(
+                                routeList[index]['mapUrl']!,
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Text('无地图链接'),
+                    ),
                   );
                 },
               ),
