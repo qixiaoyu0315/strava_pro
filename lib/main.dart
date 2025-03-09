@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 import 'page/route_page.dart'; // 导入 route_page
 import 'page/setting_page.dart'; // 导入 setting_page
+import 'service/strava_client_manager.dart';
+import 'model/api_key_model.dart'; // 导入 ApiKeyModel
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 获取 API 密钥
+  final apiKeyModel = ApiKeyModel();
+  final apiKey = await apiKeyModel.getApiKey();
+  
+  if (apiKey != null) {
+    // 初始化 StravaClientManager
+    await StravaClientManager().initialize(apiKey['api_id']!, apiKey['api_key']!);
+  } else {
+    // 处理没有找到 API 密钥的情况
+    print('未找到 API 密钥');
+  }
+
   runApp(const MainApp());
 }
 

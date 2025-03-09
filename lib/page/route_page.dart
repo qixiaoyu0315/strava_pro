@@ -8,9 +8,11 @@ import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'route_detail_page.dart'; // 导入新页面
+import '../service/strava_client_manager.dart';
 
 class RoutePage extends StatefulWidget {
   const RoutePage({Key? key}) : super(key: key);
+  
   @override
   _RoutePageState createState() => _RoutePageState();
 }
@@ -20,7 +22,6 @@ class _RoutePageState extends State<RoutePage> {
   String key = '';
 
   final ApiKeyModel _apiKeyModel = ApiKeyModel();
-  late final StravaClient stravaClient;
   TokenResponse? token;
   DetailedAthlete? athlete;
   List<Map<String, dynamic>> routeList = [];
@@ -29,10 +30,6 @@ class _RoutePageState extends State<RoutePage> {
   void initState() {
     super.initState();
     _loadApiKey().then((_) {
-      stravaClient = StravaClient(
-        secret: key,
-        clientId: id,
-      );
       _authenticate();
     });
   }
@@ -51,7 +48,7 @@ class _RoutePageState extends State<RoutePage> {
 
   void getRoutes() async {
     try {
-      final routes = await stravaClient.routes.listAthleteRoutes(115603263, 1, 10);
+      final routes = await StravaClientManager().stravaClient.routes.listAthleteRoutes(115603263, 1, 10);
       routeList.clear();
       for (var route in routes) {
         routeList.add({
@@ -78,14 +75,7 @@ class _RoutePageState extends State<RoutePage> {
   }
 
   void _authenticate() {
-    ExampleAuthentication(stravaClient).testAuthentication(
-      [
-        AuthenticationScope.profile_read_all,
-        AuthenticationScope.read_all,
-        AuthenticationScope.activity_read_all
-      ], 
-      "stravaflutter://redirect",
-    ).then((token) {
+    StravaClientManager().authenticate().then((token) {
       setState(() {
         this.token = token;
       });
