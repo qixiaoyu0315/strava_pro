@@ -7,6 +7,7 @@ import 'package:strava_client/strava_client.dart';
 import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'route_detail_page.dart'; // 导入新页面
 
 class RoutePage extends StatefulWidget {
   const RoutePage({Key? key}) : super(key: key);
@@ -201,6 +202,15 @@ class _RoutePageState extends State<RoutePage> {
                               ),
                             )
                           : Text('无地图链接'),
+                      onTap: () {
+                        // 点击时导航到新页面
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RouteDetailPage(idStr: routeList[index]['idStr']!), // 传递 idStr
+                          ),
+                        );
+                      },
                     ),
                   );
                 },
