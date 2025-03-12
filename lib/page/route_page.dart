@@ -121,92 +121,108 @@ class _RoutePageState extends State<RoutePage> {
         title: const Text('Route'),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: routeList.length,
-                itemBuilder: (context, index) {
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8.0), // 每个卡片之间的垂直间距
-                    elevation: 4, // 卡片阴影
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10), // 圆角边框
-                    ),
-                    child: ListTile(
-                      title: Text(
-                        '名称: ${routeList[index]['name']}',
-                        style: TextStyle(fontWeight: FontWeight.bold), // 加粗名称
+        padding: const EdgeInsets.fromLTRB(8.0,0,8,0),
+        child: ListView.builder(
+          itemCount: routeList.length,
+          itemBuilder: (context, index) {
+            return InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RouteDetailPage(idStr: routeList[index]['idStr']!),
+                  ),
+                );
+              },
+              child: Card(
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                elevation: 4,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.38 - 16,
+                        child: Image.network(
+                          routeList[index]['mapUrl'] != '无地图链接'
+                              ? routeList[index]['mapUrl']!
+                              : 'https://via.placeholder.com/100',
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 距离和高度放在同一行
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween, // 在水平方向上均匀分配空间
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 距离
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.directions_bike), // 使用自行车图标
-                                    SizedBox(width: 4), // 图标与文本之间的间距
-                                    Text('${routeList[index]['distance']?.toStringAsFixed(2)} km'),
-                                  ],
+                              Text(
+                                routeList[index]['name'],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
                                 ),
                               ),
-                              // 高度
-                              Expanded(
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start, // 右对齐
-                                  children: [
-                                    Icon(Icons.landscape_outlined), // 使用地形图标
-                                    SizedBox(width: 4),
-                                    Text('${routeList[index]['elevationGain']?.toInt()} m'), // 只保留整数部分
-                                  ],
-                                ),
+                              SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  // 左列
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(Icons.directions_bike),
+                                            SizedBox(width: 4),
+                                            Text('${routeList[index]['distance']?.toStringAsFixed(2)} km'),
+                                          ],
+                                        ),
+                                        SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.landscape_outlined),
+                                            SizedBox(width: 4),
+                                            Text('${routeList[index]['elevationGain']?.toInt()} m'),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // 右列
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(Icons.access_time),
+                                            SizedBox(width: 4),
+                                            Text('${routeList[index]['estimatedMovingTime']?.toStringAsFixed(2)} h'),
+                                          ],
+                                        ),
+                                        SizedBox(height: 8),
+                                        SizedBox(height: 24),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          SizedBox(height: 8), // 图标与下一个信息之间的间距
-                          // 预计时间放在下一行
-                          Row(
-                            children: [
-                              Icon(Icons.access_time), // 使用时间图标
-                              SizedBox(width: 4),
-                              Text('${routeList[index]['estimatedMovingTime']?.toStringAsFixed(2)} h'), // 显示预计时间
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                      trailing: routeList[index]['mapUrl'] != '无地图链接'
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(10), // 设置圆角半径
-                              child: Image.network(
-                                routeList[index]['mapUrl']!,
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Text('无地图链接'),
-                      onTap: () {
-                        // 点击时导航到新页面
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RouteDetailPage(idStr: routeList[index]['idStr']!), // 传递 idStr
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
