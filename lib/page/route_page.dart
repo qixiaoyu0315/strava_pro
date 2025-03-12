@@ -46,7 +46,7 @@ class _RoutePageState extends State<RoutePage> {
   //   }
   // }
 
-  void getRoutes() async {
+  Future<void> getRoutes() async {
     try {
       final routes = await StravaClientManager().stravaClient.routes.listAthleteRoutes(115603263, 1, 10);
       routeList.clear();
@@ -117,112 +117,125 @@ class _RoutePageState extends State<RoutePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Route'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(8.0,0,8,0),
-        child: ListView.builder(
-          itemCount: routeList.length,
-          itemBuilder: (context, index) {
-            return InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => RouteDetailPage(idStr: routeList[index]['idStr']!),
-                  ),
-                );
-              },
-              child: Card(
-                margin: const EdgeInsets.symmetric(vertical: 8.0),
-                elevation: 4,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: MediaQuery.of(context).size.width * 0.38 - 16,
-                        child: Image.network(
-                          routeList[index]['mapUrl'] != '无地图链接'
-                              ? routeList[index]['mapUrl']!
-                              : 'https://via.placeholder.com/100',
-                          fit: BoxFit.cover,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await getRoutes();
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: const Text('STRAVA-路线'),
+              floating: true, // 向上滑动时隐藏，向下滑动时显示
+              snap: true, // 确保完全显示或完全隐藏
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    return InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RouteDetailPage(idStr: routeList[index]['idStr']!),
+                          ),
+                        );
+                      },
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8.0),
+                        elevation: 4,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                routeList[index]['name'],
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
+                              SizedBox(
+                                width: MediaQuery.of(context).size.width * 0.38 - 16,
+                                child: Image.network(
+                                  routeList[index]['mapUrl'] != '无地图链接'
+                                      ? routeList[index]['mapUrl']!
+                                      : 'https://via.placeholder.com/100',
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                              SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  // 左列
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(Icons.directions_bike),
-                                            SizedBox(width: 4),
-                                            Text('${routeList[index]['distance']?.toStringAsFixed(2)} km'),
-                                          ],
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        routeList[index]['name'],
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
                                         ),
-                                        SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Icon(Icons.landscape_outlined),
-                                            SizedBox(width: 4),
-                                            Text('${routeList[index]['elevationGain']?.toInt()} m'),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          // 左列
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Icon(Icons.directions_bike),
+                                                    SizedBox(width: 4),
+                                                    Text('${routeList[index]['distance']?.toStringAsFixed(2)} km'),
+                                                  ],
+                                                ),
+                                                SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    Icon(Icons.landscape_outlined),
+                                                    SizedBox(width: 4),
+                                                    Text('${routeList[index]['elevationGain']?.toInt()} m'),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          // 右列
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisAlignment: MainAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Icon(Icons.access_time),
+                                                    SizedBox(width: 4),
+                                                    Text('${routeList[index]['estimatedMovingTime']?.toStringAsFixed(2)} h'),
+                                                  ],
+                                                ),
+                                                SizedBox(height: 8),
+                                                SizedBox(height: 24),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                  // 右列
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(Icons.access_time),
-                                            SizedBox(width: 4),
-                                            Text('${routeList[index]['estimatedMovingTime']?.toStringAsFixed(2)} h'),
-                                          ],
-                                        ),
-                                        SizedBox(height: 8),
-                                        SizedBox(height: 24),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
+                  childCount: routeList.length,
                 ),
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
