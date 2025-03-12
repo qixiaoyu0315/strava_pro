@@ -55,6 +55,7 @@ class _RoutePageState extends State<RoutePage> {
           'idStr': route.idStr ?? '未知',
           'name': route.name ?? '未知',
           'mapUrl': route.mapUrls?.url ?? '无地图链接',
+          'mapDarkUrl': route.mapUrls?.darkUrl ?? route.mapUrls?.url ?? '无地图链接',
           'distance': (route.distance ?? 0) / 1000, // 转换为公里
           'elevationGain': route.elevationGain ?? 0, // 高度
           'estimatedMovingTime': (route.estimatedMovingTime ?? 0) / 3600, // 转换为小时
@@ -157,7 +158,9 @@ class _RoutePageState extends State<RoutePage> {
                                 width: MediaQuery.of(context).size.width * 0.38 - 16,
                                 child: Image.network(
                                   routeList[index]['mapUrl'] != '无地图链接'
-                                      ? routeList[index]['mapUrl']!
+                                      ? Theme.of(context).brightness == Brightness.dark
+                                          ? routeList[index]['mapDarkUrl']!
+                                          : routeList[index]['mapUrl']!
                                       : 'https://via.placeholder.com/100',
                                   fit: BoxFit.cover,
                                 ),
