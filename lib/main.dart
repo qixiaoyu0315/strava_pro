@@ -48,19 +48,11 @@ class _MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
+      theme: ThemeData.light(useMaterial3: true).copyWith(
+        colorScheme: ThemeData.light().colorScheme,
       ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
+      darkTheme: ThemeData.dark(useMaterial3: true).copyWith(
+        colorScheme: ThemeData.dark().colorScheme,
       ),
       themeMode: ThemeMode.system, // 跟随系统主题
       home: Scaffold(
