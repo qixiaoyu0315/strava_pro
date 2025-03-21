@@ -4,6 +4,11 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import '../service/strava_client_manager.dart';
 import 'package:strava_client/strava_client.dart' as strava;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:http/http.dart' as http;
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
@@ -17,6 +22,92 @@ class RouteDetailPage extends StatefulWidget {
 class _RouteDetailPageState extends State<RouteDetailPage> {
   final MapController _mapController = MapController();
   LatLng? initialCenter; // 用于存储初始中心点
+
+  Future<void> _exportGPX(strava.Route routeData) async {
+    try {
+      // 检查 Android 版本并请求相应权限
+      if (Platform.isAndroid) {
+        final androidInfo = await DeviceInfoPlugin().androidInfo;
+        if (androidInfo.version.sdkInt >= 33) {
+          // Android 13 及以上版本
+          var status = await Permission.photos.status;
+          if (!status.isGranted) {
+            status = await Permission.photos.request();
+            if (!status.isGranted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('需要存储权限才能导出文件')),
+              );
+              return;
+            }
+          }
+        } else {
+          // Android 13 以下版本
+          var status = await Permission.storage.status;
+          if (!status.isGranted) {
+            status = await Permission.storage.request();
+            if (!status.isGranted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('需要存储权限才能导出文件')),
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      // 获取下载目录
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('无法访问存储目录')),
+        );
+        return;
+      }
+
+      // 确保目录存在
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      // 创建文件名
+      final fileName = '${routeData.name?.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_') ?? 'route'}_${DateTime.now().millisecondsSinceEpoch}.gpx';
+      final file = File('${directory.path}/$fileName');
+
+      // 获取访问令牌
+      final tokenResponse = await StravaClientManager().authenticate();
+      final accessToken = tokenResponse.accessToken;
+      if (accessToken == null) {
+        throw Exception('未获取到访问令牌');
+      }
+
+      // 直接从 Strava API 获取 GPX 数据
+      final response = await http.get(
+        Uri.parse('https://www.strava.com/api/v3/routes/${routeData.id}/export_gpx'),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('获取 GPX 数据失败: ${response.statusCode}');
+      }
+
+      // 写入二进制数据
+      await file.writeAsBytes(response.bodyBytes);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('GPX文件已保存到: ${file.path}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导出失败: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,11 +277,23 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '路线名称: ${routeData.name}',
-                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '路线名称: ${routeData.name}',
+                                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => _exportGPX(routeData),
+                                icon: Icon(Icons.download),
+                                tooltip: '导出GPX文件',
+                              ),
+                            ],
                           ),
                           SizedBox(height: 16),
                           Column(

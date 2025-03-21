@@ -177,6 +177,8 @@ class _RoutePageState extends State<RoutePage> {
                                           fontWeight: FontWeight.bold,
                                           fontSize: 18,
                                         ),
+                                                                    maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                                       ),
                                       SizedBox(height: 12),
                                       Row(
