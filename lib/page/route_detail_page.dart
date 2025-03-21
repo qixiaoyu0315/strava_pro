@@ -58,7 +58,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       // 获取下载目录
       Directory? directory;
       if (Platform.isAndroid) {
-        directory = Directory('/storage/emulated/0/Download');
+        directory = Directory('/storage/emulated/0/Download/strava_pro');
       } else {
         directory = await getApplicationDocumentsDirectory();
       }
@@ -76,7 +76,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       }
 
       // 创建文件名
-      final fileName = '${routeData.name?.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_') ?? 'route'}_${DateTime.now().millisecondsSinceEpoch}.gpx';
+      final fileName = '${routeData.idStr}.gpx';
       final file = File('${directory.path}/$fileName');
 
       // 获取访问令牌
