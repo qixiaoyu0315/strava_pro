@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart' as http;
+import '../widgets/elevation_chart.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
@@ -23,6 +24,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   final MapController _mapController = MapController();
   LatLng? initialCenter; // 用于存储初始中心点
   String? gpxFilePath; // 添加变量存储 GPX 文件路径
+  ElevationData? elevationData;
 
   @override
   void initState() {
@@ -42,8 +44,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       final file = File('${directory.path}/${widget.idStr}.gpx');
       print(file.path);
       if (await file.exists()) {
+        final data = await ElevationData.fromGPXFile(file.path);
         setState(() {
           gpxFilePath = file.path;
+          elevationData = data;
         });
       }
     } catch (e) {
@@ -126,13 +130,16 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
       // 写入二进制数据
       await file.writeAsBytes(response.bodyBytes);
-
+      
+      // 解析GPX文件
+      final data = await ElevationData.fromGPXFile(file.path);
       setState(() {
         gpxFilePath = file.path;
+        elevationData = data;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('GPX文件已保存到: ${file.path}')),
+        SnackBar(content: Text('GPX文件已保存并解析完成')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,9 +151,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('路线详情'),
-      ),
       body: FutureBuilder<strava.Route>(
         future: getRoute(widget.idStr),
         builder: (context, snapshot) {
@@ -185,256 +189,274 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             initialCenter = center;
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                // 地图部分
-                Expanded(
-                  flex: 3,
-                  child: Stack(
-                    children: [
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverAppBar(
+                title: Text('路线详情'),
+                floating: true, // 允许浮动
+                snap: true, // 迅速显示完整bar
+                forceElevated: innerBoxIsScrolled,
+              ),
+            ],
+            body: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(16.0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // 地图部分
                       Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.5),
-                              spreadRadius: 2,
-                              blurRadius: 5,
-                              offset: Offset(0, 3),
+                        height: 300,  // 固定地图高度
+                        child: Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.5),
+                                    spreadRadius: 2,
+                                    blurRadius: 5,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: points.isNotEmpty
+                                  ? FlutterMap(
+                                      mapController: _mapController,
+                                      options: MapOptions(
+                                        initialCenter: center,
+                                        initialZoom: 8.0,
+                                      ),
+                                      children: [
+                                        TileLayer(
+                                          urlTemplate:
+                                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                          subdomains: const ['a', 'b', 'c'],
+                                          userAgentPackageName: 'com.example.app',
+                                        ),
+                                        PolylineLayer(
+                                          polylines: [
+                                            Polyline(
+                                              points: points,
+                                              strokeWidth: 4.0,
+                                              color: Colors.blue,
+                                            ),
+                                          ],
+                                        ),
+                                        MarkerLayer(
+                                          markers: [
+                                            if (points.isNotEmpty) ...[
+                                              Marker(
+                                                point: points.first,
+                                                child: Icon(
+                                                  Icons.location_on,
+                                                  color: Colors.green,
+                                                  size: 40.0,
+                                                ),
+                                              ),
+                                              Marker(
+                                                point: points.last,
+                                                child: Icon(
+                                                  Icons.flag,
+                                                  color: Colors.red,
+                                                  size: 40.0,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    )
+                                  : Center(child: Text('没有可用的路线数据')),
+                            ),
+                            // 添加返回起点按钮
+                            Positioned(
+                              right: 16,
+                              bottom: 16,
+                              child: FloatingActionButton(
+                                heroTag: 'return_start',
+                                mini: true,
+                                onPressed: () {
+                                  if (points.isNotEmpty) {
+                                    _mapController.move(points.first, 15.0);
+                                  }
+                                },
+                                child: Icon(Icons.my_location),
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.blue,
+                              ),
+                            ),
+                            // 添加重置地图按钮
+                            Positioned(
+                              right: 16,
+                              bottom: 80,
+                              child: FloatingActionButton(
+                                heroTag: 'reset_map',
+                                mini: true,
+                                onPressed: () {
+                                  if (initialCenter != null) {
+                                    _mapController.move(initialCenter!, 8.0);
+                                  }
+                                },
+                                child: Icon(Icons.refresh),
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.blue,
+                              ),
                             ),
                           ],
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: points.isNotEmpty
-                            ? FlutterMap(
-                                mapController: _mapController,
-                                options: MapOptions(
-                                  initialCenter: center,
-                                  initialZoom: 8.0,
-                                ),
-                                children: [
-                                  TileLayer(
-                                    urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                    subdomains: const ['a', 'b', 'c'],
-                                    userAgentPackageName: 'com.example.app',
-                                  ),
-                                  PolylineLayer(
-                                    polylines: [
-                                      Polyline(
-                                        points: points,
-                                        strokeWidth: 4.0,
-                                        color: Colors.blue,
+                      ),
+
+                      SizedBox(height: 16),
+
+                      // GPX文件路径显示
+                      if (gpxFilePath != null) ...[
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outlineVariant,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.file_present,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'GPX 文件已保存',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                    ],
-                                  ),
-                                  MarkerLayer(
-                                    markers: [
-                                      if (points.isNotEmpty) ...[
-                                        Marker(
-                                          point: points.first,
-                                          child: Icon(
-                                            Icons.location_on,
-                                            color: Colors.green,
-                                            size: 40.0,
-                                          ),
-                                        ),
-                                        Marker(
-                                          point: points.last,
-                                          child: Icon(
-                                            Icons.flag,
-                                            color: Colors.red,
-                                            size: 40.0,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              )
-                            : Center(child: Text('没有可用的路线数据')),
-                      ),
-                      // 添加返回起点按钮
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: FloatingActionButton(
-                          heroTag: 'return_start',
-                          mini: true,
-                          onPressed: () {
-                            if (points.isNotEmpty) {
-                              _mapController.move(points.first, 15.0);
-                            }
-                          },
-                          child: Icon(Icons.my_location),
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.blue,
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      gpxFilePath!,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      // 添加重置地图按钮
-                      Positioned(
-                        right: 16,
-                        bottom: 80, // 调整位置以避免重叠
-                        child: FloatingActionButton(
-                          heroTag: 'reset_map',
-                          mini: true,
-                          onPressed: () {
-                            if (initialCenter != null) {
-                              _mapController.move(initialCenter!, 8.0); // 重置到初始位置
-                            }
-                          },
-                          child: Icon(Icons.refresh),
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.blue,
+                        SizedBox(height: 16),
+                      ],
+
+                      // 高度图表
+                      if (elevationData != null) ...[
+                        ElevationChart(data: elevationData!),
+                        SizedBox(height: 16),
+                      ],
+
+                      // 路线信息部分
+                      Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 8),
-                // GPX文件路径显示
-                if (gpxFilePath != null) ...[
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.file_present,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'GPX 文件已保存',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '路线名称: ${routeData.name}',
+                                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (gpxFilePath == null)
+                                    IconButton(
+                                      onPressed: () => _exportGPX(routeData),
+                                      icon: Icon(Icons.download),
+                                      tooltip: '导出GPX文件',
+                                    ),
+                                ],
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                gpxFilePath!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              SizedBox(height: 16),
+                              Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.directions_bike),
+                                      SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${((routeData.distance ?? 0) / 1000).toStringAsFixed(2)} km',
+                                            style: TextStyle(fontSize: 16),
+                                          ),
+                                          Text('距离', style: TextStyle(color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.landscape_outlined),
+                                      SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${routeData.elevationGain?.toStringAsFixed(2) ?? 0} m',
+                                            style: TextStyle(fontSize: 16),
+                                          ),
+                                          Text('累计爬升', style: TextStyle(color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.access_time),
+                                      SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${((routeData.estimatedMovingTime ?? 0) / 3600).toStringAsFixed(2)} h',
+                                            style: TextStyle(fontSize: 16),
+                                          ),
+                                          Text('预计时间', style: TextStyle(color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                SizedBox(height: 8),
-
-                // 路线信息部分
-                Expanded(
-                  flex: 2,
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '路线名称: ${routeData.name}',
-                                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (gpxFilePath == null) // 只在文件不存在时显示下载按钮
-                                IconButton(
-                                  onPressed: () => _exportGPX(routeData),
-                                  icon: Icon(Icons.download),
-                                  tooltip: '导出GPX文件',
-                                ),
-                            ],
-                          ),
-                          SizedBox(height: 16),
-                          Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.directions_bike),
-                                  SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${((routeData.distance ?? 0) / 1000).toStringAsFixed(2)} km',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                      Text('距离', style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Icon(Icons.landscape_outlined),
-                                  SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${routeData.elevationGain?.toStringAsFixed(2) ?? 0} m',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                      Text('累计爬升', style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Icon(Icons.access_time),
-                                  SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${((routeData.estimatedMovingTime ?? 0) / 3600).toStringAsFixed(2)} h',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                      Text('预计时间', style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
                       ),
-                    ),
+                      SizedBox(height: 16),
+                    ]),
                   ),
                 ),
               ],

@@ -21,6 +21,9 @@ dependencies:
   path_provider: ^2.1.5
   permission_handler: ^11.4.0
   device_info_plus: ^9.0.3
+  xml: ^6.5.0  # 用于解析 GPX 文件
+  fl_chart: ^0.70.2 # 用于绘制图表
+  great_circle_distance_calculator: ^1.0.3  # 用于计算两点之间的距离
 
 
 dev_dependencies:
