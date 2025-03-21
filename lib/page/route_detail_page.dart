@@ -22,6 +22,34 @@ class RouteDetailPage extends StatefulWidget {
 class _RouteDetailPageState extends State<RouteDetailPage> {
   final MapController _mapController = MapController();
   LatLng? initialCenter; // 用于存储初始中心点
+  String? gpxFilePath; // 添加变量存储 GPX 文件路径
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingGPXFile(); // 添加检查文件的方法
+  }
+
+  Future<void> _checkExistingGPXFile() async {
+    try {
+      Directory directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download/strava_pro');
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final file = File('${directory.path}/${widget.idStr}.gpx');
+      print(file.path);
+      if (await file.exists()) {
+        setState(() {
+          gpxFilePath = file.path;
+        });
+      }
+    } catch (e) {
+      print('检查GPX文件失败: $e');
+    }
+  }
 
   Future<void> _exportGPX(strava.Route routeData) async {
     try {
@@ -98,6 +126,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
       // 写入二进制数据
       await file.writeAsBytes(response.bodyBytes);
+
+      setState(() {
+        gpxFilePath = file.path;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('GPX文件已保存到: ${file.path}')),
@@ -261,8 +293,57 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                     ],
                   ),
                 ),
+                SizedBox(height: 8),
+                // GPX文件路径显示
+                if (gpxFilePath != null) ...[
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.file_present,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'GPX 文件已保存',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                gpxFilePath!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
-                SizedBox(height: 16),
+                SizedBox(height: 8),
 
                 // 路线信息部分
                 Expanded(
@@ -288,11 +369,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              IconButton(
-                                onPressed: () => _exportGPX(routeData),
-                                icon: Icon(Icons.download),
-                                tooltip: '导出GPX文件',
-                              ),
+                              if (gpxFilePath == null) // 只在文件不存在时显示下载按钮
+                                IconButton(
+                                  onPressed: () => _exportGPX(routeData),
+                                  icon: Icon(Icons.download),
+                                  tooltip: '导出GPX文件',
+                                ),
                             ],
                           ),
                           SizedBox(height: 16),
