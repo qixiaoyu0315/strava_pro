@@ -5,13 +5,27 @@ import 'package:xml/xml.dart';
 import 'package:great_circle_distance_calculator/great_circle_distance_calculator.dart';
 import 'dart:io';
 
+class ElevationPoint {
+  final double distance;  // 距离（公里）
+  final double elevation;  // 海拔（米）
+  final LatLng position;  // 地理位置
+
+  ElevationPoint({
+    required this.distance,
+    required this.elevation,
+    required this.position,
+  });
+}
+
 class ElevationData {
   final List<FlSpot> points;
+  final List<ElevationPoint> elevationPoints;
   final double maxElevation;
   final double totalDistance;
 
   ElevationData({
     required this.points,
+    required this.elevationPoints,
     required this.maxElevation,
     required this.totalDistance,
   });
@@ -24,6 +38,7 @@ class ElevationData {
       final trackPoints = document.findAllElements('trkpt');
       
       List<FlSpot> points = [];
+      List<ElevationPoint> elevationPoints = [];
       double distance = 0;
       double maxElevation = 0;
       LatLng? previousPoint;
@@ -32,6 +47,8 @@ class ElevationData {
         final lat = double.parse(point.getAttribute('lat')!);
         final lon = double.parse(point.getAttribute('lon')!);
         final ele = double.parse(point.findElements('ele').first.text);
+        final currentPosition = LatLng(lat, lon);
+        
         if (previousPoint != null) {
           final distanceInMeters = GreatCircleDistance.fromDegrees(
             latitude1: previousPoint.latitude,
@@ -42,13 +59,21 @@ class ElevationData {
           distance += distanceInMeters;
         }
         
-        points.add(FlSpot(distance / 1000, ele)); // 转换为公里
+        final currentDistance = distance / 1000;  // 转换为公里
+        points.add(FlSpot(currentDistance, ele));
+        elevationPoints.add(ElevationPoint(
+          distance: currentDistance,
+          elevation: ele,
+          position: currentPosition,
+        ));
+        
         if (ele > maxElevation) maxElevation = ele;
-        previousPoint = LatLng(lat, lon);
+        previousPoint = currentPosition;
       }
       
       return ElevationData(
         points: points,
+        elevationPoints: elevationPoints,
         maxElevation: maxElevation,
         totalDistance: distance / 1000,
       );
@@ -61,10 +86,12 @@ class ElevationData {
 
 class ElevationChart extends StatelessWidget {
   final ElevationData data;
+  final Function(ElevationPoint point)? onPointSelected;
 
   const ElevationChart({
     Key? key,
     required this.data,
+    this.onPointSelected,
   }) : super(key: key);
 
   @override
@@ -186,8 +213,24 @@ class ElevationChart extends StatelessWidget {
                     tooltipMargin: 8,
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
+                        // 找到最接近的点位信息
+                        int closestIndex = 0;
+                        double minDistance = double.infinity;
+                        
+                        for (int i = 0; i < data.points.length; i++) {
+                          final point = data.points[i];
+                          final distance = (point.x - spot.x).abs();
+                          if (distance < minDistance) {
+                            minDistance = distance;
+                            closestIndex = i;
+                          }
+                        }
+                        
+                        final pointData = data.elevationPoints[closestIndex];
+                        
                         return LineTooltipItem(
-                          '距离: ${spot.x.toStringAsFixed(1)} km\n高度: ${spot.y.toStringAsFixed(0)} m',
+                          '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
+                          '海拔: ${pointData.elevation.toStringAsFixed(0)} m',
                           TextStyle(
                             color: Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
@@ -196,6 +239,27 @@ class ElevationChart extends StatelessWidget {
                       }).toList();
                     },
                   ),
+                  touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
+                    if (event is FlTapUpEvent && response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
+                      final spot = response.lineBarSpots!.first;
+                      // 找到最接近的点位信息
+                      int closestIndex = 0;
+                      double minDistance = double.infinity;
+                      
+                      for (int i = 0; i < data.points.length; i++) {
+                        final point = data.points[i];
+                        final distance = (point.x - spot.x).abs();
+                        if (distance < minDistance) {
+                          minDistance = distance;
+                          closestIndex = i;
+                        }
+                      }
+                      
+                      final pointData = data.elevationPoints[closestIndex];
+                      onPointSelected?.call(pointData);
+                    }
+                  },
+                  handleBuiltInTouches: true,
                 ),
               ),
             ),

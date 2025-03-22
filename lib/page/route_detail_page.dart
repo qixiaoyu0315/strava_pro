@@ -25,6 +25,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   LatLng? initialCenter; // 用于存储初始中心点
   String? gpxFilePath; // 添加变量存储 GPX 文件路径
   ElevationData? elevationData;
+  LatLng? selectedPoint; // 添加选中点的位置
 
   @override
   void initState() {
@@ -209,19 +210,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                         height: 300,  // 固定地图高度
                         child: Stack(
                           children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.5),
-                                    spreadRadius: 2,
-                                    blurRadius: 5,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              clipBehavior: Clip.antiAlias,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
                               child: points.isNotEmpty
                                   ? FlutterMap(
                                       mapController: _mapController,
@@ -264,6 +254,15 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                   size: 40.0,
                                                 ),
                                               ),
+                                              if (selectedPoint != null)
+                                                Marker(
+                                                  point: selectedPoint!,
+                                                  child: Icon(
+                                                    Icons.location_on,
+                                                    color: Colors.orange,
+                                                    size: 40.0,
+                                                  ),
+                                                ),
                                             ],
                                           ],
                                         ),
@@ -310,11 +309,16 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                       ),
 
                       SizedBox(height: 16),
-                                            // 高度图表
-                      if (elevationData != null) ...[
-                        ElevationChart(data: elevationData!),
-                        SizedBox(height: 16),
-                      ],
+                      // 高度图表
+                      if (elevationData != null)
+                        ElevationChart(
+                          data: elevationData!,
+                          onPointSelected: (point) {
+                            setState(() {
+                              selectedPoint = point.position;
+                            });
+                          },
+                        ),
 
                       // 路线信息部分
                       Card(
