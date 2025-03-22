@@ -319,7 +319,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             });
                           },
                         ),
-
+SizedBox(height: 16),
                       // 路线信息部分
                       Card(
                         elevation: 4,
