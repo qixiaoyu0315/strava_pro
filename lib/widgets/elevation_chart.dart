@@ -9,11 +9,13 @@ class ElevationPoint {
   final double distance;  // 距离（公里）
   final double elevation;  // 海拔（米）
   final LatLng position;  // 地理位置
+  final double gradient;  // 坡度（百分比）
 
   ElevationPoint({
     required this.distance,
     required this.elevation,
     required this.position,
+    required this.gradient,
   });
 }
 
@@ -42,6 +44,8 @@ class ElevationData {
       double distance = 0;
       double maxElevation = 0;
       LatLng? previousPoint;
+      double? previousElevation;
+      double? previousDistance;
       
       for (var point in trackPoints) {
         final lat = double.parse(point.getAttribute('lat')!);
@@ -60,15 +64,29 @@ class ElevationData {
         }
         
         final currentDistance = distance / 1000;  // 转换为公里
+        
+        // 计算坡度
+        double gradient = 0.0;
+        if (previousElevation != null && previousDistance != null) {
+          final elevationDiff = ele - previousElevation;  // 高度差（米）
+          final horizontalDist = (currentDistance - previousDistance) * 1000;  // 水平距离（米）
+          if (horizontalDist > 0) {
+            gradient = (elevationDiff / horizontalDist) * 100;  // 转换为百分比
+          }
+        }
+        
         points.add(FlSpot(currentDistance, ele));
         elevationPoints.add(ElevationPoint(
           distance: currentDistance,
           elevation: ele,
           position: currentPosition,
+          gradient: gradient,
         ));
         
         if (ele > maxElevation) maxElevation = ele;
         previousPoint = currentPosition;
+        previousElevation = ele;
+        previousDistance = currentDistance;
       }
       
       return ElevationData(
@@ -93,6 +111,22 @@ class ElevationChart extends StatelessWidget {
     required this.data,
     this.onPointSelected,
   }) : super(key: key);
+
+  Color _getGradientColor(double gradient) {
+    if (gradient > 10) return Colors.red;
+    if (gradient > 6) return Colors.orange;
+    if (gradient > 3) return Colors.yellow;
+    if (gradient > 0) return Colors.green;
+    if (gradient < -10) return Colors.purple;
+    if (gradient < -6) return Colors.blue;
+    if (gradient < -3) return Colors.lightBlue;
+    return Colors.green;
+  }
+
+  String _getGradientText(double gradient) {
+    if (gradient.abs() < 0.1) return '平路';
+    return '${gradient.toStringAsFixed(1)}%';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +176,7 @@ class ElevationChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: true,
-                  horizontalInterval: 100,
+                  horizontalInterval: (data.maxElevation / 5).ceil() * 100,
                   verticalInterval: interval,
                 ),
                 titlesData: FlTitlesData(
@@ -233,14 +267,29 @@ class ElevationChart extends StatelessWidget {
                         }
                         
                         final pointData = data.elevationPoints[closestIndex];
+                        final gradientColor = _getGradientColor(pointData.gradient);
+                        final gradientText = _getGradientText(pointData.gradient);
                         
                         return LineTooltipItem(
                           '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
-                          '海拔: ${pointData.elevation.toStringAsFixed(0)} m',
+                          '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
+                          '坡度: $gradientText',
                           TextStyle(
                             color: Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
+                          children: [
+                            TextSpan(
+                              text: '\n',
+                            ),
+                            TextSpan(
+                              text: '●',
+                              style: TextStyle(
+                                color: gradientColor,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         );
                       }).toList();
                     },
