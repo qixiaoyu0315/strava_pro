@@ -25,12 +25,18 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   LatLng? initialCenter; // 用于存储初始中心点
   String? gpxFilePath; // 添加变量存储 GPX 文件路径
   ElevationData? elevationData;
-  LatLng? selectedPoint; // 添加选中点的位置
+  final ValueNotifier<LatLng?> selectedPoint = ValueNotifier<LatLng?>(null);
 
   @override
   void initState() {
     super.initState();
     _checkExistingGPXFile(); // 添加检查文件的方法
+  }
+
+  @override
+  void dispose() {
+    selectedPoint.dispose();
+    super.dispose();
   }
 
   Future<void> _checkExistingGPXFile() async {
@@ -149,6 +155,76 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     }
   }
 
+  Widget _buildMap(List<LatLng> points, LatLng center) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: points.isNotEmpty
+          ? FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: 8.0,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  subdomains: const ['a', 'b', 'c'],
+                  userAgentPackageName: 'com.example.app',
+                ),
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: points,
+                      strokeWidth: 4.0,
+                      color: Colors.blue,
+                    ),
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: points.first,
+                      child: Icon(
+                        Icons.location_on,
+                        color: Colors.green,
+                        size: 40.0,
+                      ),
+                    ),
+                    Marker(
+                      point: points.last,
+                      child: Icon(
+                        Icons.flag,
+                        color: Colors.red,
+                        size: 40.0,
+                      ),
+                    ),
+                  ],
+                ),
+                ValueListenableBuilder<LatLng?>(
+                  valueListenable: selectedPoint,
+                  builder: (context, point, child) {
+                    if (point == null) return const SizedBox();
+                    return MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: point,
+                          child: Icon(
+                            Icons.location_on,
+                            color: Colors.orange,
+                            size: 40.0,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            )
+          : Center(child: Text('没有可用的路线数据')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,66 +286,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                         height: 300,  // 固定地图高度
                         child: Stack(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: points.isNotEmpty
-                                  ? FlutterMap(
-                                      mapController: _mapController,
-                                      options: MapOptions(
-                                        initialCenter: center,
-                                        initialZoom: 8.0,
-                                      ),
-                                      children: [
-                                        TileLayer(
-                                          urlTemplate:
-                                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                          subdomains: const ['a', 'b', 'c'],
-                                          userAgentPackageName: 'com.example.app',
-                                        ),
-                                        PolylineLayer(
-                                          polylines: [
-                                            Polyline(
-                                              points: points,
-                                              strokeWidth: 4.0,
-                                              color: Colors.blue,
-                                            ),
-                                          ],
-                                        ),
-                                        MarkerLayer(
-                                          markers: [
-                                            if (points.isNotEmpty) ...[
-                                              Marker(
-                                                point: points.first,
-                                                child: Icon(
-                                                  Icons.location_on,
-                                                  color: Colors.green,
-                                                  size: 40.0,
-                                                ),
-                                              ),
-                                              Marker(
-                                                point: points.last,
-                                                child: Icon(
-                                                  Icons.flag,
-                                                  color: Colors.red,
-                                                  size: 40.0,
-                                                ),
-                                              ),
-                                              if (selectedPoint != null)
-                                                Marker(
-                                                  point: selectedPoint!,
-                                                  child: Icon(
-                                                    Icons.location_on,
-                                                    color: Colors.orange,
-                                                    size: 40.0,
-                                                  ),
-                                                ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    )
-                                  : Center(child: Text('没有可用的路线数据')),
-                            ),
+                            _buildMap(points, center),
                             // 添加返回起点按钮
                             Positioned(
                               right: 16,
@@ -314,9 +331,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                         ElevationChart(
                           data: elevationData!,
                           onPointSelected: (point) {
-                            setState(() {
-                              selectedPoint = point.position;
-                            });
+                            selectedPoint.value = point.position;
                           },
                         ),
 SizedBox(height: 16),
