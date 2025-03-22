@@ -169,11 +169,17 @@ class ElevationChart extends StatelessWidget {
                     ),
                   ),
                   leftTitles: AxisTitles(
-                    // axisNameWidget: const Text('海拔 (m)'),
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: 100,
+                      interval: (data.maxElevation / 5).ceil() * 100,  // 将纵坐标分为5个区间
                       reservedSize: 40,
+                      getTitlesWidget: (value, meta) {
+                        // 只显示整百的刻度
+                        if (value % 100 == 0) {
+                          return Text('${value.toInt()}');
+                        }
+                        return const SizedBox();
+                      },
                     ),
                   ),
                 ),
