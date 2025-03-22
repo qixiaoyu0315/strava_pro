@@ -93,7 +93,7 @@ class ElevationChart extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '高度剖面图',
+                '海拔高度',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
@@ -127,7 +127,7 @@ class ElevationChart extends StatelessWidget {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                   bottomTitles: AxisTitles(
-                    axisNameWidget: const Text('距离 (km)'),
+                    // axisNameWidget: const Text('距离 (km)'),
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: interval,
@@ -142,7 +142,7 @@ class ElevationChart extends StatelessWidget {
                     ),
                   ),
                   leftTitles: AxisTitles(
-                    axisNameWidget: const Text('海拔 (m)'),
+                    // axisNameWidget: const Text('海拔 (m)'),
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: 100,
