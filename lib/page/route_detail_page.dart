@@ -26,6 +26,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   String? gpxFilePath; // 添加变量存储 GPX 文件路径
   ElevationData? elevationData;
   final ValueNotifier<LatLng?> selectedPoint = ValueNotifier<LatLng?>(null);
+  bool isNavigationMode = false; // 添加导航模式状态
+  List<LatLng>? gpxPoints; // 存储GPX文件中的路线点
 
   @override
   void initState() {
@@ -52,10 +54,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       print(file.path);
       if (await file.exists()) {
         final data = await ElevationData.fromGPXFile(file.path);
-        setState(() {
-          gpxFilePath = file.path;
-          elevationData = data;
-        });
+        if (data != null) {
+          setState(() {
+            gpxFilePath = file.path;
+            elevationData = data;
+            gpxPoints = data.elevationPoints.map((point) => point.position).toList();
+          });
+        }
       }
     } catch (e) {
       print('检查GPX文件失败: $e');
@@ -140,10 +145,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       
       // 解析GPX文件
       final data = await ElevationData.fromGPXFile(file.path);
-      setState(() {
-        gpxFilePath = file.path;
-        elevationData = data;
-      });
+      if (data != null) {
+        setState(() {
+          gpxFilePath = file.path;
+          elevationData = data;
+          gpxPoints = data.elevationPoints.map((point) => point.position).toList();
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('GPX文件已保存并解析完成')),
@@ -156,9 +164,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   }
 
   Widget _buildMap(List<LatLng> points, LatLng center) {
+    final displayPoints = isNavigationMode && gpxPoints != null ? gpxPoints! : points;
+    
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
-      child: points.isNotEmpty
+      child: displayPoints.isNotEmpty
           ? FlutterMap(
               mapController: _mapController,
               options: MapOptions(
@@ -175,7 +185,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: points,
+                      points: displayPoints,
                       strokeWidth: 4.0,
                       color: Colors.blue,
                     ),
@@ -184,7 +194,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 MarkerLayer(
                   markers: [
                     Marker(
-                      point: points.first,
+                      point: displayPoints.first,
                       child: Icon(
                         Icons.location_on,
                         color: Colors.green,
@@ -192,7 +202,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                       ),
                     ),
                     Marker(
-                      point: points.last,
+                      point: displayPoints.last,
                       child: Icon(
                         Icons.flag,
                         color: Colors.red,
@@ -268,12 +278,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
           return NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverAppBar(
-                title: Text('路线详情'),
-                floating: true, // 允许浮动
-                snap: true, // 迅速显示完整bar
-                forceElevated: innerBoxIsScrolled,
-              ),
+              if (!isNavigationMode)
+                SliverAppBar(
+                  title: Text('路线详情'),
+                  floating: true,
+                  snap: true,
+                  forceElevated: innerBoxIsScrolled,
+                ),
             ],
             body: CustomScrollView(
               slivers: [
@@ -281,52 +292,51 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                   padding: const EdgeInsets.all(16.0),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      // 地图部分
                       Container(
-                        height: 300,  // 固定地图高度
+                        height: isNavigationMode ? MediaQuery.of(context).size.height * 0.6 : 300,
                         child: Stack(
                           children: [
                             _buildMap(points, center),
-                            // 添加返回起点按钮
                             Positioned(
                               right: 16,
                               bottom: 16,
-                              child: FloatingActionButton(
-                                heroTag: 'return_start',
-                                mini: true,
-                                onPressed: () {
-                                  if (points.isNotEmpty) {
-                                    _mapController.move(points.first, 15.0);
-                                  }
-                                },
-                                child: Icon(Icons.my_location),
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.blue,
-                              ),
-                            ),
-                            // 添加重置地图按钮
-                            Positioned(
-                              right: 16,
-                              bottom: 80,
-                              child: FloatingActionButton(
-                                heroTag: 'reset_map',
-                                mini: true,
-                                onPressed: () {
-                                  if (initialCenter != null) {
-                                    _mapController.move(initialCenter!, 8.0);
-                                  }
-                                },
-                                child: Icon(Icons.refresh),
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.blue,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (!isNavigationMode) ...[
+                                    FloatingActionButton(
+                                      heroTag: 'return_start',
+                                      mini: true,
+                                      onPressed: () {
+                                        if (points.isNotEmpty) {
+                                          _mapController.move(points.first, 15.0);
+                                        }
+                                      },
+                                      child: Icon(Icons.my_location),
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: Colors.blue,
+                                    ),
+                                    SizedBox(height: 8),
+                                    FloatingActionButton(
+                                      heroTag: 'reset_map',
+                                      mini: true,
+                                      onPressed: () {
+                                        if (initialCenter != null) {
+                                          _mapController.move(initialCenter!, 8.0);
+                                        }
+                                      },
+                                      child: Icon(Icons.refresh),
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: Colors.blue,
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-
                       SizedBox(height: 16),
-                      // 高度图表
                       if (elevationData != null)
                         ElevationChart(
                           data: elevationData!,
@@ -334,97 +344,98 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             selectedPoint.value = point.position;
                           },
                         ),
-SizedBox(height: 16),
-                      // 路线信息部分
-                      Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '路线名称: ${routeData.name}',
-                                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                      if (!isNavigationMode) ...[
+                        SizedBox(height: 16),
+                        // 路线信息部分
+                        Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '路线名称: ${routeData.name}',
+                                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                  if (gpxFilePath == null)
-                                    IconButton(
-                                      onPressed: () => _exportGPX(routeData),
-                                      icon: Icon(Icons.download),
-                                      tooltip: '导出GPX文件',
+                                    if (gpxFilePath == null)
+                                      IconButton(
+                                        onPressed: () => _exportGPX(routeData),
+                                        icon: Icon(Icons.download),
+                                        tooltip: '导出GPX文件',
+                                      ),
+                                  ],
+                                ),
+                                SizedBox(height: 16),
+                                Column(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.directions_bike),
+                                        SizedBox(width: 8),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${((routeData.distance ?? 0) / 1000).toStringAsFixed(2)} km',
+                                              style: TextStyle(fontSize: 16),
+                                            ),
+                                            Text('距离', style: TextStyle(color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                ],
-                              ),
-                              SizedBox(height: 16),
-                              Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(Icons.directions_bike),
-                                      SizedBox(width: 8),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${((routeData.distance ?? 0) / 1000).toStringAsFixed(2)} km',
-                                            style: TextStyle(fontSize: 16),
-                                          ),
-                                          Text('距离', style: TextStyle(color: Colors.grey)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.landscape_outlined),
-                                      SizedBox(width: 8),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${routeData.elevationGain?.toStringAsFixed(2) ?? 0} m',
-                                            style: TextStyle(fontSize: 16),
-                                          ),
-                                          Text('累计爬升', style: TextStyle(color: Colors.grey)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.access_time),
-                                      SizedBox(width: 8),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${((routeData.estimatedMovingTime ?? 0) / 3600).toStringAsFixed(2)} h',
-                                            style: TextStyle(fontSize: 16),
-                                          ),
-                                          Text('预计时间', style: TextStyle(color: Colors.grey)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.landscape_outlined),
+                                        SizedBox(width: 8),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${routeData.elevationGain?.toStringAsFixed(2) ?? 0} m',
+                                              style: TextStyle(fontSize: 16),
+                                            ),
+                                            Text('累计爬升', style: TextStyle(color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.access_time),
+                                        SizedBox(width: 8),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${((routeData.estimatedMovingTime ?? 0) / 3600).toStringAsFixed(2)} h',
+                                              style: TextStyle(fontSize: 16),
+                                            ),
+                                            Text('预计时间', style: TextStyle(color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(height: 16),
+                      ],
                     ]),
                   ),
                 ),
@@ -433,6 +444,19 @@ SizedBox(height: 16),
           );
         },
       ),
+      floatingActionButton: gpxFilePath != null
+          ? FloatingActionButton(
+              onPressed: () {
+                setState(() {
+                  isNavigationMode = !isNavigationMode;
+                });
+              },
+              child: Icon(isNavigationMode ? Icons.close : Icons.play_arrow),
+              backgroundColor: isNavigationMode ? Colors.red : Colors.blue,
+              foregroundColor: Colors.white,
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
