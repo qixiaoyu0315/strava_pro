@@ -331,46 +331,66 @@ class ElevationChart extends StatelessWidget {
                         tooltipMargin: 8,
                         getTooltipItems: (touchedSpots) {
                           return touchedSpots.map((spot) {
-                            int index = spot.x.round();
-                            if (index >= 0 && index < data.elevationPoints.length) {
-                              final pointData = data.elevationPoints[index];
-                              final gradientColor = _getGradientColor(pointData.gradient);
-                              final gradientText = _getGradientText(pointData.gradient);
-                              
-                              return LineTooltipItem(
-                                '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
-                                '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
-                                '坡度: $gradientText',
-                                TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                children: [
-                                  TextSpan(
-                                    text: '\n',
-                                  ),
-                                  TextSpan(
-                                    text: '●',
-                                    style: TextStyle(
-                                      color: gradientColor,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              );
+                            // 找到最接近的点
+                            int closestIndex = 0;
+                            double minDistance = double.infinity;
+                            
+                            for (int i = 0; i < data.points.length; i++) {
+                              final point = data.points[i];
+                              final distance = (point.x - spot.x).abs();
+                              if (distance < minDistance) {
+                                minDistance = distance;
+                                closestIndex = i;
+                              }
                             }
-                            return null;
+                            
+                            final pointData = data.elevationPoints[closestIndex];
+                            final gradientColor = _getGradientColor(pointData.gradient);
+                            final gradientText = _getGradientText(pointData.gradient);
+                            
+                            return LineTooltipItem(
+                              '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
+                              '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
+                              '坡度: $gradientText',
+                              TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: '\n',
+                                ),
+                                TextSpan(
+                                  text: '●',
+                                  style: TextStyle(
+                                    color: gradientColor,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            );
                           }).toList();
                         },
                       ),
                       touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
                         if (event is FlTapUpEvent && response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
                           final spot = response.lineBarSpots!.first;
-                          int index = spot.x.round();
-                          if (index >= 0 && index < data.elevationPoints.length) {
-                            final pointData = data.elevationPoints[index];
-                            onPointSelected?.call(pointData);
+                          
+                          // 找到最接近的点
+                          int closestIndex = 0;
+                          double minDistance = double.infinity;
+                          
+                          for (int i = 0; i < data.points.length; i++) {
+                            final point = data.points[i];
+                            final distance = (point.x - spot.x).abs();
+                            if (distance < minDistance) {
+                              minDistance = distance;
+                              closestIndex = i;
+                            }
                           }
+                          
+                          final pointData = data.elevationPoints[closestIndex];
+                          onPointSelected?.call(pointData);
                         }
                       },
                       handleBuiltInTouches: true,
