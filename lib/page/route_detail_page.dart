@@ -867,6 +867,39 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                           },
                         ),
                       ] else ...[
+                        // 地图组件
+                        Container(
+                          height: MediaQuery.of(context).size.height * 0.4,
+                          child: _buildMap(points, center),
+                        ),
+                        SizedBox(height: 16),
+                        // 海拔图
+                        if (elevationData != null)
+                          Container(
+                            height: 200,
+                            margin: EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(15),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(15),
+                              child: ElevationChart(
+                                data: elevationData!,
+                                onPointSelected: (point) {
+                                  selectedPoint.value = point.position;
+                                },
+                                currentSegmentIndex: null,
+                              ),
+                            ),
+                          ),
                         // 路线信息部分
                         Card(
                           elevation: 4,
