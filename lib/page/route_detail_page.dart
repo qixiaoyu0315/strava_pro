@@ -261,7 +261,30 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     }
     print('最小距离: $minDistance');
 
-    return minDistance <= 20; // 如果最小距离小于20米，返回true
+    return minDistance <= 50; // 如果最小距离小于20米，返回true
+  }
+
+  // 计算最近的路线点和对应的距离
+  (int, double)? _findNearestSegment(LatLng deviceLocation, List<LatLng> routePoints) {
+    if (routePoints.length < 2) return null;
+
+    double minDistance = double.infinity;
+    int nearestSegmentIndex = -1;
+
+    // 遍历所有相邻的路线点对
+    for (int i = 0; i < routePoints.length - 1; i++) {
+      double distance = _calculateDistanceToLine(
+        deviceLocation,
+        routePoints[i],
+        routePoints[i + 1]
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestSegmentIndex = i;
+      }
+    }
+
+    return (nearestSegmentIndex, minDistance);
   }
 
   Widget _buildMap(List<LatLng> points, LatLng center) {
@@ -415,6 +438,17 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             initialCenter = center;
           }
 
+          // 计算最近的路线段和距离
+          int? nearestSegmentIndex;
+          double? minDistance;
+          if (currentLocation != null && isNavigationMode) {
+            final result = _findNearestSegment(currentLocation!, points);
+            if (result != null) {
+              nearestSegmentIndex = result.$1;
+              minDistance = result.$2;
+            }
+          }
+
           return NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
               if (!isNavigationMode)
@@ -482,6 +516,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                           onPointSelected: (point) {
                             selectedPoint.value = point.position;
                           },
+                          currentSegmentIndex: minDistance != null && minDistance <= 50 ? nearestSegmentIndex : null,
                         ),
                       if (!isNavigationMode) ...[
                         SizedBox(height: 16),

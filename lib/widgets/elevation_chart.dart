@@ -105,11 +105,13 @@ class ElevationData {
 class ElevationChart extends StatelessWidget {
   final ElevationData data;
   final Function(ElevationPoint point)? onPointSelected;
+  final int? currentSegmentIndex;  // 添加当前段索引参数
 
   const ElevationChart({
     Key? key,
     required this.data,
     this.onPointSelected,
+    this.currentSegmentIndex,  // 添加到构造函数
   }) : super(key: key);
 
   Color _getGradientColor(double gradient) {
@@ -130,12 +132,6 @@ class ElevationChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 计算合适的横坐标刻度数量（约5-7个）
-    int numberOfLabels = 6;
-    double interval = data.totalDistance / (numberOfLabels - 1);
-    // 向上取整到0.5或1的倍数，使刻度更整齐
-    interval = (interval / 0.5).ceil() * 0.5;
-
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
@@ -177,7 +173,7 @@ class ElevationChart extends StatelessWidget {
                   show: true,
                   drawVerticalLine: true,
                   horizontalInterval: (data.maxElevation / 5).ceil() * 100,
-                  verticalInterval: interval,
+                  verticalInterval: data.totalDistance / 5,
                 ),
                 titlesData: FlTitlesData(
                   show: true,
@@ -188,16 +184,13 @@ class ElevationChart extends StatelessWidget {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                   bottomTitles: AxisTitles(
-                    // axisNameWidget: const Text('距离 (km)'),
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: interval,
+                      interval: data.totalDistance / 5,
                       getTitlesWidget: (value, meta) {
-                        // 对于起点和终点，显示完整数字
                         if (value == 0 || value >= data.totalDistance - 0.1) {
                           return Text('${value.toStringAsFixed(1)}');
                         }
-                        // 对于中间点，显示整数部分
                         return Text('${value.toInt()}');
                       },
                     ),
@@ -205,10 +198,9 @@ class ElevationChart extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: (data.maxElevation / 5).ceil() * 100,  // 将纵坐标分为5个区间
+                      interval: (data.maxElevation / 5).ceil() * 100,
                       reservedSize: 40,
                       getTitlesWidget: (value, meta) {
-                        // 只显示整百的刻度
                         if (value % 100 == 0) {
                           return Text('${value.toInt()}');
                         }
@@ -235,7 +227,32 @@ class ElevationChart extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary,
                     barWidth: 2,
                     isStrokeCapRound: true,
-                    dotData: const FlDotData(show: false),
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        Color color = Colors.transparent;
+                        double radius = 0;
+                        
+                        // 如果是当前段的点，显示绿色点
+                        if (currentSegmentIndex != null && index == currentSegmentIndex) {
+                          color = Colors.green;
+                          radius = 4;
+                          
+                          // 自动显示提示信息
+                          final pointData = data.elevationPoints[index];
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            onPointSelected?.call(pointData);
+                          });
+                        }
+                        
+                        return FlDotCirclePainter(
+                          radius: radius,
+                          color: color,
+                          strokeWidth: 2,
+                          strokeColor: color,
+                        );
+                      },
+                    ),
                     belowBarData: BarAreaData(
                       show: true,
                       color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
@@ -243,6 +260,7 @@ class ElevationChart extends StatelessWidget {
                   ),
                 ],
                 lineTouchData: LineTouchData(
+                  enabled: currentSegmentIndex == null, // 当显示当前位置时禁用触摸
                   touchTooltipData: LineTouchTooltipData(
                     tooltipRoundedRadius: 8,
                     tooltipPadding: const EdgeInsets.all(8),
@@ -253,65 +271,46 @@ class ElevationChart extends StatelessWidget {
                     tooltipMargin: 8,
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
-                        // 找到最接近的点位信息
-                        int closestIndex = 0;
-                        double minDistance = double.infinity;
-                        
-                        for (int i = 0; i < data.points.length; i++) {
-                          final point = data.points[i];
-                          final distance = (point.x - spot.x).abs();
-                          if (distance < minDistance) {
-                            minDistance = distance;
-                            closestIndex = i;
-                          }
-                        }
-                        
-                        final pointData = data.elevationPoints[closestIndex];
-                        final gradientColor = _getGradientColor(pointData.gradient);
-                        final gradientText = _getGradientText(pointData.gradient);
-                        
-                        return LineTooltipItem(
-                          '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
-                          '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
-                          '坡度: $gradientText',
-                          TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: '\n',
+                        int index = spot.x.round();
+                        if (index >= 0 && index < data.elevationPoints.length) {
+                          final pointData = data.elevationPoints[index];
+                          final gradientColor = _getGradientColor(pointData.gradient);
+                          final gradientText = _getGradientText(pointData.gradient);
+                          
+                          return LineTooltipItem(
+                            '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
+                            '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
+                            '坡度: $gradientText',
+                            TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
                             ),
-                            TextSpan(
-                              text: '●',
-                              style: TextStyle(
-                                color: gradientColor,
-                                fontSize: 16,
+                            children: [
+                              TextSpan(
+                                text: '\n',
                               ),
-                            ),
-                          ],
-                        );
+                              TextSpan(
+                                text: '●',
+                                style: TextStyle(
+                                  color: gradientColor,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                        return null;
                       }).toList();
                     },
                   ),
                   touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
                     if (event is FlTapUpEvent && response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
                       final spot = response.lineBarSpots!.first;
-                      // 找到最接近的点位信息
-                      int closestIndex = 0;
-                      double minDistance = double.infinity;
-                      
-                      for (int i = 0; i < data.points.length; i++) {
-                        final point = data.points[i];
-                        final distance = (point.x - spot.x).abs();
-                        if (distance < minDistance) {
-                          minDistance = distance;
-                          closestIndex = i;
-                        }
+                      int index = spot.x.round();
+                      if (index >= 0 && index < data.elevationPoints.length) {
+                        final pointData = data.elevationPoints[index];
+                        onPointSelected?.call(pointData);
                       }
-                      
-                      final pointData = data.elevationPoints[closestIndex];
-                      onPointSelected?.call(pointData);
                     }
                   },
                   handleBuiltInTouches: true,
