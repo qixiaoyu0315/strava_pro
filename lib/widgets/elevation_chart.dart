@@ -105,13 +105,13 @@ class ElevationData {
 class ElevationChart extends StatelessWidget {
   final ElevationData data;
   final Function(ElevationPoint point)? onPointSelected;
-  final int? currentSegmentIndex;  // 添加当前段索引参数
+  final int? currentSegmentIndex;
 
   const ElevationChart({
     Key? key,
     required this.data,
     this.onPointSelected,
-    this.currentSegmentIndex,  // 添加到构造函数
+    this.currentSegmentIndex,
   }) : super(key: key);
 
   Color _getGradientColor(double gradient) {
@@ -128,6 +128,71 @@ class ElevationChart extends StatelessWidget {
   String _getGradientText(double gradient) {
     if (gradient.abs() < 0.1) return '平路';
     return '${gradient.toStringAsFixed(1)}%';
+  }
+
+  Widget _buildTooltip(BuildContext context, ElevationPoint pointData) {
+    final gradientColor = _getGradientColor(pointData.gradient);
+    final gradientText = _getGradientText(pointData.gradient);
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '距离: ${pointData.distance.toStringAsFixed(1)} km',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            '海拔: ${pointData.elevation.toStringAsFixed(0)} m',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '坡度: $gradientText',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: gradientColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -167,155 +232,159 @@ class ElevationChart extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Expanded(
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  horizontalInterval: (data.maxElevation / 5).ceil() * 100,
-                  verticalInterval: data.totalDistance / 5,
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: data.totalDistance / 5,
-                      getTitlesWidget: (value, meta) {
-                        if (value == 0 || value >= data.totalDistance - 0.1) {
-                          return Text('${value.toStringAsFixed(1)}');
-                        }
-                        return Text('${value.toInt()}');
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: (data.maxElevation / 5).ceil() * 100,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) {
-                        if (value % 100 == 0) {
-                          return Text('${value.toInt()}');
-                        }
-                        return const SizedBox();
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(
-                  show: true,
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outline,
-                    width: 1,
-                  ),
-                ),
-                minX: 0,
-                maxX: data.totalDistance,
-                minY: 0,
-                maxY: (data.maxElevation / 100).ceil() * 100,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: data.points,
-                    isCurved: true,
-                    color: Theme.of(context).colorScheme.primary,
-                    barWidth: 2,
-                    isStrokeCapRound: true,
-                    dotData: FlDotData(
+            child: Stack(
+              children: [
+                LineChart(
+                  LineChartData(
+                    gridData: FlGridData(
                       show: true,
-                      getDotPainter: (spot, percent, barData, index) {
-                        Color color = Colors.transparent;
-                        double radius = 0;
-                        
-                        // 如果是当前段的点，显示绿色点
-                        if (currentSegmentIndex != null && index == currentSegmentIndex) {
-                          color = Colors.green;
-                          radius = 4;
-                          
-                          // 自动显示提示信息
-                          final pointData = data.elevationPoints[index];
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            onPointSelected?.call(pointData);
-                          });
-                        }
-                        
-                        return FlDotCirclePainter(
-                          radius: radius,
-                          color: color,
-                          strokeWidth: 2,
-                          strokeColor: color,
-                        );
-                      },
+                      drawVerticalLine: true,
+                      horizontalInterval: (data.maxElevation / 5).ceil() * 100,
+                      verticalInterval: data.totalDistance / 5,
                     ),
-                    belowBarData: BarAreaData(
+                    titlesData: FlTitlesData(
                       show: true,
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: data.totalDistance / 5,
+                          getTitlesWidget: (value, meta) {
+                            if (value == 0 || value >= data.totalDistance - 0.1) {
+                              return Text('${value.toStringAsFixed(1)}');
+                            }
+                            return Text('${value.toInt()}');
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          interval: (data.maxElevation / 5).ceil() * 100,
+                          reservedSize: 40,
+                          getTitlesWidget: (value, meta) {
+                            if (value % 100 == 0) {
+                              return Text('${value.toInt()}');
+                            }
+                            return const SizedBox();
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-                lineTouchData: LineTouchData(
-                  enabled: currentSegmentIndex == null, // 当显示当前位置时禁用触摸
-                  touchTooltipData: LineTouchTooltipData(
-                    tooltipRoundedRadius: 8,
-                    tooltipPadding: const EdgeInsets.all(8),
-                    tooltipBorder: BorderSide(
-                      color: Theme.of(context).colorScheme.outline,
-                      width: 1,
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1,
+                      ),
                     ),
-                    tooltipMargin: 8,
-                    getTooltipItems: (touchedSpots) {
-                      return touchedSpots.map((spot) {
-                        int index = spot.x.round();
-                        if (index >= 0 && index < data.elevationPoints.length) {
-                          final pointData = data.elevationPoints[index];
-                          final gradientColor = _getGradientColor(pointData.gradient);
-                          final gradientText = _getGradientText(pointData.gradient);
-                          
-                          return LineTooltipItem(
-                            '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
-                            '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
-                            '坡度: $gradientText',
-                            TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: '\n',
-                              ),
-                              TextSpan(
-                                text: '●',
-                                style: TextStyle(
-                                  color: gradientColor,
-                                  fontSize: 16,
+                    minX: 0,
+                    maxX: data.totalDistance,
+                    minY: 0,
+                    maxY: (data.maxElevation / 100).ceil() * 100,
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: data.points,
+                        isCurved: true,
+                        color: Theme.of(context).colorScheme.primary,
+                        barWidth: 2,
+                        isStrokeCapRound: true,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, barData, index) {
+                            Color color = Colors.transparent;
+                            double radius = 0;
+                            
+                            if (currentSegmentIndex != null && index == currentSegmentIndex) {
+                              color = Colors.green;
+                              radius = 4;
+                            }
+                            
+                            return FlDotCirclePainter(
+                              radius: radius,
+                              color: color,
+                              strokeWidth: 2,
+                              strokeColor: color,
+                            );
+                          },
+                        ),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                        ),
+                      ),
+                    ],
+                    lineTouchData: LineTouchData(
+                      enabled: currentSegmentIndex == null,
+                      touchTooltipData: LineTouchTooltipData(
+                        tooltipRoundedRadius: 8,
+                        tooltipPadding: const EdgeInsets.all(8),
+                        tooltipBorder: BorderSide(
+                          color: Theme.of(context).colorScheme.outline,
+                          width: 1,
+                        ),
+                        tooltipMargin: 8,
+                        getTooltipItems: (touchedSpots) {
+                          return touchedSpots.map((spot) {
+                            int index = spot.x.round();
+                            if (index >= 0 && index < data.elevationPoints.length) {
+                              final pointData = data.elevationPoints[index];
+                              final gradientColor = _getGradientColor(pointData.gradient);
+                              final gradientText = _getGradientText(pointData.gradient);
+                              
+                              return LineTooltipItem(
+                                '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
+                                '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
+                                '坡度: $gradientText',
+                                TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                            ],
-                          );
+                                children: [
+                                  TextSpan(
+                                    text: '\n',
+                                  ),
+                                  TextSpan(
+                                    text: '●',
+                                    style: TextStyle(
+                                      color: gradientColor,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return null;
+                          }).toList();
+                        },
+                      ),
+                      touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
+                        if (event is FlTapUpEvent && response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
+                          final spot = response.lineBarSpots!.first;
+                          int index = spot.x.round();
+                          if (index >= 0 && index < data.elevationPoints.length) {
+                            final pointData = data.elevationPoints[index];
+                            onPointSelected?.call(pointData);
+                          }
                         }
-                        return null;
-                      }).toList();
-                    },
+                      },
+                      handleBuiltInTouches: true,
+                    ),
                   ),
-                  touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
-                    if (event is FlTapUpEvent && response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
-                      final spot = response.lineBarSpots!.first;
-                      int index = spot.x.round();
-                      if (index >= 0 && index < data.elevationPoints.length) {
-                        final pointData = data.elevationPoints[index];
-                        onPointSelected?.call(pointData);
-                      }
-                    }
-                  },
-                  handleBuiltInTouches: true,
                 ),
-              ),
+                if (currentSegmentIndex != null && currentSegmentIndex! < data.elevationPoints.length)
+                  Positioned(
+                    left: (data.points[currentSegmentIndex!].x / data.totalDistance) * 
+                          (MediaQuery.of(context).size.width - 32),
+                    top: 0,
+                    child: _buildTooltip(context, data.elevationPoints[currentSegmentIndex!]),
+                  ),
+              ],
             ),
           ),
         ],
