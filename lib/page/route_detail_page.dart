@@ -11,6 +11,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/elevation_chart.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
@@ -23,23 +24,32 @@ class RouteDetailPage extends StatefulWidget {
 
 class _RouteDetailPageState extends State<RouteDetailPage> {
   final MapController _mapController = MapController();
-  LatLng? initialCenter; // 用于存储初始中心点
-  String? gpxFilePath; // 添加变量存储 GPX 文件路径
+  LatLng? initialCenter;
+  String? gpxFilePath;
   ElevationData? elevationData;
   final ValueNotifier<LatLng?> selectedPoint = ValueNotifier<LatLng?>(null);
-  bool isNavigationMode = false; // 添加导航模式状态
-  List<LatLng>? gpxPoints; // 存储GPX文件中的路线点
-  LatLng? currentLocation; // 添加当前位置变量
+  final ValueNotifier<LatLng?> currentLocation = ValueNotifier<LatLng?>(null);
+  final ValueNotifier<int?> currentSegmentIndex = ValueNotifier<int?>(null);
+  final ValueNotifier<double?> currentMinDistance = ValueNotifier<double?>(null);
+  bool isNavigationMode = false;
+  List<LatLng>? gpxPoints;
+  Timer? _locationTimer;
 
   @override
   void initState() {
     super.initState();
-    _checkExistingGPXFile(); // 添加检查文件的方法
+    _checkExistingGPXFile();
+    // 初始化时就请求位置权限
+    _checkLocationPermission();
   }
 
   @override
   void dispose() {
     selectedPoint.dispose();
+    currentLocation.dispose();
+    currentSegmentIndex.dispose();
+    currentMinDistance.dispose();
+    _stopLocationUpdates();
     super.dispose();
   }
 
@@ -165,51 +175,133 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     }
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _checkLocationPermission() async {
     try {
-      print('开始获取位置...');
-      // 检查位置权限
+      // 检查定位服务是否启用
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请开启定位服务')),
+        );
+        // 打开定位设置页面
+        await Geolocator.openLocationSettings();
+        return;
+      }
+
+      // 检查权限
       LocationPermission permission = await Geolocator.checkPermission();
-      print('当前位置权限状态: $permission');
-      
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        print('请求权限后的状态: $permission');
         if (permission == LocationPermission.denied) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要位置权限才能获取当前位置')),
+            const SnackBar(content: Text('需要定位权限才能获取位置')),
           );
           return;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('位置权限被永久拒绝，请在设置中开启')),
+          const SnackBar(content: Text('定位权限被永久拒绝，请在设置中开启')),
+        );
+        await Geolocator.openAppSettings();
+        return;
+      }
+    } catch (e) {
+      print('检查位置权限失败: $e');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      print('开始获取位置...');
+
+      // 再次检查定位服务是否启用
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请开启定位服务')),
         );
         return;
       }
 
-      // 获取当前位置
-      print('开始获取具体位置...');
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high
-      );
-      print('获取到的位置: 纬度=${position.latitude}, 经度=${position.longitude}');
-      
-      setState(() {
-        currentLocation = LatLng(position.latitude, position.longitude);
-      });
-      print('已更新当前位置标记');
+      // 首先尝试获取上次已知位置
+      Position? lastKnownPosition = await Geolocator.getLastKnownPosition();
+      if (lastKnownPosition != null) {
+        currentLocation.value = LatLng(lastKnownPosition.latitude, lastKnownPosition.longitude);
+        _mapController.move(currentLocation.value!, 15.0);
+        _updateCurrentSegment();
+        print('使用上次已知位置');
+      }
 
-      // 移动地图到当前位置
-      _mapController.move(currentLocation!, 15.0);
-      print('已将地图移动到当前位置');
+      // 使用位置流来获取位置更新
+      final LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.low,
+        distanceFilter: 5,
+      );
+
+      // 开始监听位置更新
+      Geolocator.getPositionStream(
+        locationSettings: locationSettings
+      ).listen(
+        (Position position) {
+          if (!mounted) return;
+          
+          print('获取到新位置，精度：${position.accuracy}米');
+          final newLocation = LatLng(position.latitude, position.longitude);
+          
+          // 如果是第一次获取位置，或者与上一次位置相差超过5米
+          if (currentLocation.value == null ||
+              Geolocator.distanceBetween(
+                currentLocation.value!.latitude,
+                currentLocation.value!.longitude,
+                position.latitude,
+                position.longitude
+              ) > 5) {
+            
+            currentLocation.value = newLocation;
+            
+            // 只有在距离变化较大时才移动地图
+            if (currentLocation.value == null ||
+                Geolocator.distanceBetween(
+                  currentLocation.value!.latitude,
+                  currentLocation.value!.longitude,
+                  position.latitude,
+                  position.longitude
+                ) > 20) {
+              _mapController.move(newLocation, 15.0);
+            }
+            
+            _updateCurrentSegment();
+          }
+        },
+        onError: (error) {
+          print('位置流错误: $error');
+          // 如果是权限错误，提示用户
+          if (error is LocationServiceDisabledException) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('请开启定位服务')),
+            );
+          }
+        },
+        cancelOnError: false,
+      );
+
     } catch (e) {
       print('获取位置失败: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('获取位置失败: $e')),
       );
+    }
+  }
+
+  void _updateCurrentSegment() {
+    if (currentLocation.value != null && gpxPoints != null) {
+      final result = _findNearestSegment(currentLocation.value!, gpxPoints!);
+      if (result != null) {
+        currentSegmentIndex.value = result.$1;
+        currentMinDistance.value = result.$2;
+      }
     }
   }
 
@@ -288,13 +380,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   }
 
   Widget _buildMap(List<LatLng> points, LatLng center) {
-    final displayPoints = isNavigationMode && gpxPoints != null ? gpxPoints! : points;
-    final bool isNearRoute = currentLocation != null ? 
-        _isNearRoute(currentLocation!, displayPoints) : false;
-    
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
-      child: displayPoints.isNotEmpty
+      child: points.isNotEmpty
           ? FlutterMap(
               mapController: _mapController,
               options: MapOptions(
@@ -303,15 +391,14 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: const ['a', 'b', 'c'],
                   userAgentPackageName: 'com.example.app',
                 ),
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: displayPoints,
+                      points: points,
                       strokeWidth: 4.0,
                       color: Colors.blue,
                     ),
@@ -319,59 +406,59 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 ),
                 MarkerLayer(
                   markers: [
-                    // 起点标记
                     Marker(
-                      point: displayPoints.first,
-                      child: Icon(
-                        Icons.location_on,
-                        color: Colors.green,
-                        size: 40.0,
-                      ),
+                      point: points.first,
+                      child: Icon(Icons.location_on, color: Colors.green, size: 40.0),
                     ),
-                    // 终点标记
                     Marker(
-                      point: displayPoints.last,
-                      child: Icon(
-                        Icons.flag,
-                        color: Colors.red,
-                        size: 40.0,
-                      ),
+                      point: points.last,
+                      child: Icon(Icons.flag, color: Colors.red, size: 40.0),
                     ),
-                    // 当前位置标记
-                    if (currentLocation != null)
-                      Marker(
-                        point: currentLocation!,
-                        child: Container(
-                          height: 32,
-                          width: 32,
-                          alignment: Alignment.center,
-                          child: Stack(
+                  ],
+                ),
+                ValueListenableBuilder<LatLng?>(
+                  valueListenable: currentLocation,
+                  builder: (context, location, child) {
+                    if (location == null) return const SizedBox();
+                    final isNearRoute = gpxPoints != null ? 
+                        _isNearRoute(location, gpxPoints!) : false;
+                    return MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: location,
+                          child: Container(
+                            height: 32,
+                            width: 32,
                             alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isNearRoute ? Colors.green : Colors.red,
-                                    width: 3,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (isNearRoute ? Colors.green : Colors.red).withOpacity(0.3),
-                                      spreadRadius: 4,
-                                      blurRadius: 4,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isNearRoute ? Colors.green : Colors.red,
+                                      width: 3,
                                     ),
-                                  ],
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (isNearRoute ? Colors.green : Colors.red).withOpacity(0.3),
+                                        spreadRadius: 4,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 ValueListenableBuilder<LatLng?>(
                   valueListenable: selectedPoint,
@@ -381,11 +468,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                       markers: [
                         Marker(
                           point: point,
-                          child: Icon(
-                            Icons.location_on,
-                            color: Colors.orange,
-                            size: 40.0,
-                          ),
+                          child: Icon(Icons.location_on, color: Colors.orange, size: 40.0),
                         ),
                       ],
                     );
@@ -395,6 +478,18 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             )
           : Center(child: Text('没有可用的路线数据')),
     );
+  }
+
+  void _startLocationUpdates() {
+    // 不再需要定时器，因为我们使用位置流来更新位置
+    _locationTimer?.cancel();
+    _locationTimer = null;
+    _getCurrentLocation();
+  }
+
+  void _stopLocationUpdates() {
+    _locationTimer?.cancel();
+    _locationTimer = null;
   }
 
   @override
@@ -412,41 +507,22 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           }
 
           final routeData = snapshot.data!;
-
           List<LatLng> points = [];
           if (routeData.map?.summaryPolyline != null) {
             PolylinePoints polylinePoints = PolylinePoints();
-            List<PointLatLng> result =
-                polylinePoints.decodePolyline(routeData.map!.summaryPolyline!);
-            points = result
-                .map((point) => LatLng(point.latitude, point.longitude))
-                .toList();
+            List<PointLatLng> result = polylinePoints.decodePolyline(routeData.map!.summaryPolyline!);
+            points = result.map((point) => LatLng(point.latitude, point.longitude)).toList();
           }
 
-          // 计算地图的中心点
           LatLng center = points.isNotEmpty
               ? LatLng(
-                  points.map((p) => p.latitude).reduce((a, b) => a + b) /
-                      points.length,
-                  points.map((p) => p.longitude).reduce((a, b) => a + b) /
-                      points.length,
+                  points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
+                  points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
                 )
-              : LatLng(39.9042, 116.4074); // 默认位置（北京）
+              : LatLng(39.9042, 116.4074);
 
-          // 设置初始中心点
           if (initialCenter == null) {
             initialCenter = center;
-          }
-
-          // 计算最近的路线段和距离
-          int? nearestSegmentIndex;
-          double? minDistance;
-          if (currentLocation != null && isNavigationMode) {
-            final result = _findNearestSegment(currentLocation!, points);
-            if (result != null) {
-              nearestSegmentIndex = result.$1;
-              minDistance = result.$2;
-            }
           }
 
           return NestedScrollView(
@@ -467,56 +543,26 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                     delegate: SliverChildListDelegate([
                       Container(
                         height: isNavigationMode ? MediaQuery.of(context).size.height * 0.6 : 300,
-                        child: Stack(
-                          children: [
-                            _buildMap(points, center),
-                            Positioned(
-                              right: 16,
-                              bottom: 16,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (!isNavigationMode) ...[
-                                    FloatingActionButton(
-                                      heroTag: 'return_start',
-                                      mini: true,
-                                      onPressed: () {
-                                        if (points.isNotEmpty) {
-                                          _mapController.move(points.first, 15.0);
-                                        }
-                                      },
-                                      child: Icon(Icons.my_location),
-                                      backgroundColor: Colors.white,
-                                      foregroundColor: Colors.blue,
-                                    ),
-                                    SizedBox(height: 8),
-                                    FloatingActionButton(
-                                      heroTag: 'reset_map',
-                                      mini: true,
-                                      onPressed: () {
-                                        if (initialCenter != null) {
-                                          _mapController.move(initialCenter!, 8.0);
-                                        }
-                                      },
-                                      child: Icon(Icons.refresh),
-                                      backgroundColor: Colors.white,
-                                      foregroundColor: Colors.blue,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: _buildMap(points, center),
                       ),
                       SizedBox(height: 16),
                       if (elevationData != null)
-                        ElevationChart(
-                          data: elevationData!,
-                          onPointSelected: (point) {
-                            selectedPoint.value = point.position;
+                        ValueListenableBuilder<int?>(
+                          valueListenable: currentSegmentIndex,
+                          builder: (context, segmentIndex, child) {
+                            return ValueListenableBuilder<double?>(
+                              valueListenable: currentMinDistance,
+                              builder: (context, minDistance, child) {
+                                return ElevationChart(
+                                  data: elevationData!,
+                                  onPointSelected: (point) {
+                                    selectedPoint.value = point.position;
+                                  },
+                                  currentSegmentIndex: minDistance != null && minDistance <= 50 ? segmentIndex : null,
+                                );
+                              },
+                            );
                           },
-                          currentSegmentIndex: minDistance != null && minDistance <= 50 ? nearestSegmentIndex : null,
                         ),
                       if (!isNavigationMode) ...[
                         SizedBox(height: 16),
@@ -624,7 +670,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 setState(() {
                   isNavigationMode = !isNavigationMode;
                   if (isNavigationMode) {
-                    _getCurrentLocation(); // 在进入导航模式时获取位置
+                    _getCurrentLocation();
+                    _startLocationUpdates();
+                  } else {
+                    _stopLocationUpdates();
                   }
                 });
               },
