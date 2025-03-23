@@ -320,7 +320,7 @@ class ElevationChart extends StatelessWidget {
                       ),
                     ],
                     lineTouchData: LineTouchData(
-                      enabled: currentSegmentIndex == null,
+                      enabled: true,
                       touchTooltipData: LineTouchTooltipData(
                         tooltipRoundedRadius: 8,
                         tooltipPadding: const EdgeInsets.all(8),
@@ -400,7 +400,7 @@ class ElevationChart extends StatelessWidget {
                 if (currentSegmentIndex != null && currentSegmentIndex! < data.elevationPoints.length)
                   Positioned(
                     left: (data.points[currentSegmentIndex!].x / data.totalDistance) * 
-                          (MediaQuery.of(context).size.width - 32),
+                          (MediaQuery.of(context).size.width - 32 - 32),
                     top: 0,
                     child: _buildTooltip(context, data.elevationPoints[currentSegmentIndex!]),
                   ),
