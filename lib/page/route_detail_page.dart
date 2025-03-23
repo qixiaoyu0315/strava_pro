@@ -34,6 +34,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   bool isNavigationMode = false;
   List<LatLng>? gpxPoints;
   Timer? _locationTimer;
+  final ValueNotifier<Position?> currentPosition = ValueNotifier<Position?>(null);
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     currentLocation.dispose();
     currentSegmentIndex.dispose();
     currentMinDistance.dispose();
+    currentPosition.dispose();
     _stopLocationUpdates();
     super.dispose();
   }
@@ -248,9 +250,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           if (!mounted) return;
           
           print('获取到新位置，精度：${position.accuracy}米');
+          currentPosition.value = position;  // 更新位置信息
           final newLocation = LatLng(position.latitude, position.longitude);
           
-          // 如果是第一次获取位置，或者与上一次位置相差超过5米
           if (currentLocation.value == null ||
               Geolocator.distanceBetween(
                 currentLocation.value!.latitude,
@@ -258,26 +260,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 position.latitude,
                 position.longitude
               ) > 5) {
-            
             currentLocation.value = newLocation;
-            
-            // 只有在距离变化较大时才移动地图
-            if (currentLocation.value == null ||
-                Geolocator.distanceBetween(
-                  currentLocation.value!.latitude,
-                  currentLocation.value!.longitude,
-                  position.latitude,
-                  position.longitude
-                ) > 20) {
-              _mapController.move(newLocation, 15.0);
-            }
-            
             _updateCurrentSegment();
           }
         },
         onError: (error) {
           print('位置流错误: $error');
-          // 如果是权限错误，提示用户
           if (error is LocationServiceDisabledException) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('请开启定位服务')),
@@ -492,6 +480,40 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     _locationTimer = null;
   }
 
+  // 添加计算坡度的方法
+  double? _calculateCurrentGradient() {
+    if (currentSegmentIndex.value == null || elevationData == null) return null;
+    final points = elevationData!.elevationPoints;
+    final index = currentSegmentIndex.value!;
+    if (index >= points.length - 1) return null;
+
+    final point1 = points[index];
+    final point2 = points[index + 1];
+    
+    final elevationDiff = point2.elevation - point1.elevation;
+    final distance = Geolocator.distanceBetween(
+      point1.position.latitude,
+      point1.position.longitude,
+      point2.position.latitude,
+      point2.position.longitude
+    );
+    
+    if (distance == 0) return 0;
+    return (elevationDiff / distance) * 100; // 转换为百分比
+  }
+
+  // 添加坡度颜色计算方法
+  Color _getGradientColor(double gradient) {
+    if (gradient > 15) return Colors.red;
+    if (gradient > 10) return Colors.orange;
+    if (gradient > 5) return Colors.yellow.shade800;
+    if (gradient > 0) return Colors.green;
+    if (gradient < -15) return Colors.purple;
+    if (gradient < -10) return Colors.blue;
+    if (gradient < -5) return Colors.lightBlue;
+    return Colors.blue.shade200;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -545,6 +567,92 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                         height: isNavigationMode ? MediaQuery.of(context).size.height * 0.6 : 300,
                         child: _buildMap(points, center),
                       ),
+                      if (isNavigationMode)
+                        ValueListenableBuilder<Position?>(
+                          valueListenable: currentPosition,
+                          builder: (context, position, child) {
+                            final gradient = _calculateCurrentGradient();
+                            return Container(
+                              margin: EdgeInsets.symmetric(vertical: 8),
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(15),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  // 海拔信息
+                                  Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.height, color: Colors.blue),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            '海拔',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  // 分隔线
+                                  Container(
+                                    height: 40,
+                                    width: 1,
+                                    color: Colors.grey.withOpacity(0.3),
+                                  ),
+                                  // 坡度信息
+                                  Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.trending_up, color: Colors.orange),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            '坡度',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        gradient != null ? '${gradient.toStringAsFixed(1)}%' : '--',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: gradient != null ? _getGradientColor(gradient) : Colors.black,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       SizedBox(height: 16),
                       if (elevationData != null)
                         ValueListenableBuilder<int?>(
