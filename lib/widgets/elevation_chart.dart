@@ -239,7 +239,7 @@ class ElevationChart extends StatelessWidget {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: true,
-                      horizontalInterval: (data.maxElevation / 5).ceil() * 100,
+                      horizontalInterval: (data.maxElevation + 10) / 5,
                       verticalInterval: data.totalDistance / 5,
                     ),
                     titlesData: FlTitlesData(
@@ -265,13 +265,10 @@ class ElevationChart extends StatelessWidget {
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: (data.maxElevation / 5).ceil() * 100,
+                          interval: (data.maxElevation + 10) / 5,
                           reservedSize: 40,
                           getTitlesWidget: (value, meta) {
-                            if (value % 100 == 0) {
-                              return Text('${value.toInt()}');
-                            }
-                            return const SizedBox();
+                            return Text('${value.toInt()}');
                           },
                         ),
                       ),
@@ -286,7 +283,7 @@ class ElevationChart extends StatelessWidget {
                     minX: 0,
                     maxX: data.totalDistance,
                     minY: 0,
-                    maxY: (data.maxElevation / 100).ceil() * 100,
+                    maxY: data.maxElevation + 10,
                     lineBarsData: [
                       LineChartBarData(
                         spots: data.points,
