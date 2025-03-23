@@ -32,7 +32,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   final ValueNotifier<double?> currentMinDistance = ValueNotifier<double?>(null);
   bool isNavigationMode = false;
   List<LatLng>? gpxPoints;
-  Timer? _locationTimer;
+  StreamSubscription<Position>? _positionStreamSubscription;
   final ValueNotifier<Position?> currentPosition = ValueNotifier<Position?>(null);
 
   @override
@@ -45,12 +45,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
   @override
   void dispose() {
+    _positionStreamSubscription?.cancel();
     selectedPoint.dispose();
     currentLocation.dispose();
     currentSegmentIndex.dispose();
     currentMinDistance.dispose();
     currentPosition.dispose();
-    _stopLocationUpdates();
     super.dispose();
   }
 
@@ -176,6 +176,51 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     }
   }
 
+  void _startLocationUpdates() {
+    print('开始位置更新服务...');
+    _stopLocationUpdates();
+
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5, // 每移动5米更新一次
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen(
+      (Position position) {
+        if (!mounted) return;
+        
+        print('获取到新位置 - '
+              '位置: ${position.latitude}, ${position.longitude}, '
+              '精度: ${position.accuracy}米, '
+              '海拔: ${position.altitude}米, '
+              '速度: ${position.speed}m/s');
+        
+        currentPosition.value = position;
+        currentLocation.value = LatLng(position.latitude, position.longitude);
+        _updateCurrentSegment();
+        
+        // _showToast('GPS已更新 - 精度: ${position.accuracy.toStringAsFixed(1)}米');
+      },
+      onError: (error) {
+        print('位置流错误: $error');
+        if (error is LocationServiceDisabledException) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请开启定位服务')),
+          );
+        }
+      },
+      cancelOnError: false,
+    );
+  }
+
+  void _stopLocationUpdates() {
+    print('停止位置更新服务...');
+    _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
+  }
+
   Future<void> _checkLocationPermission() async {
     try {
       // 检查定位服务是否启用
@@ -184,7 +229,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('请开启定位服务')),
         );
-        // 打开定位设置页面
         await Geolocator.openLocationSettings();
         return;
       }
@@ -208,77 +252,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         await Geolocator.openAppSettings();
         return;
       }
+
+      // 权限获取成功后，开始位置更新
+      _startLocationUpdates();
     } catch (e) {
       print('检查位置权限失败: $e');
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    try {
-      print('开始获取位置...');
-
-      // 再次检查定位服务是否启用
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请开启定位服务')),
-        );
-        return;
-      }
-
-      // 首先尝试获取上次已知位置
-      Position? lastKnownPosition = await Geolocator.getLastKnownPosition();
-      if (lastKnownPosition != null) {
-        currentLocation.value = LatLng(lastKnownPosition.latitude, lastKnownPosition.longitude);
-        _mapController.move(currentLocation.value!, 15.0);
-        _updateCurrentSegment();
-        print('使用上次已知位置');
-      }
-
-      // 使用位置流来获取位置更新
-      final LocationSettings locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.low,
-        distanceFilter: 5,
-      );
-
-      // 开始监听位置更新
-      Geolocator.getPositionStream(
-        locationSettings: locationSettings
-      ).listen(
-        (Position position) {
-          if (!mounted) return;
-          
-          print('获取到新位置，精度：${position.accuracy}米');
-          currentPosition.value = position;  // 更新位置信息
-          final newLocation = LatLng(position.latitude, position.longitude);
-          
-          if (currentLocation.value == null ||
-              Geolocator.distanceBetween(
-                currentLocation.value!.latitude,
-                currentLocation.value!.longitude,
-                position.latitude,
-                position.longitude
-              ) > 5) {
-            currentLocation.value = newLocation;
-            _updateCurrentSegment();
-          }
-        },
-        onError: (error) {
-          print('位置流错误: $error');
-          if (error is LocationServiceDisabledException) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('请开启定位服务')),
-            );
-          }
-        },
-        cancelOnError: false,
-      );
-
-    } catch (e) {
-      print('获取位置失败: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('获取位置失败: $e')),
-      );
     }
   }
 
@@ -467,18 +445,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  void _startLocationUpdates() {
-    // 不再需要定时器，因为我们使用位置流来更新位置
-    _locationTimer?.cancel();
-    _locationTimer = null;
-    _getCurrentLocation();
-  }
-
-  void _stopLocationUpdates() {
-    _locationTimer?.cancel();
-    _locationTimer = null;
-  }
-
   // 添加计算坡度的方法
   double? _calculateCurrentGradient() {
     if (currentSegmentIndex.value == null || elevationData == null) return null;
@@ -526,6 +492,38 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       if (gradient < -5) return Colors.lightBlue;
       return Colors.blue.shade200;
     }
+  }
+
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.gps_fixed, color: Colors.white, size: 16),
+              SizedBox(width: 8),
+              Text(message),
+            ],
+          ),
+        ),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.black87,
+        margin: EdgeInsets.symmetric(
+          horizontal: MediaQuery.of(context).size.width * 0.2,
+          vertical: 100,
+        ),
+        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(25),
+        ),
+        dismissDirection: DismissDirection.horizontal,
+      ),
+    );
   }
 
   @override
@@ -1033,7 +1031,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 setState(() {
                   isNavigationMode = !isNavigationMode;
                   if (isNavigationMode) {
-                    _getCurrentLocation();
                     _startLocationUpdates();
                   } else {
                     _stopLocationUpdates();
