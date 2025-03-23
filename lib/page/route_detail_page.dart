@@ -197,10 +197,31 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               '速度: ${position.speed}m/s');
         
         currentPosition.value = position;
-        currentLocation.value = LatLng(position.latitude, position.longitude);
+        final newLocation = LatLng(position.latitude, position.longitude);
+        currentLocation.value = newLocation;
         _updateCurrentSegment();
-        
-        // _showToast('GPS已更新 - 精度: ${position.accuracy.toStringAsFixed(1)}米');
+
+        // 检查新位置是否在地图视野内
+        if (isNavigationMode) {
+          final bounds = _mapController.camera.visibleBounds;
+          if (bounds != null) {
+            // 计算设备位置到视野边缘的距离比例
+            final distanceToEdge = _calculateDistanceToEdge(newLocation, bounds);
+            
+            // 如果距离边缘太近或已经超出视野，移动地图
+            if (distanceToEdge < 0.2 || !_isLocationInBounds(newLocation, bounds)) {
+              // 计算新的地图中心点，稍微向前偏移以显示更多前方区域
+              final bearing = position.heading;
+              final offset = _calculateMapOffset(newLocation, bearing);
+              
+              _mapController.move(
+                offset,
+                _mapController.camera.zoom,
+                offset: Offset(0, -0.3), // 稍微向上偏移以显示更多前方区域
+              );
+            }
+          }
+        }
       },
       onError: (error) {
         print('位置流错误: $error');
@@ -560,6 +581,49 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     final latDiff = (max - min).abs();
     final zoom = math.log(360.0 * screenSize / (latDiff * 256.0)) / math.ln2;
     return zoom;
+  }
+
+  // 计算位置到地图视野边缘的最小距离比例
+  double _calculateDistanceToEdge(LatLng location, LatLngBounds bounds) {
+    final latRatio = math.min(
+      (location.latitude - bounds.south) / (bounds.north - bounds.south),
+      (bounds.north - location.latitude) / (bounds.north - bounds.south)
+    );
+    
+    final lngRatio = math.min(
+      (location.longitude - bounds.west) / (bounds.east - bounds.west),
+      (bounds.east - location.longitude) / (bounds.east - bounds.west)
+    );
+    
+    return math.min(latRatio, lngRatio);
+  }
+
+  // 根据设备朝向计算地图偏移中心点
+  LatLng _calculateMapOffset(LatLng location, double bearing) {
+    // 计算前方偏移距离（米）
+    const offsetDistance = 100.0; // 100米
+    
+    // 将偏移距离和方向转换为坐标偏移
+    final radiusBearing = (bearing * math.pi) / 180;
+    final latOffset = math.cos(radiusBearing) * offsetDistance / 111320.0; // 约111.32km = 1度纬度
+    final lngOffset = math.sin(radiusBearing) * offsetDistance / (111320.0 * math.cos(location.latitude * math.pi / 180));
+    
+    return LatLng(
+      location.latitude + latOffset,
+      location.longitude + lngOffset
+    );
+  }
+
+  // 检查位置是否在地图视野范围内
+  bool _isLocationInBounds(LatLng location, LatLngBounds bounds) {
+    final padding = 0.1; // 添加10%的边距判断
+    final latRange = bounds.north - bounds.south;
+    final lngRange = bounds.east - bounds.west;
+    
+    return location.latitude <= (bounds.north - latRange * padding) &&
+           location.latitude >= (bounds.south + latRange * padding) &&
+           location.longitude <= (bounds.east - lngRange * padding) &&
+           location.longitude >= (bounds.west + lngRange * padding);
   }
 
   @override
