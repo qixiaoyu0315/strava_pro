@@ -5,6 +5,7 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import '../service/strava_client_manager.dart';
 import 'package:strava_client/strava_client.dart' as strava;
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -39,8 +40,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   void initState() {
     super.initState();
     _checkExistingGPXFile();
-    // 初始化时就请求位置权限
-    _checkLocationPermission();
   }
 
   @override
@@ -353,6 +352,36 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               options: MapOptions(
                 initialCenter: center,
                 initialZoom: 8.0,
+                onMapReady: () {
+                  // 计算路线的边界
+                  double minLat = points.map((p) => p.latitude).reduce(math.min);
+                  double maxLat = points.map((p) => p.latitude).reduce(math.max);
+                  double minLng = points.map((p) => p.longitude).reduce(math.min);
+                  double maxLng = points.map((p) => p.longitude).reduce(math.max);
+
+                  // 创建边界矩形并添加边距
+                  final bounds = LatLngBounds.fromPoints([
+                    LatLng(minLat - 0.02, minLng - 0.02),
+                    LatLng(maxLat + 0.02, maxLng + 0.02)
+                  ]);
+
+                  // 调整地图以适应边界
+                  Future.delayed(Duration(milliseconds: 100), () {
+                    _mapController.move(
+                      bounds.center,
+                      _mapController.camera.zoom,
+                    );
+                    
+                    // 计算合适的缩放级别
+                    final latZoom = _calculateZoomLevel(bounds.south, bounds.north, MediaQuery.of(context).size.height);
+                    final lngZoom = _calculateZoomLevel(bounds.west, bounds.east, MediaQuery.of(context).size.width);
+                    
+                    _mapController.move(
+                      bounds.center,
+                      math.min(latZoom, lngZoom) - 0.5, // 减少0.5级缩放以留出边距
+                    );
+                  });
+                },
               ),
               children: [
                 TileLayer(
@@ -524,6 +553,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         dismissDirection: DismissDirection.horizontal,
       ),
     );
+  }
+
+  // 添加计算缩放级别的辅助方法
+  double _calculateZoomLevel(double min, double max, double screenSize) {
+    final latDiff = (max - min).abs();
+    final zoom = math.log(360.0 * screenSize / (latDiff * 256.0)) / math.ln2;
+    return zoom;
   }
 
   @override
@@ -1027,15 +1063,17 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       ),
       floatingActionButton: gpxFilePath != null
           ? FloatingActionButton(
-              onPressed: () {
+              onPressed: () async {
                 setState(() {
                   isNavigationMode = !isNavigationMode;
-                  if (isNavigationMode) {
-                    _startLocationUpdates();
-                  } else {
-                    _stopLocationUpdates();
-                  }
                 });
+                
+                if (isNavigationMode) {
+                  // 进入导航模式时检查权限并开始位置更新
+                  await _checkLocationPermission();
+                } else {
+                  _stopLocationUpdates();
+                }
               },
               child: Icon(isNavigationMode ? Icons.close : Icons.navigation),
               backgroundColor: isNavigationMode ? Colors.red : Colors.blue,
