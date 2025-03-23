@@ -15,7 +15,6 @@ import 'dart:async';
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
-
   const RouteDetailPage({Key? key, required this.idStr}) : super(key: key);
 
   @override
@@ -673,7 +672,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                           
                                                           children: [
                                                             Icon(Icons.trending_up,
-                                                              color: Theme.of(context).colorScheme.secondary,
+                                                              color: Theme.of(context).colorScheme.primary,
                                                               size: 20
                                                             ),
                                                             SizedBox(width: 6),

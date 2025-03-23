@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:xml/xml.dart';
 import 'package:great_circle_distance_calculator/great_circle_distance_calculator.dart';
 import 'dart:io';
+import 'dart:async';
 
 class ElevationPoint {
   final double distance;  // 距离（公里）
@@ -102,7 +103,7 @@ class ElevationData {
   }
 }
 
-class ElevationChart extends StatelessWidget {
+class ElevationChart extends StatefulWidget {
   final ElevationData data;
   final Function(ElevationPoint point)? onPointSelected;
   final int? currentSegmentIndex;
@@ -114,15 +115,65 @@ class ElevationChart extends StatelessWidget {
     this.currentSegmentIndex,
   }) : super(key: key);
 
+  @override
+  State<ElevationChart> createState() => _ElevationChartState();
+}
+
+class _ElevationChartState extends State<ElevationChart> {
+  Timer? _tooltipTimer;
+  bool _showTooltip = false;
+  int? _lastSegmentIndex;
+
+  @override
+  void dispose() {
+    _tooltipTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(ElevationChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当位置发生变化时重置计时器
+    if (widget.currentSegmentIndex != _lastSegmentIndex && widget.currentSegmentIndex != null) {
+      _lastSegmentIndex = widget.currentSegmentIndex;
+      setState(() {
+        _showTooltip = true;
+      });
+      _tooltipTimer?.cancel();
+      _tooltipTimer = Timer(Duration(seconds: 5), () {
+        if (mounted) {
+          setState(() {
+            _showTooltip = false;
+          });
+        }
+      });
+    }
+  }
+
   Color _getGradientColor(double gradient) {
-    if (gradient > 10) return Colors.red;
-    if (gradient > 6) return Colors.orange;
-    if (gradient > 3) return Colors.yellow;
-    if (gradient > 0) return Colors.green;
-    if (gradient < -10) return Colors.purple;
-    if (gradient < -6) return Colors.blue;
-    if (gradient < -3) return Colors.lightBlue;
-    return Colors.green;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    if (isDarkMode) {
+      // 夜间模式下的颜色
+      if (gradient > 15) return Color(0xFFFF5252);      // 深红色
+      if (gradient > 10) return Color(0xFFFFB74D);      // 深橙色
+      if (gradient > 5) return Color(0xFFFFEB3B);       // 深黄色
+      if (gradient > 0) return Color(0xFF66BB6A);       // 深绿色
+      if (gradient < -15) return Color(0xFFE040FB);     // 深紫色
+      if (gradient < -10) return Color(0xFF448AFF);     // 深蓝色
+      if (gradient < -5) return Color(0xFF40C4FF);      // 浅蓝色
+      return Color(0xFF81D4FA);                         // 最浅蓝色
+    } else {
+      // 日间模式下的颜色
+      if (gradient > 15) return Colors.red;
+      if (gradient > 10) return Colors.orange;
+      if (gradient > 5) return Colors.yellow.shade800;
+      if (gradient > 0) return Colors.green;
+      if (gradient < -15) return Colors.purple;
+      if (gradient < -10) return Colors.blue;
+      if (gradient < -5) return Colors.lightBlue;
+      return Colors.blue.shade200;
+    }
   }
 
   String _getGradientText(double gradient) {
@@ -222,7 +273,7 @@ class ElevationChart extends StatelessWidget {
                 ),
               ),
               Text(
-                '总距离: ${data.totalDistance.toStringAsFixed(2)}km',
+                '总距离: ${widget.data.totalDistance.toStringAsFixed(2)}km',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 12,
@@ -239,8 +290,8 @@ class ElevationChart extends StatelessWidget {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: true,
-                      horizontalInterval: (data.maxElevation + 10) / 5,
-                      verticalInterval: data.totalDistance / 5,
+                      horizontalInterval: (widget.data.maxElevation + 10) / 5,
+                      verticalInterval: widget.data.totalDistance / 5,
                     ),
                     titlesData: FlTitlesData(
                       show: true,
@@ -253,9 +304,9 @@ class ElevationChart extends StatelessWidget {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: data.totalDistance / 5,
+                          interval: widget.data.totalDistance / 5,
                           getTitlesWidget: (value, meta) {
-                            if (value == 0 || value >= data.totalDistance - 0.1) {
+                            if (value == 0 || value >= widget.data.totalDistance - 0.1) {
                               return Text('${value.toStringAsFixed(1)}');
                             }
                             return Text('${value.toInt()}');
@@ -265,7 +316,7 @@ class ElevationChart extends StatelessWidget {
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: (data.maxElevation + 10) / 5,
+                          interval: (widget.data.maxElevation + 10) / 5,
                           reservedSize: 40,
                           getTitlesWidget: (value, meta) {
                             return Text('${value.toInt()}');
@@ -281,12 +332,12 @@ class ElevationChart extends StatelessWidget {
                       ),
                     ),
                     minX: 0,
-                    maxX: data.totalDistance,
+                    maxX: widget.data.totalDistance,
                     minY: 0,
-                    maxY: data.maxElevation + 10,
+                    maxY: widget.data.maxElevation + 10,
                     lineBarsData: [
                       LineChartBarData(
-                        spots: data.points,
+                        spots: widget.data.points,
                         isCurved: true,
                         color: Theme.of(context).colorScheme.primary,
                         barWidth: 2,
@@ -297,7 +348,7 @@ class ElevationChart extends StatelessWidget {
                             Color color = Colors.transparent;
                             double radius = 0;
                             
-                            if (currentSegmentIndex != null && index == currentSegmentIndex) {
+                            if (widget.currentSegmentIndex != null && index == widget.currentSegmentIndex) {
                               color = Colors.green;
                               radius = 4;
                             }
@@ -332,8 +383,8 @@ class ElevationChart extends StatelessWidget {
                             int closestIndex = 0;
                             double minDistance = double.infinity;
                             
-                            for (int i = 0; i < data.points.length; i++) {
-                              final point = data.points[i];
+                            for (int i = 0; i < widget.data.points.length; i++) {
+                              final point = widget.data.points[i];
                               final distance = (point.x - spot.x).abs();
                               if (distance < minDistance) {
                                 minDistance = distance;
@@ -341,7 +392,7 @@ class ElevationChart extends StatelessWidget {
                               }
                             }
                             
-                            final pointData = data.elevationPoints[closestIndex];
+                            final pointData = widget.data.elevationPoints[closestIndex];
                             final gradientColor = _getGradientColor(pointData.gradient);
                             final gradientText = _getGradientText(pointData.gradient);
                             
@@ -377,8 +428,8 @@ class ElevationChart extends StatelessWidget {
                           int closestIndex = 0;
                           double minDistance = double.infinity;
                           
-                          for (int i = 0; i < data.points.length; i++) {
-                            final point = data.points[i];
+                          for (int i = 0; i < widget.data.points.length; i++) {
+                            final point = widget.data.points[i];
                             final distance = (point.x - spot.x).abs();
                             if (distance < minDistance) {
                               minDistance = distance;
@@ -386,20 +437,22 @@ class ElevationChart extends StatelessWidget {
                             }
                           }
                           
-                          final pointData = data.elevationPoints[closestIndex];
-                          onPointSelected?.call(pointData);
+                          final pointData = widget.data.elevationPoints[closestIndex];
+                          widget.onPointSelected?.call(pointData);
                         }
                       },
                       handleBuiltInTouches: true,
                     ),
                   ),
                 ),
-                if (currentSegmentIndex != null && currentSegmentIndex! < data.elevationPoints.length)
+                if (widget.currentSegmentIndex != null && 
+                    widget.currentSegmentIndex! < widget.data.elevationPoints.length && 
+                    _showTooltip)
                   Positioned(
-                    left: (data.points[currentSegmentIndex!].x / data.totalDistance) * 
+                    left: (widget.data.points[widget.currentSegmentIndex!].x / widget.data.totalDistance) * 
                           (MediaQuery.of(context).size.width - 32 - 32),
                     top: 0,
-                    child: _buildTooltip(context, data.elevationPoints[currentSegmentIndex!]),
+                    child: _buildTooltip(context, widget.data.elevationPoints[widget.currentSegmentIndex!]),
                   ),
               ],
             ),
