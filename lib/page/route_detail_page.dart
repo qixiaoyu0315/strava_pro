@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/elevation_chart.dart';
+import 'package:geolocator/geolocator.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
@@ -28,6 +29,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   final ValueNotifier<LatLng?> selectedPoint = ValueNotifier<LatLng?>(null);
   bool isNavigationMode = false; // 添加导航模式状态
   List<LatLng>? gpxPoints; // 存储GPX文件中的路线点
+  LatLng? currentLocation; // 添加当前位置变量
 
   @override
   void initState() {
@@ -163,6 +165,54 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     }
   }
 
+  Future<void> _getCurrentLocation() async {
+    try {
+      print('开始获取位置...');
+      // 检查位置权限
+      LocationPermission permission = await Geolocator.checkPermission();
+      print('当前位置权限状态: $permission');
+      
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        print('请求权限后的状态: $permission');
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('需要位置权限才能获取当前位置')),
+          );
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('位置权限被永久拒绝，请在设置中开启')),
+        );
+        return;
+      }
+
+      // 获取当前位置
+      print('开始获取具体位置...');
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high
+      );
+      print('获取到的位置: 纬度=${position.latitude}, 经度=${position.longitude}');
+      
+      setState(() {
+        currentLocation = LatLng(position.latitude, position.longitude);
+      });
+      print('已更新当前位置标记');
+
+      // 移动地图到当前位置
+      _mapController.move(currentLocation!, 15.0);
+      print('已将地图移动到当前位置');
+    } catch (e) {
+      print('获取位置失败: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('获取位置失败: $e')),
+      );
+    }
+  }
+
   Widget _buildMap(List<LatLng> points, LatLng center) {
     final displayPoints = isNavigationMode && gpxPoints != null ? gpxPoints! : points;
     
@@ -193,6 +243,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                 ),
                 MarkerLayer(
                   markers: [
+                    // 起点标记
                     Marker(
                       point: displayPoints.first,
                       child: Icon(
@@ -201,6 +252,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                         size: 40.0,
                       ),
                     ),
+                    // 终点标记
                     Marker(
                       point: displayPoints.last,
                       child: Icon(
@@ -209,6 +261,49 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                         size: 40.0,
                       ),
                     ),
+                    // 当前位置标记
+                    if (currentLocation != null)
+                      Marker(
+                        point: currentLocation!,
+                        child: Container(
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.blue,
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 3,
+                                height: 6,
+                                color: Colors.blue,
+                              ),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withOpacity(0.3),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 ValueListenableBuilder<LatLng?>(
@@ -449,9 +544,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               onPressed: () {
                 setState(() {
                   isNavigationMode = !isNavigationMode;
+                  if (isNavigationMode) {
+                    _getCurrentLocation(); // 在进入导航模式时获取位置
+                  }
                 });
               },
-              child: Icon(isNavigationMode ? Icons.close : Icons.play_arrow),
+              child: Icon(isNavigationMode ? Icons.close : Icons.navigation),
               backgroundColor: isNavigationMode ? Colors.red : Colors.blue,
               foregroundColor: Colors.white,
             )
