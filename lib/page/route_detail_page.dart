@@ -504,14 +504,29 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
   // 添加坡度颜色计算方法
   Color _getGradientColor(double gradient) {
-    if (gradient > 15) return Colors.red;
-    if (gradient > 10) return Colors.orange;
-    if (gradient > 5) return Colors.yellow.shade800;
-    if (gradient > 0) return Colors.green;
-    if (gradient < -15) return Colors.purple;
-    if (gradient < -10) return Colors.blue;
-    if (gradient < -5) return Colors.lightBlue;
-    return Colors.blue.shade200;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    if (isDarkMode) {
+      // 夜间模式下的颜色
+      if (gradient > 15) return Color(0xFFFF5252);      // 深红色
+      if (gradient > 10) return Color(0xFFFFB74D);      // 深橙色
+      if (gradient > 5) return Color(0xFFFFEB3B);       // 深黄色
+      if (gradient > 0) return Color(0xFF66BB6A);       // 深绿色
+      if (gradient < -15) return Color(0xFFE040FB);     // 深紫色
+      if (gradient < -10) return Color(0xFF448AFF);     // 深蓝色
+      if (gradient < -5) return Color(0xFF40C4FF);      // 浅蓝色
+      return Color(0xFF81D4FA);                         // 最浅蓝色
+    } else {
+      // 日间模式下的颜色
+      if (gradient > 15) return Colors.red;
+      if (gradient > 10) return Colors.orange;
+      if (gradient > 5) return Colors.yellow.shade800;
+      if (gradient > 0) return Colors.green;
+      if (gradient < -15) return Colors.purple;
+      if (gradient < -10) return Colors.blue;
+      if (gradient < -5) return Colors.lightBlue;
+      return Colors.blue.shade200;
+    }
   }
 
   @override
@@ -598,11 +613,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                             margin: EdgeInsets.only(bottom: 8),
                                             padding: EdgeInsets.all(12),
                                             decoration: BoxDecoration(
-                                              color: Colors.white,
+                                              color: Theme.of(context).cardColor,
                                               borderRadius: BorderRadius.circular(15),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.black.withOpacity(0.1),
+                                                  color: Theme.of(context).shadowColor.withOpacity(0.1),
                                                   blurRadius: 10,
                                                   spreadRadius: 1,
                                                 ),
@@ -621,13 +636,16 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                       children: [
                                                         Row(
                                                           children: [
-                                                            Icon(Icons.height, color: Colors.blue, size: 20),
+                                                            Icon(Icons.height, 
+                                                              color: Theme.of(context).colorScheme.primary,
+                                                              size: 20
+                                                            ),
                                                             SizedBox(width: 6),
                                                             Text(
                                                               '海拔',
                                                               style: TextStyle(
                                                                 fontSize: 13,
-                                                                color: Colors.grey[600],
+                                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                               ),
                                                             ),
                                                           ],
@@ -638,6 +656,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                           style: TextStyle(
                                                             fontSize: 16,
                                                             fontWeight: FontWeight.bold,
+                                                            color: Theme.of(context).colorScheme.onSurface,
                                                           ),
                                                         ),
                                                       ],
@@ -645,20 +664,24 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                     Container(
                                                       height: 36,
                                                       width: 1,
-                                                      color: Colors.grey.withOpacity(0.3),
+                                                      color: Theme.of(context).dividerColor.withOpacity(0.3),
                                                     ),
                                                     Column(
                                                       mainAxisAlignment: MainAxisAlignment.center,
                                                       children: [
                                                         Row(
+                                                          
                                                           children: [
-                                                            Icon(Icons.trending_up, color: Colors.orange, size: 20),
+                                                            Icon(Icons.trending_up,
+                                                              color: Theme.of(context).colorScheme.secondary,
+                                                              size: 20
+                                                            ),
                                                             SizedBox(width: 6),
                                                             Text(
                                                               '坡度',
                                                               style: TextStyle(
                                                                 fontSize: 13,
-                                                                color: Colors.grey[600],
+                                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                               ),
                                                             ),
                                                           ],
@@ -669,7 +692,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                           style: TextStyle(
                                                             fontSize: 16,
                                                             fontWeight: FontWeight.bold,
-                                                            color: gradient != null ? _getGradientColor(gradient) : Colors.black,
+                                                            color: gradient != null ? _getGradientColor(gradient) : Theme.of(context).colorScheme.onSurface,
                                                           ),
                                                         ),
                                                       ],
@@ -683,11 +706,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                           Expanded(
                                             child: Container(
                                               decoration: BoxDecoration(
-                                                color: Colors.white,
+                                                color: Theme.of(context).cardColor,
                                                 borderRadius: BorderRadius.circular(15),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: Colors.black.withOpacity(0.1),
+                                                    color: Theme.of(context).shadowColor.withOpacity(0.1),
                                                     blurRadius: 10,
                                                     spreadRadius: 1,
                                                   ),
@@ -741,11 +764,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                     margin: EdgeInsets.symmetric(horizontal: 8),
                                     padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(15),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
+                                          color: Theme.of(context).shadowColor.withOpacity(0.1),
                                           blurRadius: 10,
                                           spreadRadius: 1,
                                         ),
@@ -764,13 +787,16 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                               children: [
                                                 Row(
                                                   children: [
-                                                    Icon(Icons.height, color: Colors.blue, size: 20),
+                                                    Icon(Icons.height, 
+                                                      color: Theme.of(context).colorScheme.primary,
+                                                      size: 20
+                                                    ),
                                                     SizedBox(width: 6),
                                                     Text(
                                                       '海拔',
                                                       style: TextStyle(
                                                         fontSize: 13,
-                                                        color: Colors.grey[600],
+                                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                   ],
@@ -781,6 +807,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
+                                                    color: Theme.of(context).colorScheme.onSurface,
                                                   ),
                                                 ),
                                               ],
@@ -788,20 +815,23 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                             Container(
                                               height: 36,
                                               width: 1,
-                                              color: Colors.grey.withOpacity(0.3),
+                                              color: Theme.of(context).dividerColor.withOpacity(0.3),
                                             ),
                                             Column(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
                                                 Row(
                                                   children: [
-                                                    Icon(Icons.trending_up, color: Colors.orange, size: 20),
+                                                    Icon(Icons.trending_up,
+                                                      color: Theme.of(context).colorScheme.secondary,
+                                                      size: 20
+                                                    ),
                                                     SizedBox(width: 6),
                                                     Text(
                                                       '坡度',
                                                       style: TextStyle(
                                                         fontSize: 13,
-                                                        color: Colors.grey[600],
+                                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                   ],
@@ -812,7 +842,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
-                                                    color: gradient != null ? _getGradientColor(gradient) : Colors.black,
+                                                    color: gradient != null ? _getGradientColor(gradient) : Theme.of(context).colorScheme.onSurface,
                                                   ),
                                                 ),
                                               ],
@@ -828,11 +858,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                                     height: unit * 3,
                                     margin: EdgeInsets.symmetric(horizontal: 8),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: Theme.of(context).cardColor,
                                       borderRadius: BorderRadius.circular(15),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
+                                          color: Theme.of(context).shadowColor.withOpacity(0.1),
                                           blurRadius: 10,
                                           spreadRadius: 1,
                                         ),
@@ -879,11 +909,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             height: 200,
                             margin: EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(15),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Theme.of(context).shadowColor.withOpacity(0.1),
                                   blurRadius: 10,
                                   spreadRadius: 1,
                                 ),
