@@ -213,8 +213,61 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     }
   }
 
+  // 计算点到线段的距离
+  double _calculateDistanceToLine(LatLng point, LatLng lineStart, LatLng lineEnd) {
+    double lat = point.latitude;
+    double lon = point.longitude;
+    double lat1 = lineStart.latitude;
+    double lon1 = lineStart.longitude;
+    double lat2 = lineEnd.latitude;
+    double lon2 = lineEnd.longitude;
+
+    // 使用 Geolocator 计算点到两个端点的距离
+    double d1 = Geolocator.distanceBetween(lat, lon, lat1, lon1);
+    double d2 = Geolocator.distanceBetween(lat, lon, lat2, lon2);
+    double lineLength = Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
+
+    // 如果线段长度为0，返回到端点的距离
+    if (lineLength == 0) return d1;
+
+    // 计算点到线段的投影是否在线段上
+    double t = ((lat - lat1) * (lat2 - lat1) + (lon - lon1) * (lon2 - lon1)) / 
+               ((lat2 - lat1) * (lat2 - lat1) + (lon2 - lon1) * (lon2 - lon1));
+
+    if (t < 0) return d1;  // 投影点在线段起点之前
+    if (t > 1) return d2;  // 投影点在线段终点之后
+
+    // 计算投影点的坐标
+    double projLat = lat1 + t * (lat2 - lat1);
+    double projLon = lon1 + t * (lon2 - lon1);
+
+    // 返回点到投影点的距离
+    return Geolocator.distanceBetween(lat, lon, projLat, projLon);
+  }
+
+  // 检查设备位置是否在路线附近
+  bool _isNearRoute(LatLng deviceLocation, List<LatLng> routePoints) {
+    if (routePoints.length < 2) return false;
+
+    double minDistance = double.infinity;
+    // 遍历所有相邻的路线点对
+    for (int i = 0; i < routePoints.length - 1; i++) {
+      double distance = _calculateDistanceToLine(
+        deviceLocation,
+        routePoints[i],
+        routePoints[i + 1]
+      );
+      minDistance = distance < minDistance ? distance : minDistance;
+    }
+    print('最小距离: $minDistance');
+
+    return minDistance <= 20; // 如果最小距离小于20米，返回true
+  }
+
   Widget _buildMap(List<LatLng> points, LatLng center) {
     final displayPoints = isNavigationMode && gpxPoints != null ? gpxPoints! : points;
+    final bool isNearRoute = currentLocation != null ? 
+        _isNearRoute(currentLocation!, displayPoints) : false;
     
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -266,38 +319,29 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                       Marker(
                         point: currentLocation!,
                         child: Container(
-                          child: Column(
+                          height: 32,
+                          width: 32,
+                          alignment: Alignment.center,
+                          child: Stack(
+                            alignment: Alignment.center,
                             children: [
                               Container(
-                                padding: EdgeInsets.all(4),
+                                width: 16,
+                                height: 16,
                                 decoration: BoxDecoration(
-                                  color: Colors.blue,
+                                  color: Colors.white,
                                   shape: BoxShape.circle,
-                                ),
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.blue,
-                                      width: 3,
-                                    ),
+                                  border: Border.all(
+                                    color: isNearRoute ? Colors.green : Colors.red,
+                                    width: 3,
                                   ),
-                                ),
-                              ),
-                              Container(
-                                width: 3,
-                                height: 6,
-                                color: Colors.blue,
-                              ),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.3),
-                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (isNearRoute ? Colors.green : Colors.red).withOpacity(0.3),
+                                      spreadRadius: 4,
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
