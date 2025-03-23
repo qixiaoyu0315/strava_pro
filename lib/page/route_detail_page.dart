@@ -563,117 +563,160 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                   padding: const EdgeInsets.all(16.0),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      Container(
-                        height: isNavigationMode ? MediaQuery.of(context).size.height * 0.6 : 300,
-                        child: _buildMap(points, center),
-                      ),
-                      if (isNavigationMode)
-                        ValueListenableBuilder<Position?>(
-                          valueListenable: currentPosition,
-                          builder: (context, position, child) {
-                            final gradient = _calculateCurrentGradient();
-                            return Container(
-                              margin: EdgeInsets.symmetric(vertical: 8),
-                              padding: EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(15),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  // 海拔信息
-                                  Column(
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.height, color: Colors.blue),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            '海拔',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                      if (isNavigationMode) ...[
+                        // 计算屏幕可用高度
+                        Builder(
+                          builder: (context) {
+                            final screenHeight = MediaQuery.of(context).size.height;
+                            final paddingTop = MediaQuery.of(context).padding.top;
+                            final paddingBottom = MediaQuery.of(context).padding.bottom;
+                            // 增加总padding到64，为组件间距留出更多空间
+                            final availableHeight = screenHeight - paddingTop - paddingBottom - 64;
+                            final unit = availableHeight / 10; // 将可用高度分成10份（5+2+3）
+
+                            return Column(
+                              children: [
+                                // 地图组件 (5份)
+                                Container(
+                                  height: unit * 5,
+                                  child: _buildMap(points, center),
+                                ),
+                                // 地图和信息卡片之间的间距
+                                SizedBox(height: 16),
+                                // 海拔和坡度信息卡片 (2份)
+                                Container(
+                                  height: unit * 1.8, // 稍微减小高度，为间距留出空间
+                                  margin: EdgeInsets.symmetric(horizontal: 8),
+                                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(15),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
                                       ),
                                     ],
                                   ),
-                                  // 分隔线
-                                  Container(
-                                    height: 40,
-                                    width: 1,
-                                    color: Colors.grey.withOpacity(0.3),
-                                  ),
-                                  // 坡度信息
-                                  Column(
-                                    children: [
-                                      Row(
+                                  child: ValueListenableBuilder<Position?>(
+                                    valueListenable: currentPosition,
+                                    builder: (context, position, child) {
+                                      final gradient = _calculateCurrentGradient();
+                                      return Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                         children: [
-                                          Icon(Icons.trending_up, color: Colors.orange),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            '坡度',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey,
-                                            ),
+                                          // 海拔信息
+                                          Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.height, color: Colors.blue, size: 20),
+                                                  SizedBox(width: 6),
+                                                  Text(
+                                                    '海拔',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 2),
+                                              Text(
+                                                '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          // 分隔线
+                                          Container(
+                                            height: 36,
+                                            width: 1,
+                                            color: Colors.grey.withOpacity(0.3),
+                                          ),
+                                          // 坡度信息
+                                          Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.trending_up, color: Colors.orange, size: 20),
+                                                  SizedBox(width: 6),
+                                                  Text(
+                                                    '坡度',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 2),
+                                              Text(
+                                                gradient != null ? '${gradient.toStringAsFixed(1)}%' : '--',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: gradient != null ? _getGradientColor(gradient) : Colors.black,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text(
-                                        gradient != null ? '${gradient.toStringAsFixed(1)}%' : '--',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: gradient != null ? _getGradientColor(gradient) : Colors.black,
-                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                // 信息卡片和海拔图之间的间距
+                                SizedBox(height: 16),
+                                // 海拔图 (3份)
+                                Container(
+                                  height: unit * 2.8, // 稍微减小高度，为间距留出空间
+                                  margin: EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(15),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(15),
+                                    child: elevationData != null
+                                      ? ValueListenableBuilder<int?>(
+                                          valueListenable: currentSegmentIndex,
+                                          builder: (context, segmentIndex, child) {
+                                            return ValueListenableBuilder<double?>(
+                                              valueListenable: currentMinDistance,
+                                              builder: (context, minDistance, child) {
+                                                return ElevationChart(
+                                                  data: elevationData!,
+                                                  onPointSelected: (point) {
+                                                    selectedPoint.value = point.position;
+                                                  },
+                                                  currentSegmentIndex: minDistance != null && minDistance <= 50 ? segmentIndex : null,
+                                                );
+                                              },
+                                            );
+                                          },
+                                        )
+                                      : SizedBox(),
+                                  ),
+                                ),
+                              ],
                             );
                           },
                         ),
-                      SizedBox(height: 16),
-                      if (elevationData != null)
-                        ValueListenableBuilder<int?>(
-                          valueListenable: currentSegmentIndex,
-                          builder: (context, segmentIndex, child) {
-                            return ValueListenableBuilder<double?>(
-                              valueListenable: currentMinDistance,
-                              builder: (context, minDistance, child) {
-                                return ElevationChart(
-                                  data: elevationData!,
-                                  onPointSelected: (point) {
-                                    selectedPoint.value = point.position;
-                                  },
-                                  currentSegmentIndex: minDistance != null && minDistance <= 50 ? segmentIndex : null,
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      if (!isNavigationMode) ...[
-                        SizedBox(height: 16),
+                      ] else ...[
                         // 路线信息部分
                         Card(
                           elevation: 4,
