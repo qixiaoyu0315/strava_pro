@@ -77,7 +77,67 @@ https://developers.strava.com/
     执行 gradlew clean 后，会有下载 jar 的日志输出（下载了多少/jar 多大）直观明了。
 ```
 
+### 2.stravaclient包问题处理
 
+- /Users/qixiaoyu/.pub-cache/hosted/pub.dev/strava_client-2.1.2/lib/src/domain/model/model_summary_athlete.dart
+
+​        需要增加判断
+
+```dart 
+country: json["country"] == null ? "" : json["country"],
+```
+
+- /Users/qixiaoyu/.pub-cache/hosted/pub.dev/strava_client-2.1.2/lib/src/domain/model/model_route.dart segments 相关注释
+
+```dart
+class MapUrls {
+  final String? url;
+  final String? retinaUrl;
+  final String? lightUrl;
+  final String? darkUrl;
+
+  MapUrls({this.url, this.retinaUrl, this.lightUrl, this.darkUrl});
+
+  MapUrls.fromJson(Map<String, dynamic> json)
+      : url = json['url'],
+        retinaUrl = json['retina_url'],
+        lightUrl = json['light_url'],
+        darkUrl = json['dark_url'];
+
+  Map<String, dynamic> toJson() {
+    return {
+      'url': url,
+      'retina_url': retinaUrl,
+      'light_url': lightUrl,
+      'dark_url': darkUrl,
+    };
+  }
+}
+
+class Route {
+  // 其他属性...
+  MapUrls? mapUrls; // 添加 mapUrls 属性
+
+  Route({
+    // 其他参数...
+    this.mapUrls,
+  });
+
+  Route.fromJson(dynamic json) {
+    // 其他解析...
+    mapUrls = json['map_urls'] != null ? MapUrls.fromJson(json['map_urls']) : null; // 解析 map_urls
+  }
+
+  Map<String, dynamic> toJson() {
+    var jsonMap = <String, dynamic>{};
+    // 其他序列化...
+    if (mapUrls != null) {
+      jsonMap['map_urls'] = mapUrls!.toJson(); // 序列化 map_urls
+    }
+    return jsonMap;
+  }
+} 
+```
 
 
 

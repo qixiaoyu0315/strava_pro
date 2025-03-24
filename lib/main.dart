@@ -33,7 +33,7 @@ class _MainAppState extends State<MainApp> {
   int _selectedIndex = 0; // 当前选中的索引
 
   final List<Widget> _pages = [ // 页面列表
-    const Center(child: Text('Hello World!')),
+    const Center(child: Text('Hello Strava!')),
     const RoutePage(), // 跳转到 route_page
     const SettingPage(), // 跳转到 setting_page
   ];

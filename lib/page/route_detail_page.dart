@@ -112,18 +112,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       }
 
       // 获取下载目录
-      Directory? directory;
+      Directory directory;
       if (Platform.isAndroid) {
         directory = Directory('/storage/emulated/0/Download/strava_pro');
       } else {
         directory = await getApplicationDocumentsDirectory();
-      }
-
-      if (directory == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法访问存储目录')),
-        );
-        return;
       }
 
       // 确保目录存在
@@ -518,63 +511,18 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   }
 
   // 添加坡度颜色计算方法
-  Color _getGradientColor(double gradient) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    if (isDarkMode) {
-      // 夜间模式下的颜色
-      if (gradient > 15) return Color(0xFFFF5252);      // 深红色
-      if (gradient > 10) return Color(0xFFFFB74D);      // 深橙色
-      if (gradient > 5) return Color(0xFFFFEB3B);       // 深黄色
-      if (gradient > 0) return Color(0xFF66BB6A);       // 深绿色
-      if (gradient < -15) return Color(0xFFE040FB);     // 深紫色
-      if (gradient < -10) return Color(0xFF448AFF);     // 深蓝色
-      if (gradient < -5) return Color(0xFF40C4FF);      // 浅蓝色
-      return Color(0xFF81D4FA);                         // 最浅蓝色
-    } else {
-      // 日间模式下的颜色
-      if (gradient > 15) return Colors.red;
-      if (gradient > 10) return Colors.orange;
-      if (gradient > 5) return Colors.yellow.shade800;
-      if (gradient > 0) return Colors.green;
-      if (gradient < -15) return Colors.purple;
-      if (gradient < -10) return Colors.blue;
-      if (gradient < -5) return Colors.lightBlue;
-      return Colors.blue.shade200;
-    }
+  Color _getGradientColor(double gradient) {   
+    // 日间模式下的颜色
+    if (gradient > 15) return Colors.red;
+    if (gradient > 10) return Colors.orange;
+    if (gradient > 5) return Colors.yellow.shade800;
+    if (gradient > 0) return Colors.green;
+    if (gradient < -15) return Colors.purple;
+    if (gradient < -10) return Colors.blue;
+    if (gradient < -5) return Colors.lightBlue;
+    return Colors.blue.shade200;
   }
 
-  void _showToast(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.gps_fixed, color: Colors.white, size: 16),
-              SizedBox(width: 8),
-              Text(message),
-            ],
-          ),
-        ),
-        duration: Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.black87,
-        margin: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.2,
-          vertical: 100,
-        ),
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(25),
-        ),
-        dismissDirection: DismissDirection.horizontal,
-      ),
-    );
-  }
 
   // 添加计算缩放级别的辅助方法
   double _calculateZoomLevel(double min, double max, double screenSize) {
