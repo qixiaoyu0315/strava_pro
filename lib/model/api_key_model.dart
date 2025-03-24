@@ -52,4 +52,9 @@ class ApiKeyModel {
     }
     return null;
   }
+
+  Future<void> deleteApiKey() async {
+    final db = await database;
+    await db.delete('api_keys');
+  }
 } 
