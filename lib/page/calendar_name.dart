@@ -9,7 +9,7 @@ class CalendarPage extends StatefulWidget {
   State<CalendarPage> createState() => _CalendarPageState();
 }
 
-class _CalendarPageState extends State<CalendarPage> {
+class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderStateMixin {
   late DateTime _selectedDate;
   late DateTime _displayedMonth;
   late ScrollController _scrollController;
@@ -17,6 +17,11 @@ class _CalendarPageState extends State<CalendarPage> {
   final List<DateTime> _loadedMonths = [];
   bool _isScrolling = false;
   bool _isInitialized = false;
+  
+  // 添加动画控制器
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -24,6 +29,22 @@ class _CalendarPageState extends State<CalendarPage> {
     final now = DateTime.now();
     _selectedDate = now;
     _displayedMonth = DateTime(now.year, now.month);
+    
+    // 初始化动画控制器
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _scaleAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutBack,
+    );
+    
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
     
     // 初始化加载最近三个月
     _initializeMonths();
@@ -71,6 +92,9 @@ class _CalendarPageState extends State<CalendarPage> {
     setState(() {
       _isInitialized = true;
     });
+    
+    // 开始播放动画
+    _animationController.forward();
 
     // 滚动到当前月份（最后一个）
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -171,95 +195,131 @@ class _CalendarPageState extends State<CalendarPage> {
     final otherMonthTextColor = isDark ? Colors.white38 : Colors.black38;
     final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
 
-    // 如果还没有初始化完成，显示加载指示器
     if (!_isInitialized) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: ScaleTransition(
+            scale: CurvedAnimation(
+              parent: _animationController,
+              curve: Curves.elasticOut,
+            ),
+            child: const CircularProgressIndicator(),
+          ),
         ),
       );
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Text('一', style: TextStyle(color: weekdayTextColor)),
-                  Text('二', style: TextStyle(color: weekdayTextColor)),
-                  Text('三', style: TextStyle(color: weekdayTextColor)),
-                  Text('四', style: TextStyle(color: weekdayTextColor)),
-                  Text('五', style: TextStyle(color: weekdayTextColor)),
-                  Text('六', style: TextStyle(color: Colors.blue)),
-                  Text('日', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                itemCount: _loadedMonths.length,
-                itemBuilder: (context, index) {
-                  // 正向构建月份，最早的月份在顶部
-                  final currentMonth = _loadedMonths[index];
-                  
-                  return Container(
-                    height: 420,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () => _selectMonth(currentMonth),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 16,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              color: _displayedMonth.year == currentMonth.year && 
-                                    _displayedMonth.month == currentMonth.month
-                                  ? Colors.blue.withOpacity(0.1)
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${currentMonth.year}年${currentMonth.month}月',
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 16,
-                                    fontWeight: _displayedMonth.year == currentMonth.year && 
-                                              _displayedMonth.month == currentMonth.month
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_drop_down,
-                                  color: textColor,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
-                        ),
-                      ],
+      body: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Text('一', style: TextStyle(color: weekdayTextColor)),
+                          Text('二', style: TextStyle(color: weekdayTextColor)),
+                          Text('三', style: TextStyle(color: weekdayTextColor)),
+                          Text('四', style: TextStyle(color: weekdayTextColor)),
+                          Text('五', style: TextStyle(color: weekdayTextColor)),
+                          Text('六', style: TextStyle(color: Colors.blue)),
+                          Text('日', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
                     ),
-                  );
-                },
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        itemCount: _loadedMonths.length,
+                        itemBuilder: (context, index) {
+                          final currentMonth = _loadedMonths[index];
+                          return AnimatedBuilder(
+                            animation: _animationController,
+                            builder: (context, child) {
+                              final delay = (index / _loadedMonths.length) * 0.5;
+                              final itemAnimation = CurvedAnimation(
+                                parent: _animationController,
+                                curve: Interval(
+                                  delay,
+                                  delay + 0.5,
+                                  curve: Curves.easeOutBack,
+                                ),
+                              );
+                              
+                              return Transform.scale(
+                                scale: 0.8 + (0.2 * itemAnimation.value),
+                                child: Opacity(
+                                  opacity: itemAnimation.value.clamp(0.0, 1.0),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              height: 420,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _selectMonth(currentMonth),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        color: _displayedMonth.year == currentMonth.year && 
+                                              _displayedMonth.month == currentMonth.month
+                                            ? Colors.blue.withOpacity(0.1)
+                                            : null,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${currentMonth.year}年${currentMonth.month}月',
+                                            style: TextStyle(
+                                              color: textColor,
+                                              fontSize: 16,
+                                              fontWeight: _displayedMonth.year == currentMonth.year && 
+                                                        _displayedMonth.month == currentMonth.month
+                                                  ? FontWeight.bold
+                                                  : FontWeight.w500,
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.arrow_drop_down,
+                                            color: textColor,
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -504,6 +564,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   @override
   void dispose() {
+    _animationController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -537,11 +598,11 @@ class _YearMonthPickerState extends State<YearMonthPicker> {
     _selectedYear = widget.initialDate.year;
     _selectedMonth = widget.initialDate.month;
     _yearController = PageController(
-      initialPage: _selectedYear - widget.firstDate.year,
+      initialPage: widget.initialDate.year - widget.firstDate.year,
       viewportFraction: 0.3,
     );
     _monthController = PageController(
-      initialPage: _selectedMonth - 1,
+      initialPage: widget.initialDate.month - 1,
       viewportFraction: 0.3,
     );
   }
