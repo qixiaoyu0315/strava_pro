@@ -12,34 +12,57 @@ class CalendarPage extends StatefulWidget {
 class _CalendarPageState extends State<CalendarPage> {
   late DateTime _selectedDate;
   late DateTime _displayedMonth;
-  late PageController _pageController;
+  late ScrollController _scrollController;
   final Map<String, bool> _svgCache = {}; // 缓存 SVG 存在状态
+  final int _totalMonths = 48; // 显示前后两年的月份
+  bool _isScrolling = false;
 
   @override
   void initState() {
     super.initState();
     _selectedDate = DateTime.now();
     _displayedMonth = DateTime(_selectedDate.year, _selectedDate.month);
-    _pageController = PageController(initialPage: 1200); // 从中间开始，支持前后滑动
+    _scrollController = ScrollController(
+      initialScrollOffset: _calculateInitialOffset(),
+    );
+    _scrollController.addListener(_onScroll);
     _preloadSvgForMonth(_displayedMonth);
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _onPageChanged(int page) {
-    final difference = page - 1200;
-    setState(() {
-      _displayedMonth = DateTime(
-        _displayedMonth.year,
-        _displayedMonth.month + difference,
-      );
-    });
-    _preloadSvgForMonth(_displayedMonth);
-    _pageController.jumpToPage(1200); // 重置到中间页
+  double _calculateInitialOffset() {
+    // 计算初始滚动位置，使当前月份显示在中间偏下位置
+    final monthHeight = 400.0; // 每个月的高度
+    final middleIndex = _totalMonths ~/ 2;
+    return monthHeight * middleIndex - 200.0; // 减去一些偏移使当前月份显示在中间偏下
+  }
+
+  void _onScroll() {
+    if (!_isScrolling) {
+      _isScrolling = true;
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          final currentIndex = (_scrollController.offset / 400.0).round();
+          final monthDiff = currentIndex - (_totalMonths ~/ 2);
+          final newMonth = DateTime(
+            _displayedMonth.year,
+            _displayedMonth.month + monthDiff,
+          );
+          if (newMonth != _displayedMonth) {
+            setState(() {
+              _displayedMonth = newMonth;
+            });
+            _preloadSvgForMonth(_displayedMonth);
+          }
+        }
+        _isScrolling = false;
+      });
+    }
   }
 
   Future<void> _selectMonth() async {
@@ -65,6 +88,17 @@ class _CalendarPageState extends State<CalendarPage> {
         _displayedMonth = picked;
       });
       _preloadSvgForMonth(_displayedMonth);
+      
+      // 滚动到选中的月份
+      final middleIndex = _totalMonths ~/ 2;
+      final monthDiff = _displayedMonth.month - DateTime.now().month +
+          (_displayedMonth.year - DateTime.now().year) * 12;
+      final targetOffset = (middleIndex + monthDiff) * 400.0 - 200.0;
+      _scrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -181,17 +215,38 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
           Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              scrollDirection: Axis.vertical, // 改为垂直方向滑动
-              onPageChanged: _onPageChanged,
+            child: ListView.builder(
+              controller: _scrollController,
+              itemCount: _totalMonths,
               itemBuilder: (context, index) {
-                final monthDiff = index - 1200;
+                final monthDiff = index - (_totalMonths ~/ 2);
                 final currentMonth = DateTime(
-                  _displayedMonth.year,
-                  _displayedMonth.month + monthDiff,
+                  DateTime.now().year,
+                  DateTime.now().month + monthDiff,
                 );
-                return _buildMonthGrid(currentMonth, textColor, otherMonthTextColor);
+                return Container(
+                  height: 400, // 固定每个月的高度
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      if (index > 0) // 不是第一个月才显示月份标题
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            '${currentMonth.year}年${currentMonth.month}月',
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
+                      ),
+                    ],
+                  ),
+                );
               },
             ),
           ),
