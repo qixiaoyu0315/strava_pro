@@ -90,15 +90,18 @@ class _CalendarPageState extends State<CalendarPage> {
   void _onScroll() {
     if (!_isScrolling) {
       _isScrolling = true;
-      Future.delayed(const Duration(milliseconds: 100), () async {
+      
+      // 使用防抖，减少滚动过程中的计算频率
+      Future.delayed(const Duration(milliseconds: 150), () async {
         if (!mounted) return;
         if (_scrollController.hasClients) {
-          // 检测是否需要加载更多历史月份
-          if (_scrollController.position.pixels < 500) {
-            await _loadPreviousMonth();
+          // 提前预加载，避免滚动时卡顿
+          if (_scrollController.position.pixels < 1000) {
+            // 批量加载多个月份，减少频繁加载
+            await _loadPreviousMonths(3); // 一次加载3个月
           }
           
-          // 更新当前显示的月份
+          // 更新当前显示的月份，使用节流避免频繁更新
           final visibleIndex = (_scrollController.position.pixels / 420.0).round();
           if (visibleIndex >= 0 && visibleIndex < _loadedMonths.length) {
             final newDisplayedMonth = _loadedMonths[visibleIndex];
@@ -115,34 +118,48 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  Future<void> _loadPreviousMonth() async {
+  Future<void> _loadPreviousMonths(int count) async {
     if (_loadedMonths.isEmpty) return;
     
     final firstMonth = _loadedMonths.first;
-    final prevMonth = DateTime(firstMonth.year, firstMonth.month - 1);
+    List<DateTime> monthsToAdd = [];
     
-    DateTime monthToAdd;
-    if (prevMonth.month == 0) {
-      monthToAdd = DateTime(prevMonth.year - 1, 12);
-    } else {
-      monthToAdd = prevMonth;
+    // 计算需要加载的月份
+    for (int i = 1; i <= count; i++) {
+      final prevMonth = DateTime(firstMonth.year, firstMonth.month - i);
+      DateTime monthToAdd;
+      
+      if (prevMonth.month == 0) {
+        monthToAdd = DateTime(prevMonth.year - 1, 12);
+      } else if (prevMonth.month < 0) {
+        final yearOffset = (prevMonth.month.abs() / 12).ceil();
+        final newMonth = 12 - (prevMonth.month.abs() % 12);
+        monthToAdd = DateTime(prevMonth.year - yearOffset, newMonth);
+      } else {
+        monthToAdd = prevMonth;
+      }
+      
+      // 检查是否已经加载了这个月份
+      if (!_loadedMonths.any((m) => m.year == monthToAdd.year && m.month == monthToAdd.month)) {
+        monthsToAdd.add(monthToAdd);
+      }
     }
     
-    // 检查是否已经加载了这个月份
-    if (_loadedMonths.any((m) => m.year == monthToAdd.year && m.month == monthToAdd.month)) {
-      return;
-    }
+    if (monthsToAdd.isEmpty) return;
     
+    // 批量更新状态
     setState(() {
-      _loadedMonths.insert(0, monthToAdd);
+      _loadedMonths.insertAll(0, monthsToAdd);
     });
     
-    // 预加载新月份的SVG
-    await _preloadSvgForMonth(monthToAdd);
+    // 批量预加载SVG
+    await Future.wait(
+      monthsToAdd.map((month) => _preloadSvgForMonth(month))
+    );
     
     // 调整滚动位置以保持当前视图
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(_scrollController.position.pixels + 420);
+      _scrollController.jumpTo(_scrollController.position.pixels + (420.0 * monthsToAdd.length));
     }
   }
 
@@ -451,15 +468,23 @@ class _CalendarPageState extends State<CalendarPage> {
     }
     
     final List<DateTime?> days = _getDaysInMonth(month);
+    final List<Future<void>> preloadTasks = [];
+    
     for (final day in days) {
       if (day == null) continue;
       String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
       String svgPath = 'assets/$formattedDate';
 
       if (!_svgCache.containsKey(svgPath)) {
-        _svgCache[svgPath] = await _doesSvgExist(svgPath);
+        preloadTasks.add(_doesSvgExist(svgPath).then((exists) {
+          _svgCache[svgPath] = exists;
+        }));
       }
     }
+    
+    // 批量处理所有预加载任务
+    await Future.wait(preloadTasks);
+    
     if (mounted) {
       setState(() {});
     }
