@@ -33,9 +33,7 @@ class _CalendarPageState extends State<CalendarPage> {
     _pendingScrollOffset = (_totalMonths - 1) * 420.0;
     
     // 初始化ScrollController并添加监听
-    _scrollController = ScrollController(
-      initialScrollOffset: _pendingScrollOffset!,
-    );
+    _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     
     // 延迟初始化以等待布局完成
@@ -52,24 +50,24 @@ class _CalendarPageState extends State<CalendarPage> {
     
     // 预加载当前月份和上个月的SVG
     final now = DateTime.now();
-    await Future.wait([
+    Future.wait([
       _preloadSvgForMonth(DateTime(now.year, now.month - 1)),
       _preloadSvgForMonth(now),
-    ]);
+    ]).then((_) {
+      if (!mounted) return;
+      
+      // 调整滚动位置到屏幕中间
+      final screenHeight = MediaQuery.of(context).size.height;
+      _pendingScrollOffset = _pendingScrollOffset! - (screenHeight / 2) + 100.0;
+      
+      // 确保ScrollController已经附加到ScrollView
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_pendingScrollOffset!);
+      }
 
-    if (!mounted) return;
-    
-    // 调整滚动位置到屏幕中间
-    final screenHeight = MediaQuery.of(context).size.height;
-    _pendingScrollOffset = _pendingScrollOffset! - (screenHeight / 2) + 100.0;
-    
-    // 确保ScrollController已经附加到ScrollView
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(_pendingScrollOffset!);
-    }
-
-    setState(() {
-      _isInitialized = true;
+      setState(() {
+        _isInitialized = true;
+      });
     });
   }
 
