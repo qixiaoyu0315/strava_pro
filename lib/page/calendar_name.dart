@@ -22,11 +22,25 @@ class _CalendarPageState extends State<CalendarPage> {
     super.initState();
     _selectedDate = DateTime.now();
     _displayedMonth = DateTime(_selectedDate.year, _selectedDate.month);
-    _scrollController = ScrollController(
-      initialScrollOffset: _calculateInitialOffset(),
-    );
-    _scrollController.addListener(_onScroll);
-    _preloadSvgForMonth(_displayedMonth);
+    _scrollController = ScrollController(); // 临时初始化
+
+    // 计算屏幕高度的一半位置
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final now = DateTime.now();
+      final screenHeight = MediaQuery.of(context).size.height;
+      final middleIndex = _totalMonths ~/ 2;
+      final initialOffset = middleIndex * 420.0 - (screenHeight / 2) + 100.0;
+      
+      _scrollController.jumpTo(initialOffset);
+      _scrollController.addListener(_onScroll);
+      
+      // 预加载当前月和前后月份的SVG
+      _preloadSvgForMonth(DateTime(now.year, now.month - 1)); // 上个月
+      _preloadSvgForMonth(DateTime(now.year, now.month));     // 当前月
+      _preloadSvgForMonth(DateTime(now.year, now.month + 1)); // 下个月
+      
+      setState(() {});
+    });
   }
 
   @override
@@ -35,29 +49,27 @@ class _CalendarPageState extends State<CalendarPage> {
     super.dispose();
   }
 
-  double _calculateInitialOffset() {
-    // 计算初始滚动位置，使当前月份显示在中间偏下位置
-    final monthHeight = 400.0; // 每个月的高度
-    final middleIndex = _totalMonths ~/ 2;
-    return monthHeight * middleIndex - 200.0; // 减去一些偏移使当前月份显示在中间偏下
-  }
-
   void _onScroll() {
     if (!_isScrolling) {
       _isScrolling = true;
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
-          final currentIndex = (_scrollController.offset / 400.0).round();
+          final currentIndex = (_scrollController.offset / 420.0).round();
           final monthDiff = currentIndex - (_totalMonths ~/ 2);
+          final now = DateTime.now();
           final newMonth = DateTime(
-            _displayedMonth.year,
-            _displayedMonth.month + monthDiff,
+            now.year + ((now.month + monthDiff - 1) ~/ 12),
+            (now.month + monthDiff - 1) % 12 + 1,
           );
+          
           if (newMonth != _displayedMonth) {
             setState(() {
               _displayedMonth = newMonth;
             });
-            _preloadSvgForMonth(_displayedMonth);
+            // 预加载前后月份的SVG
+            _preloadSvgForMonth(DateTime(newMonth.year, newMonth.month - 1));
+            _preloadSvgForMonth(newMonth);
+            _preloadSvgForMonth(DateTime(newMonth.year, newMonth.month + 1));
           }
         }
         _isScrolling = false;
@@ -98,9 +110,10 @@ class _CalendarPageState extends State<CalendarPage> {
                 itemCount: _totalMonths,
                 itemBuilder: (context, index) {
                   final monthDiff = index - (_totalMonths ~/ 2);
+                  final now = DateTime.now();
                   final currentMonth = DateTime(
-                    DateTime.now().year,
-                    DateTime.now().month + monthDiff,
+                    now.year + ((now.month + monthDiff - 1) ~/ 12),
+                    (now.month + monthDiff - 1) % 12 + 1,
                   );
                   return Container(
                     height: 420, // 增加容器高度，为SVG图标留出更多空间
@@ -182,13 +195,18 @@ class _CalendarPageState extends State<CalendarPage> {
       setState(() {
         _displayedMonth = picked;
       });
-      _preloadSvgForMonth(_displayedMonth);
+      
+      // 预加载当前月和上个月的SVG
+      _preloadSvgForMonth(picked);
+      _preloadSvgForMonth(DateTime(picked.year, picked.month - 1));
       
       // 滚动到选中的月份
+      final screenHeight = MediaQuery.of(context).size.height;
       final middleIndex = _totalMonths ~/ 2;
       final monthDiff = _displayedMonth.month - DateTime.now().month +
           (_displayedMonth.year - DateTime.now().year) * 12;
-      final targetOffset = (middleIndex + monthDiff) * 400.0 - 200.0;
+      final targetOffset = (middleIndex + monthDiff) * 420.0 - (screenHeight / 2) + 100.0;
+      
       _scrollController.animateTo(
         targetOffset,
         duration: const Duration(milliseconds: 300),
@@ -216,15 +234,26 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _preloadSvgForMonth(DateTime month) async {
+    // 处理月份跨年的情况
+    if (month.month == 0) {
+      month = DateTime(month.year - 1, 12);
+    } else if (month.month == 13) {
+      month = DateTime(month.year + 1, 1);
+    }
+    
     final List<DateTime?> days = _getDaysInMonth(month);
     for (final day in days) {
       if (day == null) continue;
       String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
       String svgPath = 'assets/$formattedDate';
 
-      _svgCache[svgPath] = await _doesSvgExist(svgPath);
+      if (!_svgCache.containsKey(svgPath)) {
+        _svgCache[svgPath] = await _doesSvgExist(svgPath);
+      }
     }
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<bool> _doesSvgExist(String assetPath) async {
