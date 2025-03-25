@@ -29,10 +29,7 @@ class _CalendarPageState extends State<CalendarPage> {
     // 计算从2000年1月到当前月份的总月数
     _totalMonths = (now.year - 2000) * 12 + now.month;
     
-    // 计算初始滚动位置
-    _pendingScrollOffset = (_totalMonths - 1) * 420.0;
-    
-    // 初始化ScrollController并添加监听
+    // 初始化ScrollController
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     
@@ -50,24 +47,30 @@ class _CalendarPageState extends State<CalendarPage> {
     
     // 预加载当前月份和上个月的SVG
     final now = DateTime.now();
-    Future.wait([
+    await Future.wait([
       _preloadSvgForMonth(DateTime(now.year, now.month - 1)),
       _preloadSvgForMonth(now),
-    ]).then((_) {
-      if (!mounted) return;
-      
-      // 调整滚动位置到屏幕中间
-      final screenHeight = MediaQuery.of(context).size.height;
-      _pendingScrollOffset = _pendingScrollOffset! - (screenHeight / 2) + 100.0;
-      
-      // 确保ScrollController已经附加到ScrollView
-      if (_scrollController.hasClients) {
-        _scrollController.jumpTo(_pendingScrollOffset!);
-      }
+    ]);
 
-      setState(() {
-        _isInitialized = true;
-      });
+    if (!mounted) return;
+    
+    setState(() {
+      _isInitialized = true;
+    });
+    
+    // 在setState之后，等待下一帧渲染完成后，滚动到当前月份
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      
+      // 计算当前月份索引（从0开始）
+      final currentMonthIndex = _totalMonths - 1;
+      
+      // 计算屏幕高度，确保当前月份在屏幕中间
+      final screenHeight = MediaQuery.of(context).size.height;
+      final offset = currentMonthIndex * 420.0 - (screenHeight / 2) + 210.0;
+      
+      // 跳转到当前月份位置
+      _scrollController.jumpTo(offset);
     });
   }
 
