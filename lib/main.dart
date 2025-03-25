@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'page/route_page.dart';
 import 'page/setting_page.dart';
+import 'page/calendar_name.dart';
 import 'service/strava_client_manager.dart';
 import 'model/api_key_model.dart';
 
@@ -26,7 +27,7 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   int _selectedIndex = 0;
   final List<Widget> _pages = [
-    const Center(child: Text('Hello Strava!')),
+    const CalendarPage(),
     const RoutePage(),
     const SettingPage(),
   ];

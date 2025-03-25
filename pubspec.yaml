@@ -24,6 +24,7 @@ dependencies:
   xml: ^6.5.0  # 用于解析 GPX 文件
   fl_chart: ^0.70.2 # 用于绘制图表
   great_circle_distance_calculator: ^1.0.3  # 用于计算两点之间的距离
+  flutter_svg: ^2.0.17
 
 
 dev_dependencies:
@@ -33,3 +34,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  assets:
+    - assets/
