@@ -65,7 +65,115 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  Future<void> _selectMonth() async {
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final otherMonthTextColor = isDark ? Colors.white38 : Colors.black38;
+    final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${_displayedMonth.year}年${_displayedMonth.month}月',
+              style: TextStyle(
+                fontSize: 20,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Text('一', style: TextStyle(color: weekdayTextColor)),
+                Text('二', style: TextStyle(color: weekdayTextColor)),
+                Text('三', style: TextStyle(color: weekdayTextColor)),
+                Text('四', style: TextStyle(color: weekdayTextColor)),
+                Text('五', style: TextStyle(color: weekdayTextColor)),
+                Text('六', style: TextStyle(color: Colors.blue)),
+                Text('日', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              itemCount: _totalMonths,
+              itemBuilder: (context, index) {
+                final monthDiff = index - (_totalMonths ~/ 2);
+                final currentMonth = DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month + monthDiff,
+                );
+                return Container(
+                  height: 400, // 固定每个月的高度
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    children: [
+                      if (index > 0) // 不是第一个月才显示月份标题
+                        GestureDetector(
+                          onTap: () => _selectMonth(currentMonth),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color: _displayedMonth.year == currentMonth.year && 
+                                    _displayedMonth.month == currentMonth.month
+                                  ? Colors.blue.withOpacity(0.1)
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${currentMonth.year}年${currentMonth.month}月',
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 16,
+                                    fontWeight: _displayedMonth.year == currentMonth.year && 
+                                              _displayedMonth.month == currentMonth.month
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  color: textColor,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectMonth(DateTime initialMonth) async {
     final DateTime? picked = await showDialog<DateTime>(
       context: context,
       builder: (BuildContext context) {
@@ -74,7 +182,7 @@ class _CalendarPageState extends State<CalendarPage> {
             width: 300,
             height: 400,
             child: YearMonthPicker(
-              initialDate: _displayedMonth,
+              initialDate: initialMonth,
               firstDate: DateTime(2000),
               lastDate: DateTime(2100),
             ),
@@ -167,92 +275,6 @@ class _CalendarPageState extends State<CalendarPage> {
     } catch (_) {
       return false;
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final isDark = brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final otherMonthTextColor = isDark ? Colors.white38 : Colors.black38;
-    final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: GestureDetector(
-          onTap: _selectMonth,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${_displayedMonth.year}年${_displayedMonth.month}月',
-                style: TextStyle(
-                  fontSize: 20,
-                  color: textColor,
-                ),
-              ),
-              Icon(Icons.arrow_drop_down, color: textColor),
-            ],
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text('一', style: TextStyle(color: weekdayTextColor)),
-                Text('二', style: TextStyle(color: weekdayTextColor)),
-                Text('三', style: TextStyle(color: weekdayTextColor)),
-                Text('四', style: TextStyle(color: weekdayTextColor)),
-                Text('五', style: TextStyle(color: weekdayTextColor)),
-                Text('六', style: TextStyle(color: Colors.blue)),
-                Text('日', style: TextStyle(color: Colors.red)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              itemCount: _totalMonths,
-              itemBuilder: (context, index) {
-                final monthDiff = index - (_totalMonths ~/ 2);
-                final currentMonth = DateTime(
-                  DateTime.now().year,
-                  DateTime.now().month + monthDiff,
-                );
-                return Container(
-                  height: 400, // 固定每个月的高度
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      if (index > 0) // 不是第一个月才显示月份标题
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            '${currentMonth.year}年${currentMonth.month}月',
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      Expanded(
-                        child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildMonthGrid(DateTime month, Color textColor, Color otherMonthTextColor) {
