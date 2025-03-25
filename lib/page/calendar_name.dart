@@ -14,10 +14,10 @@ class _CalendarPageState extends State<CalendarPage> {
   late DateTime _displayedMonth;
   late ScrollController _scrollController;
   final Map<String, bool> _svgCache = {}; // 缓存 SVG 存在状态
-  final int _totalMonths = 48; // 显示前后两年的月份
+  late final int _totalMonths; // 从2000年1月到当前月份的总月数
   bool _isScrolling = false;
   bool _isInitialized = false;
-  double? _cachedInitialOffset;
+  double? _pendingScrollOffset;
 
   @override
   void initState() {
@@ -26,28 +26,48 @@ class _CalendarPageState extends State<CalendarPage> {
     _selectedDate = now;
     _displayedMonth = DateTime(now.year, now.month);
     
-    // 预加载默认图标
-    _preloadDefaultIcon();
+    // 计算从2000年1月到当前月份的总月数
+    _totalMonths = (now.year - 2000) * 12 + now.month;
     
-    // 提前计算初始偏移量
+    // 计算初始滚动位置
+    _pendingScrollOffset = (_totalMonths - 1) * 420.0;
+    
+    // 初始化ScrollController并添加监听
+    _scrollController = ScrollController(
+      initialScrollOffset: _pendingScrollOffset!,
+    );
+    _scrollController.addListener(_onScroll);
+    
+    // 延迟初始化以等待布局完成
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _initializeScrollPosition();
+      _initializeCalendar();
     });
   }
 
-  void _initializeScrollPosition() {
+  Future<void> _initializeCalendar() async {
+    if (!mounted) return;
+    
+    // 预加载默认图标
+    await _preloadDefaultIcon();
+    
+    // 预加载当前月份和上个月的SVG
+    final now = DateTime.now();
+    await Future.wait([
+      _preloadSvgForMonth(DateTime(now.year, now.month - 1)),
+      _preloadSvgForMonth(now),
+    ]);
+
+    if (!mounted) return;
+    
+    // 调整滚动位置到屏幕中间
     final screenHeight = MediaQuery.of(context).size.height;
-    final middleIndex = _totalMonths ~/ 2;
-    _cachedInitialOffset = middleIndex * 420.0 - (screenHeight / 2) + 100.0;
+    _pendingScrollOffset = _pendingScrollOffset! - (screenHeight / 2) + 100.0;
     
-    // 立即设置滚动控制器和位置
-    _scrollController = ScrollController(initialScrollOffset: _cachedInitialOffset!);
-    _scrollController.addListener(_onScroll);
-    
-    // 预加载SVG
-    _loadInitialMonths();
-    
+    // 确保ScrollController已经附加到ScrollView
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_pendingScrollOffset!);
+    }
+
     setState(() {
       _isInitialized = true;
     });
@@ -61,54 +81,40 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  Future<void> _loadInitialMonths() async {
-    if (_isInitialized) return;
-    
-    final now = DateTime.now();
-    // 按顺序加载前一个月、当前月和后一个月
-    await _preloadSvgForMonth(DateTime(now.year, now.month - 1));
-    await _preloadSvgForMonth(DateTime(now.year, now.month));
-    await _preloadSvgForMonth(DateTime(now.year, now.month + 1));
-    
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   void _onScroll() {
     if (!_isScrolling) {
       _isScrolling = true;
-      Future.delayed(const Duration(milliseconds: 100), () {
+      Future.delayed(const Duration(milliseconds: 100), () async {
+        if (!mounted) return;
         if (_scrollController.hasClients) {
           final currentIndex = (_scrollController.offset / 420.0).round();
-          final monthDiff = currentIndex - (_totalMonths ~/ 2);
-          final now = DateTime.now();
-          final newMonth = DateTime(
-            now.year + ((now.month + monthDiff - 1) ~/ 12),
-            (now.month + monthDiff - 1) % 12 + 1,
-          );
+          final currentMonth = _getMonthFromIndex(currentIndex);
           
-          if (newMonth != _displayedMonth) {
+          if (currentMonth != _displayedMonth) {
             setState(() {
-              _displayedMonth = newMonth;
+              _displayedMonth = currentMonth;
             });
-            // 预加载前后月份的SVG
-            _preloadSvgForMonth(DateTime(newMonth.year, newMonth.month - 1));
-            _preloadSvgForMonth(newMonth);
-            _preloadSvgForMonth(DateTime(newMonth.year, newMonth.month + 1));
+            
+            // 异步预加载新月份的SVG
+            if (mounted) {
+              Future.wait([
+                _preloadSvgForMonth(DateTime(currentMonth.year, currentMonth.month - 1)),
+                _preloadSvgForMonth(currentMonth),
+              ]);
+            }
           }
         }
         _isScrolling = false;
       });
     }
+  }
+
+  DateTime _getMonthFromIndex(int index) {
+    // 从2000年1月开始计算
+    final totalMonths = index + 1; // 加1是因为从0开始计数
+    final year = 2000 + (totalMonths - 1) ~/ 12;
+    final month = ((totalMonths - 1) % 12) + 1;
+    return DateTime(year, month);
   }
 
   @override
@@ -152,61 +158,50 @@ class _CalendarPageState extends State<CalendarPage> {
                 controller: _scrollController,
                 itemCount: _totalMonths,
                 itemBuilder: (context, index) {
-                  final monthDiff = index - (_totalMonths ~/ 2);
-                  final now = DateTime.now();
-                  final currentMonth = DateTime(
-                    now.year + ((now.month + monthDiff - 1) ~/ 12),
-                    (now.month + monthDiff - 1) % 12 + 1,
-                  );
-                  
-                  // 预加载当前显示的月份的SVG
-                  if (_isInitialized && !_isScrolling) {
-                    _preloadSvgForMonth(currentMonth);
-                  }
+                  final currentMonth = _getMonthFromIndex(index);
                   
                   return Container(
-                    height: 420, // 增加容器高度，为SVG图标留出更多空间
+                    height: 420,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Column(
                       children: [
-                        if (index > 0) // 不是第一个月才显示月份标题
-                          GestureDetector(
-                            onTap: () => _selectMonth(currentMonth),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                color: _displayedMonth.year == currentMonth.year && 
-                                      _displayedMonth.month == currentMonth.month
-                                    ? Colors.blue.withOpacity(0.1)
-                                    : null,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${currentMonth.year}年${currentMonth.month}月',
-                                    style: TextStyle(
-                                      color: textColor,
-                                      fontSize: 16,
-                                      fontWeight: _displayedMonth.year == currentMonth.year && 
-                                                _displayedMonth.month == currentMonth.month
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.arrow_drop_down,
+                        GestureDetector(
+                          onTap: () => _selectMonth(currentMonth),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color: _displayedMonth.year == currentMonth.year && 
+                                    _displayedMonth.month == currentMonth.month
+                                  ? Colors.blue.withOpacity(0.1)
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${currentMonth.year}年${currentMonth.month}月',
+                                  style: TextStyle(
                                     color: textColor,
-                                    size: 20,
+                                    fontSize: 16,
+                                    fontWeight: _displayedMonth.year == currentMonth.year && 
+                                              _displayedMonth.month == currentMonth.month
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
                                   ),
-                                ],
-                              ),
+                                ),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  color: textColor,
+                                  size: 20,
+                                ),
+                              ],
                             ),
                           ),
+                        ),
                         Expanded(
                           child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
                         ),
@@ -223,6 +218,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _selectMonth(DateTime initialMonth) async {
+    final now = DateTime.now();
     final DateTime? picked = await showDialog<DateTime>(
       context: context,
       builder: (BuildContext context) {
@@ -232,8 +228,8 @@ class _CalendarPageState extends State<CalendarPage> {
             height: 400,
             child: YearMonthPicker(
               initialDate: initialMonth,
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2100),
+              firstDate: DateTime(2000, 1),
+              lastDate: DateTime(now.year, now.month),
             ),
           ),
         );
@@ -245,16 +241,16 @@ class _CalendarPageState extends State<CalendarPage> {
         _displayedMonth = picked;
       });
       
-      // 预加载当前月和上个月的SVG
+      // 预加载选中月份的SVG
       _preloadSvgForMonth(picked);
-      _preloadSvgForMonth(DateTime(picked.year, picked.month - 1));
+      if (picked.month > 1) {
+        _preloadSvgForMonth(DateTime(picked.year, picked.month - 1));
+      }
       
-      // 滚动到选中的月份
+      // 计算目标滚动位置
       final screenHeight = MediaQuery.of(context).size.height;
-      final middleIndex = _totalMonths ~/ 2;
-      final monthDiff = _displayedMonth.month - DateTime.now().month +
-          (_displayedMonth.year - DateTime.now().year) * 12;
-      final targetOffset = (middleIndex + monthDiff) * 420.0 - (screenHeight / 2) + 100.0;
+      final monthIndex = (picked.year - 2000) * 12 + picked.month - 1;
+      final targetOffset = monthIndex * 420.0 - (screenHeight / 2) + 100.0;
       
       _scrollController.animateTo(
         targetOffset,
@@ -407,6 +403,12 @@ class _CalendarPageState extends State<CalendarPage> {
     } catch (_) {
       return false;
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 }
 
