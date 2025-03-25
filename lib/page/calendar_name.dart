@@ -30,9 +30,9 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
     _selectedDate = now;
     _displayedMonth = DateTime(now.year, now.month);
     
-    // 初始化动画控制器
+    // 初始化动画控制器，增加动画时长
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1200), // 从800ms增加到1200ms
       vsync: this,
     );
     
