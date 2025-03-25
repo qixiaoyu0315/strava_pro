@@ -74,101 +74,88 @@ class _CalendarPageState extends State<CalendarPage> {
     final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+      body: SafeArea(
+        child: Column(
           children: [
-            Text(
-              '${_displayedMonth.year}年${_displayedMonth.month}月',
-              style: TextStyle(
-                fontSize: 20,
-                color: textColor,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Text('一', style: TextStyle(color: weekdayTextColor)),
+                  Text('二', style: TextStyle(color: weekdayTextColor)),
+                  Text('三', style: TextStyle(color: weekdayTextColor)),
+                  Text('四', style: TextStyle(color: weekdayTextColor)),
+                  Text('五', style: TextStyle(color: weekdayTextColor)),
+                  Text('六', style: TextStyle(color: Colors.blue)),
+                  Text('日', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                itemCount: _totalMonths,
+                itemBuilder: (context, index) {
+                  final monthDiff = index - (_totalMonths ~/ 2);
+                  final currentMonth = DateTime(
+                    DateTime.now().year,
+                    DateTime.now().month + monthDiff,
+                  );
+                  return Container(
+                    height: 420, // 增加容器高度，为SVG图标留出更多空间
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      children: [
+                        if (index > 0) // 不是第一个月才显示月份标题
+                          GestureDetector(
+                            onTap: () => _selectMonth(currentMonth),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                color: _displayedMonth.year == currentMonth.year && 
+                                      _displayedMonth.month == currentMonth.month
+                                    ? Colors.blue.withOpacity(0.1)
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${currentMonth.year}年${currentMonth.month}月',
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontSize: 16,
+                                      fontWeight: _displayedMonth.year == currentMonth.year && 
+                                                _displayedMonth.month == currentMonth.month
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    color: textColor,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        Expanded(
+                          child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text('一', style: TextStyle(color: weekdayTextColor)),
-                Text('二', style: TextStyle(color: weekdayTextColor)),
-                Text('三', style: TextStyle(color: weekdayTextColor)),
-                Text('四', style: TextStyle(color: weekdayTextColor)),
-                Text('五', style: TextStyle(color: weekdayTextColor)),
-                Text('六', style: TextStyle(color: Colors.blue)),
-                Text('日', style: TextStyle(color: Colors.red)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              itemCount: _totalMonths,
-              itemBuilder: (context, index) {
-                final monthDiff = index - (_totalMonths ~/ 2);
-                final currentMonth = DateTime(
-                  DateTime.now().year,
-                  DateTime.now().month + monthDiff,
-                );
-                return Container(
-                  height: 400, // 固定每个月的高度
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      if (index > 0) // 不是第一个月才显示月份标题
-                        GestureDetector(
-                          onTap: () => _selectMonth(currentMonth),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 16,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              color: _displayedMonth.year == currentMonth.year && 
-                                    _displayedMonth.month == currentMonth.month
-                                  ? Colors.blue.withOpacity(0.1)
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${currentMonth.year}年${currentMonth.month}月',
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 16,
-                                    fontWeight: _displayedMonth.year == currentMonth.year && 
-                                              _displayedMonth.month == currentMonth.month
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_drop_down,
-                                  color: textColor,
-                                  size: 20,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      Expanded(
-                        child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -211,43 +198,18 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   List<DateTime?> _getDaysInMonth(DateTime month) {
-    final List<DateTime?> days = [];
+    final List<DateTime?> days = List.filled(42, null); // 保持42个格子的大小，但用null填充
     
-    // 获取上个月的最后几天
+    // 获取当月第一天是星期几
     final firstDayOfMonth = DateTime(month.year, month.month, 1);
     final firstWeekday = firstDayOfMonth.weekday;
-    if (firstWeekday > 1) {
-      final lastDayOfPrevMonth = DateTime(month.year, month.month, 0);
-      for (int i = firstWeekday - 2; i >= 0; i--) {
-        days.add(DateTime(
-          lastDayOfPrevMonth.year,
-          lastDayOfPrevMonth.month,
-          lastDayOfPrevMonth.day - i,
-        ));
-      }
-    }
-
-    // 当前月的天数
+    
+    // 获取当月天数
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    for (int i = 1; i <= daysInMonth; i++) {
-      days.add(DateTime(month.year, month.month, i));
-    }
-
-    // 下个月的开始几天
-    final lastDayWeekday = DateTime(month.year, month.month, daysInMonth).weekday;
-    if (lastDayWeekday < 7) {
-      for (int i = 1; i <= 7 - lastDayWeekday; i++) {
-        days.add(DateTime(month.year, month.month + 1, i));
-      }
-    }
-
-    // 确保总是显示6周
-    while (days.length < 42) {
-      days.add(DateTime(
-        month.year,
-        month.month + 1,
-        days.length - daysInMonth + 1,
-      ));
+    
+    // 只添加当月的日期
+    for (int i = 0; i < daysInMonth; i++) {
+      days[firstWeekday - 1 + i] = DateTime(month.year, month.month, i + 1);
     }
 
     return days;
@@ -284,12 +246,12 @@ class _CalendarPageState extends State<CalendarPage> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 7,
-        childAspectRatio: 1.0,
+        childAspectRatio: 0.85,
       ),
       itemCount: 42,
       itemBuilder: (context, index) {
         final day = days[index];
-        if (day == null) return const SizedBox();
+        if (day == null) return const SizedBox(); // 空白格子
 
         final isToday = day.year == DateTime.now().year &&
             day.month == DateTime.now().month &&
@@ -299,8 +261,6 @@ class _CalendarPageState extends State<CalendarPage> {
             day.month == _selectedDate.month &&
             day.day == _selectedDate.day;
             
-        final isCurrentMonth = day.month == month.month;
-        
         final isWeekend = day.weekday == 6 || day.weekday == 7;
 
         String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
@@ -334,31 +294,29 @@ class _CalendarPageState extends State<CalendarPage> {
                   style: TextStyle(
                     color: isSelected
                         ? Colors.white
-                        : isCurrentMonth
-                            ? isWeekend
-                                ? isToday
-                                    ? Colors.blue
-                                    : day.weekday == 7
-                                        ? Colors.red
-                                        : Colors.blue
-                                : textColor
-                            : otherMonthTextColor,
+                        : isWeekend
+                            ? isToday
+                                ? Colors.blue
+                                : day.weekday == 7
+                                    ? Colors.red
+                                    : Colors.blue
+                            : textColor,
                     fontWeight: isToday ? FontWeight.bold : null,
                   ),
                 ),
-                if (isCurrentMonth)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: SvgPicture.asset(
-                        assetToLoad,
-                        colorFilter: ColorFilter.mode(
-                          isSelected ? Colors.white : Colors.green,
-                          BlendMode.srcIn,
-                        ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: SvgPicture.asset(
+                      assetToLoad,
+                      colorFilter: ColorFilter.mode(
+                        isSelected ? Colors.white : Colors.green,
+                        BlendMode.srcIn,
                       ),
+                      fit: BoxFit.contain,
                     ),
                   ),
+                ),
               ],
             ),
           ),
