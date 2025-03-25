@@ -14,10 +14,9 @@ class _CalendarPageState extends State<CalendarPage> {
   late DateTime _displayedMonth;
   late ScrollController _scrollController;
   final Map<String, bool> _svgCache = {}; // 缓存 SVG 存在状态
-  late final int _totalMonths; // 从2000年1月到当前月份的总月数
+  final List<DateTime> _loadedMonths = [];
   bool _isScrolling = false;
   bool _isInitialized = false;
-  double? _pendingScrollOffset;
 
   @override
   void initState() {
@@ -26,10 +25,10 @@ class _CalendarPageState extends State<CalendarPage> {
     _selectedDate = now;
     _displayedMonth = DateTime(now.year, now.month);
     
-    // 计算从2000年1月到当前月份的总月数
-    _totalMonths = (now.year - 2000) * 12 + now.month;
+    // 初始化加载最近三个月
+    _initializeMonths();
     
-    // 初始化ScrollController
+    // 初始化ScrollController并添加监听
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     
@@ -39,38 +38,44 @@ class _CalendarPageState extends State<CalendarPage> {
     });
   }
 
+  void _initializeMonths() {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month);
+    
+    // 添加当前月份和前两个月（按时间正序添加）
+    for (int i = -2; i <= 0; i++) {
+      final month = DateTime(currentMonth.year, currentMonth.month + i);
+      if (month.month == 0) {
+        _loadedMonths.add(DateTime(month.year - 1, 12));
+      } else if (month.month == 13) {
+        _loadedMonths.add(DateTime(month.year + 1, 1));
+      } else {
+        _loadedMonths.add(month);
+      }
+    }
+  }
+
   Future<void> _initializeCalendar() async {
     if (!mounted) return;
     
     // 预加载默认图标
     await _preloadDefaultIcon();
     
-    // 预加载当前月份和上个月的SVG
-    final now = DateTime.now();
-    await Future.wait([
-      _preloadSvgForMonth(DateTime(now.year, now.month - 1)),
-      _preloadSvgForMonth(now),
-    ]);
+    // 预加载最近三个月的SVG
+    await Future.wait(
+      _loadedMonths.map((month) => _preloadSvgForMonth(month))
+    );
 
     if (!mounted) return;
     
     setState(() {
       _isInitialized = true;
     });
-    
-    // 在setState之后，等待下一帧渲染完成后，滚动到当前月份
+
+    // 滚动到当前月份（最后一个）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      
-      // 计算当前月份索引（从0开始）
-      final currentMonthIndex = _totalMonths - 1;
-      
-      // 计算屏幕高度，确保当前月份在屏幕中间
-      final screenHeight = MediaQuery.of(context).size.height;
-      final offset = currentMonthIndex * 420.0 - (screenHeight / 2) + 210.0;
-      
-      // 跳转到当前月份位置
-      _scrollController.jumpTo(offset);
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     });
   }
 
@@ -88,20 +93,20 @@ class _CalendarPageState extends State<CalendarPage> {
       Future.delayed(const Duration(milliseconds: 100), () async {
         if (!mounted) return;
         if (_scrollController.hasClients) {
-          final currentIndex = (_scrollController.offset / 420.0).round();
-          final currentMonth = _getMonthFromIndex(currentIndex);
+          // 检测是否需要加载更多历史月份
+          if (_scrollController.position.pixels < 500) {
+            await _loadPreviousMonth();
+          }
           
-          if (currentMonth != _displayedMonth) {
-            setState(() {
-              _displayedMonth = currentMonth;
-            });
-            
-            // 异步预加载新月份的SVG
-            if (mounted) {
-              Future.wait([
-                _preloadSvgForMonth(DateTime(currentMonth.year, currentMonth.month - 1)),
-                _preloadSvgForMonth(currentMonth),
-              ]);
+          // 更新当前显示的月份
+          final visibleIndex = (_scrollController.position.pixels / 420.0).round();
+          if (visibleIndex >= 0 && visibleIndex < _loadedMonths.length) {
+            final newDisplayedMonth = _loadedMonths[visibleIndex];
+            if (newDisplayedMonth.year != _displayedMonth.year || 
+                newDisplayedMonth.month != _displayedMonth.month) {
+              setState(() {
+                _displayedMonth = newDisplayedMonth;
+              });
             }
           }
         }
@@ -110,12 +115,35 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
-  DateTime _getMonthFromIndex(int index) {
-    // 从2000年1月开始计算
-    final totalMonths = index + 1; // 加1是因为从0开始计数
-    final year = 2000 + (totalMonths - 1) ~/ 12;
-    final month = ((totalMonths - 1) % 12) + 1;
-    return DateTime(year, month);
+  Future<void> _loadPreviousMonth() async {
+    if (_loadedMonths.isEmpty) return;
+    
+    final firstMonth = _loadedMonths.first;
+    final prevMonth = DateTime(firstMonth.year, firstMonth.month - 1);
+    
+    DateTime monthToAdd;
+    if (prevMonth.month == 0) {
+      monthToAdd = DateTime(prevMonth.year - 1, 12);
+    } else {
+      monthToAdd = prevMonth;
+    }
+    
+    // 检查是否已经加载了这个月份
+    if (_loadedMonths.any((m) => m.year == monthToAdd.year && m.month == monthToAdd.month)) {
+      return;
+    }
+    
+    setState(() {
+      _loadedMonths.insert(0, monthToAdd);
+    });
+    
+    // 预加载新月份的SVG
+    await _preloadSvgForMonth(monthToAdd);
+    
+    // 调整滚动位置以保持当前视图
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.pixels + 420);
+    }
   }
 
   @override
@@ -157,9 +185,10 @@ class _CalendarPageState extends State<CalendarPage> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                itemCount: _totalMonths,
+                itemCount: _loadedMonths.length,
                 itemBuilder: (context, index) {
-                  final currentMonth = _getMonthFromIndex(index);
+                  // 正向构建月份，最早的月份在顶部
+                  final currentMonth = _loadedMonths[index];
                   
                   return Container(
                     height: 420,
@@ -238,27 +267,69 @@ class _CalendarPageState extends State<CalendarPage> {
     );
 
     if (picked != null && picked != _displayedMonth) {
+      // 检查是否需要加载选中月份之前的月份
+      await _loadMonthsUntil(picked);
+      
       setState(() {
         _displayedMonth = picked;
       });
       
-      // 预加载选中月份的SVG
-      _preloadSvgForMonth(picked);
-      if (picked.month > 1) {
-        _preloadSvgForMonth(DateTime(picked.year, picked.month - 1));
+      // 计算选中月份在列表中的位置
+      final monthIndex = _loadedMonths.indexWhere(
+        (m) => m.year == picked.year && m.month == picked.month
+      );
+      
+      if (monthIndex != -1) {
+        // 滚动到选中的月份
+        _scrollController.animateTo(
+          monthIndex * 420.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
-      
-      // 计算目标滚动位置
-      final screenHeight = MediaQuery.of(context).size.height;
-      final monthIndex = (picked.year - 2000) * 12 + picked.month - 1;
-      final targetOffset = monthIndex * 420.0 - (screenHeight / 2) + 100.0;
-      
-      _scrollController.animateTo(
-        targetOffset,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+    }
+  }
+
+  Future<void> _loadMonthsUntil(DateTime targetMonth) async {
+    if (_loadedMonths.isEmpty) return;
+    
+    // 检查目标月份是否已加载
+    if (_loadedMonths.any((m) => m.year == targetMonth.year && m.month == targetMonth.month)) {
+      return;
+    }
+    
+    // 计算需要加载的月份
+    final firstLoadedMonth = _loadedMonths.first;
+    final monthsDiff = (firstLoadedMonth.year - targetMonth.year) * 12 + 
+                      (firstLoadedMonth.month - targetMonth.month);
+    
+    if (monthsDiff <= 0) return; // 目标月份在已加载月份之后，无需加载
+    
+    // 逐个加载月份直到目标月份
+    DateTime currentMonth = targetMonth;
+    List<DateTime> monthsToAdd = [];
+    
+    while (currentMonth.year != firstLoadedMonth.year || 
+           currentMonth.month != firstLoadedMonth.month) {
+      monthsToAdd.add(currentMonth);
+      currentMonth = DateTime(
+        currentMonth.year + (currentMonth.month == 12 ? 1 : 0),
+        currentMonth.month == 12 ? 1 : currentMonth.month + 1
       );
     }
+    
+    // 按时间顺序添加月份
+    monthsToAdd = monthsToAdd.reversed.toList();
+    
+    // 批量加载月份
+    setState(() {
+      _loadedMonths.insertAll(0, monthsToAdd);
+    });
+    
+    // 预加载所有新月份的SVG
+    await Future.wait(
+      monthsToAdd.map((month) => _preloadSvgForMonth(month))
+    );
   }
 
   List<DateTime?> _getDaysInMonth(DateTime month) {
