@@ -192,7 +192,7 @@ class _RoutePageState extends State<RoutePage> {
                                                   children: [
                                                     Icon(Icons.directions_bike),
                                                     SizedBox(width: 4),
-                                                    Text('${routeList[index]['distance']?.toStringAsFixed(2)} km'),
+                                                    Text('${routeList[index]['distance']?.toStringAsFixed(1)} km'),
                                                   ],
                                                 ),
                                                 SizedBox(height: 8),

@@ -53,8 +53,8 @@ class _MainAppState extends State<MainApp> {
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: '首页',
+              icon: Icon(Icons.calendar_month),
+              label: '日历',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.route),
