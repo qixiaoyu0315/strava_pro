@@ -16,31 +16,65 @@ class _CalendarPageState extends State<CalendarPage> {
   final Map<String, bool> _svgCache = {}; // 缓存 SVG 存在状态
   final int _totalMonths = 48; // 显示前后两年的月份
   bool _isScrolling = false;
+  bool _isInitialized = false;
+  double? _cachedInitialOffset;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
-    _displayedMonth = DateTime(_selectedDate.year, _selectedDate.month);
-    _scrollController = ScrollController(); // 临时初始化
-
-    // 计算屏幕高度的一半位置
+    final now = DateTime.now();
+    _selectedDate = now;
+    _displayedMonth = DateTime(now.year, now.month);
+    
+    // 预加载默认图标
+    _preloadDefaultIcon();
+    
+    // 提前计算初始偏移量
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final now = DateTime.now();
-      final screenHeight = MediaQuery.of(context).size.height;
-      final middleIndex = _totalMonths ~/ 2;
-      final initialOffset = middleIndex * 420.0 - (screenHeight / 2) + 100.0;
-      
-      _scrollController.jumpTo(initialOffset);
-      _scrollController.addListener(_onScroll);
-      
-      // 预加载当前月和前后月份的SVG
-      _preloadSvgForMonth(DateTime(now.year, now.month - 1)); // 上个月
-      _preloadSvgForMonth(DateTime(now.year, now.month));     // 当前月
-      _preloadSvgForMonth(DateTime(now.year, now.month + 1)); // 下个月
-      
-      setState(() {});
+      if (!mounted) return;
+      _initializeScrollPosition();
     });
+  }
+
+  void _initializeScrollPosition() {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final middleIndex = _totalMonths ~/ 2;
+    _cachedInitialOffset = middleIndex * 420.0 - (screenHeight / 2) + 100.0;
+    
+    // 立即设置滚动控制器和位置
+    _scrollController = ScrollController(initialScrollOffset: _cachedInitialOffset!);
+    _scrollController.addListener(_onScroll);
+    
+    // 预加载SVG
+    _loadInitialMonths();
+    
+    setState(() {
+      _isInitialized = true;
+    });
+  }
+
+  Future<void> _preloadDefaultIcon() async {
+    try {
+      await rootBundle.load('assets/calendar_icon.svg');
+    } catch (e) {
+      debugPrint('Failed to load default calendar icon: $e');
+    }
+  }
+
+  Future<void> _loadInitialMonths() async {
+    if (_isInitialized) return;
+    
+    final now = DateTime.now();
+    // 按顺序加载前一个月、当前月和后一个月
+    await _preloadSvgForMonth(DateTime(now.year, now.month - 1));
+    await _preloadSvgForMonth(DateTime(now.year, now.month));
+    await _preloadSvgForMonth(DateTime(now.year, now.month + 1));
+    
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
+    }
   }
 
   @override
@@ -85,6 +119,15 @@ class _CalendarPageState extends State<CalendarPage> {
     final otherMonthTextColor = isDark ? Colors.white38 : Colors.black38;
     final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
 
+    // 如果还没有初始化完成，显示加载指示器
+    if (!_isInitialized) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -115,6 +158,12 @@ class _CalendarPageState extends State<CalendarPage> {
                     now.year + ((now.month + monthDiff - 1) ~/ 12),
                     (now.month + monthDiff - 1) % 12 + 1,
                   );
+                  
+                  // 预加载当前显示的月份的SVG
+                  if (_isInitialized && !_isScrolling) {
+                    _preloadSvgForMonth(currentMonth);
+                  }
+                  
                   return Container(
                     height: 420, // 增加容器高度，为SVG图标留出更多空间
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -233,41 +282,6 @@ class _CalendarPageState extends State<CalendarPage> {
     return days;
   }
 
-  Future<void> _preloadSvgForMonth(DateTime month) async {
-    // 处理月份跨年的情况
-    if (month.month == 0) {
-      month = DateTime(month.year - 1, 12);
-    } else if (month.month == 13) {
-      month = DateTime(month.year + 1, 1);
-    }
-    
-    final List<DateTime?> days = _getDaysInMonth(month);
-    for (final day in days) {
-      if (day == null) continue;
-      String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
-      String svgPath = 'assets/$formattedDate';
-
-      if (!_svgCache.containsKey(svgPath)) {
-        _svgCache[svgPath] = await _doesSvgExist(svgPath);
-      }
-    }
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<bool> _doesSvgExist(String assetPath) async {
-    if (_svgCache.containsKey(assetPath)) {
-      return _svgCache[assetPath]!;
-    }
-    try {
-      await rootBundle.load(assetPath);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Widget _buildMonthGrid(DateTime month, Color textColor, Color otherMonthTextColor) {
     final days = _getDaysInMonth(month);
     
@@ -280,7 +294,7 @@ class _CalendarPageState extends State<CalendarPage> {
       itemCount: 42,
       itemBuilder: (context, index) {
         final day = days[index];
-        if (day == null) return const SizedBox(); // 空白格子
+        if (day == null) return const SizedBox();
 
         final isToday = day.year == DateTime.now().year &&
             day.month == DateTime.now().month &&
@@ -292,13 +306,7 @@ class _CalendarPageState extends State<CalendarPage> {
             
         final isWeekend = day.weekday == 6 || day.weekday == 7;
 
-        String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
-        String svgPath = 'assets/$formattedDate';
-
-        String assetToLoad = (_svgCache.containsKey(svgPath) && _svgCache[svgPath]!)
-            ? svgPath
-            : 'assets/calendar_icon.svg';
-
+        // 构建日期格子
         return GestureDetector(
           onTap: () {
             setState(() {
@@ -336,14 +344,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                    child: SvgPicture.asset(
-                      assetToLoad,
-                      colorFilter: ColorFilter.mode(
-                        isSelected ? Colors.white : Colors.green,
-                        BlendMode.srcIn,
-                      ),
-                      fit: BoxFit.contain,
-                    ),
+                    child: _buildDayIcon(day, isSelected),
                   ),
                 ),
               ],
@@ -352,6 +353,60 @@ class _CalendarPageState extends State<CalendarPage> {
         );
       },
     );
+  }
+
+  Widget _buildDayIcon(DateTime day, bool isSelected) {
+    String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
+    String svgPath = 'assets/$formattedDate';
+    
+    // 如果SVG缓存中没有该日期，或者缓存显示该SVG不存在，使用默认图标
+    String assetToLoad = (_svgCache.containsKey(svgPath) && _svgCache[svgPath]!)
+        ? svgPath
+        : 'assets/calendar_icon.svg';
+
+    return SvgPicture.asset(
+      assetToLoad,
+      colorFilter: ColorFilter.mode(
+        isSelected ? Colors.white : Colors.green,
+        BlendMode.srcIn,
+      ),
+      fit: BoxFit.contain,
+    );
+  }
+
+  Future<void> _preloadSvgForMonth(DateTime month) async {
+    // 处理月份跨年的情况
+    if (month.month == 0) {
+      month = DateTime(month.year - 1, 12);
+    } else if (month.month == 13) {
+      month = DateTime(month.year + 1, 1);
+    }
+    
+    final List<DateTime?> days = _getDaysInMonth(month);
+    for (final day in days) {
+      if (day == null) continue;
+      String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
+      String svgPath = 'assets/$formattedDate';
+
+      if (!_svgCache.containsKey(svgPath)) {
+        _svgCache[svgPath] = await _doesSvgExist(svgPath);
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<bool> _doesSvgExist(String assetPath) async {
+    if (_svgCache.containsKey(assetPath)) {
+      return _svgCache[assetPath]!;
+    }
+    try {
+      await rootBundle.load(assetPath);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
