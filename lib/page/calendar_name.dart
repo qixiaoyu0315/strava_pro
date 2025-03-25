@@ -104,11 +104,8 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
   }
 
   Future<void> _preloadDefaultIcon() async {
-    try {
-      await rootBundle.load('assets/calendar_icon.svg');
-    } catch (e) {
-      debugPrint('Failed to load default calendar icon: $e');
-    }
+    // 不再需要预加载默认SVG，因为使用系统图标
+    return;
   }
 
   void _onScroll() {
@@ -504,13 +501,18 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
     String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
     String svgPath = 'assets/$formattedDate';
     
-    // 如果SVG缓存中没有该日期，或者缓存显示该SVG不存在，使用默认图标
-    String assetToLoad = (_svgCache.containsKey(svgPath) && _svgCache[svgPath]!)
-        ? svgPath
-        : 'assets/calendar_icon.svg';
+    // 如果SVG缓存中没有该日期，或者缓存显示该SVG不存在，使用默认笑脸图标
+    if (!_svgCache.containsKey(svgPath) || !_svgCache[svgPath]!) {
+      return Icon(
+        Icons.sentiment_satisfied_alt_rounded,
+        color: isSelected ? Colors.white : Colors.grey[400],
+        size: 24,
+      );
+    }
 
+    // 如果有对应的SVG图标，则使用SVG
     return SvgPicture.asset(
-      assetToLoad,
+      svgPath,
       colorFilter: ColorFilter.mode(
         isSelected ? Colors.white : Colors.green,
         BlendMode.srcIn,
