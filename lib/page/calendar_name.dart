@@ -9,7 +9,8 @@ class CalendarPage extends StatefulWidget {
   State<CalendarPage> createState() => _CalendarPageState();
 }
 
-class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderStateMixin {
+class _CalendarPageState extends State<CalendarPage>
+    with SingleTickerProviderStateMixin {
   late DateTime _selectedDate;
   late DateTime _displayedMonth;
   late ScrollController _scrollController;
@@ -17,7 +18,7 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
   final List<DateTime> _loadedMonths = [];
   bool _isScrolling = false;
   bool _isInitialized = false;
-  
+
   // 添加动画控制器
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -29,30 +30,30 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
     final now = DateTime.now();
     _selectedDate = now;
     _displayedMonth = DateTime(now.year, now.month);
-    
+
     // 初始化动画控制器，增加动画时长
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200), // 从800ms增加到1200ms
       vsync: this,
     );
-    
+
     _scaleAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOutBack,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-    
+
     // 初始化加载最近三个月
     _initializeMonths();
-    
+
     // 初始化ScrollController并添加监听
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
-    
+
     // 延迟初始化以等待布局完成
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCalendar();
@@ -62,7 +63,7 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
   void _initializeMonths() {
     final now = DateTime.now();
     final currentMonth = DateTime(now.year, now.month);
-    
+
     // 添加当前月份和前两个月（按时间正序添加）
     for (int i = -2; i <= 0; i++) {
       final month = DateTime(currentMonth.year, currentMonth.month + i);
@@ -78,21 +79,19 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
 
   Future<void> _initializeCalendar() async {
     if (!mounted) return;
-    
+
     // 预加载默认图标
     await _preloadDefaultIcon();
-    
+
     // 预加载最近三个月的SVG
-    await Future.wait(
-      _loadedMonths.map((month) => _preloadSvgForMonth(month))
-    );
+    await Future.wait(_loadedMonths.map((month) => _preloadSvgForMonth(month)));
 
     if (!mounted) return;
-    
+
     setState(() {
       _isInitialized = true;
     });
-    
+
     // 开始播放动画
     _animationController.forward();
 
@@ -111,7 +110,7 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
   void _onScroll() {
     if (!_isScrolling) {
       _isScrolling = true;
-      
+
       // 使用防抖，减少滚动过程中的计算频率
       Future.delayed(const Duration(milliseconds: 150), () async {
         if (!mounted) return;
@@ -121,12 +120,13 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
             // 批量加载多个月份，减少频繁加载
             await _loadPreviousMonths(3); // 一次加载3个月
           }
-          
+
           // 更新当前显示的月份，使用节流避免频繁更新
-          final visibleIndex = (_scrollController.position.pixels / 420.0).round();
+          final visibleIndex =
+              (_scrollController.position.pixels / 420.0).round();
           if (visibleIndex >= 0 && visibleIndex < _loadedMonths.length) {
             final newDisplayedMonth = _loadedMonths[visibleIndex];
-            if (newDisplayedMonth.year != _displayedMonth.year || 
+            if (newDisplayedMonth.year != _displayedMonth.year ||
                 newDisplayedMonth.month != _displayedMonth.month) {
               setState(() {
                 _displayedMonth = newDisplayedMonth;
@@ -141,15 +141,15 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
 
   Future<void> _loadPreviousMonths(int count) async {
     if (_loadedMonths.isEmpty) return;
-    
+
     final firstMonth = _loadedMonths.first;
     List<DateTime> monthsToAdd = [];
-    
+
     // 计算需要加载的月份
     for (int i = 1; i <= count; i++) {
       final prevMonth = DateTime(firstMonth.year, firstMonth.month - i);
       DateTime monthToAdd;
-      
+
       if (prevMonth.month == 0) {
         monthToAdd = DateTime(prevMonth.year - 1, 12);
       } else if (prevMonth.month < 0) {
@@ -159,28 +159,31 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
       } else {
         monthToAdd = prevMonth;
       }
-      
+
       // 检查是否已经加载了这个月份
-      if (!_loadedMonths.any((m) => m.year == monthToAdd.year && m.month == monthToAdd.month)) {
+      if (!_loadedMonths.any(
+          (m) => m.year == monthToAdd.year && m.month == monthToAdd.month)) {
         monthsToAdd.add(monthToAdd);
       }
     }
-    
+
     if (monthsToAdd.isEmpty) return;
-    
+
+    // 按照从新到旧的顺序排序月份
+    monthsToAdd.sort((a, b) => a.compareTo(b));
+
     // 批量更新状态
     setState(() {
       _loadedMonths.insertAll(0, monthsToAdd);
     });
-    
+
     // 批量预加载SVG
-    await Future.wait(
-      monthsToAdd.map((month) => _preloadSvgForMonth(month))
-    );
-    
+    await Future.wait(monthsToAdd.map((month) => _preloadSvgForMonth(month)));
+
     // 调整滚动位置以保持当前视图
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(_scrollController.position.pixels + (420.0 * monthsToAdd.length));
+      _scrollController.jumpTo(
+          _scrollController.position.pixels + (420.0 * monthsToAdd.length));
     }
   }
 
@@ -241,7 +244,8 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
                           return AnimatedBuilder(
                             animation: _animationController,
                             builder: (context, child) {
-                              final delay = (index / _loadedMonths.length) * 0.5;
+                              final delay =
+                                  (index / _loadedMonths.length) * 0.5;
                               final itemAnimation = CurvedAnimation(
                                 parent: _animationController,
                                 curve: Interval(
@@ -250,7 +254,7 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
                                   curve: Curves.easeOutBack,
                                 ),
                               );
-                              
+
                               return Transform.scale(
                                 scale: 0.8 + (0.2 * itemAnimation.value),
                                 child: Opacity(
@@ -273,8 +277,10 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
                                       ),
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(20),
-                                        color: _displayedMonth.year == currentMonth.year && 
-                                              _displayedMonth.month == currentMonth.month
+                                        color: _displayedMonth.year ==
+                                                    currentMonth.year &&
+                                                _displayedMonth.month ==
+                                                    currentMonth.month
                                             ? Colors.blue.withOpacity(0.1)
                                             : null,
                                       ),
@@ -286,8 +292,11 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
                                             style: TextStyle(
                                               color: textColor,
                                               fontSize: 16,
-                                              fontWeight: _displayedMonth.year == currentMonth.year && 
-                                                        _displayedMonth.month == currentMonth.month
+                                              fontWeight: _displayedMonth
+                                                              .year ==
+                                                          currentMonth.year &&
+                                                      _displayedMonth.month ==
+                                                          currentMonth.month
                                                   ? FontWeight.bold
                                                   : FontWeight.w500,
                                             ),
@@ -302,7 +311,8 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
                                     ),
                                   ),
                                   Expanded(
-                                    child: _buildMonthGrid(currentMonth, textColor, otherMonthTextColor),
+                                    child: _buildMonthGrid(currentMonth,
+                                        textColor, otherMonthTextColor),
                                   ),
                                 ],
                               ),
@@ -343,16 +353,15 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
     if (picked != null && picked != _displayedMonth) {
       // 检查是否需要加载选中月份之前的月份
       await _loadMonthsUntil(picked);
-      
+
       setState(() {
         _displayedMonth = picked;
       });
-      
+
       // 计算选中月份在列表中的位置
-      final monthIndex = _loadedMonths.indexWhere(
-        (m) => m.year == picked.year && m.month == picked.month
-      );
-      
+      final monthIndex = _loadedMonths
+          .indexWhere((m) => m.year == picked.year && m.month == picked.month);
+
       if (monthIndex != -1) {
         // 滚动到选中的月份
         _scrollController.animateTo(
@@ -366,56 +375,54 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
 
   Future<void> _loadMonthsUntil(DateTime targetMonth) async {
     if (_loadedMonths.isEmpty) return;
-    
+
     // 检查目标月份是否已加载
-    if (_loadedMonths.any((m) => m.year == targetMonth.year && m.month == targetMonth.month)) {
+    if (_loadedMonths.any(
+        (m) => m.year == targetMonth.year && m.month == targetMonth.month)) {
       return;
     }
-    
+
     // 计算需要加载的月份
     final firstLoadedMonth = _loadedMonths.first;
-    final monthsDiff = (firstLoadedMonth.year - targetMonth.year) * 12 + 
-                      (firstLoadedMonth.month - targetMonth.month);
-    
+    final monthsDiff = (firstLoadedMonth.year - targetMonth.year) * 12 +
+        (firstLoadedMonth.month - targetMonth.month);
+
     if (monthsDiff <= 0) return; // 目标月份在已加载月份之后，无需加载
-    
+
     // 逐个加载月份直到目标月份
     DateTime currentMonth = targetMonth;
     List<DateTime> monthsToAdd = [];
-    
-    while (currentMonth.year != firstLoadedMonth.year || 
-           currentMonth.month != firstLoadedMonth.month) {
+
+    while (currentMonth.year != firstLoadedMonth.year ||
+        currentMonth.month != firstLoadedMonth.month) {
       monthsToAdd.add(currentMonth);
       currentMonth = DateTime(
-        currentMonth.year + (currentMonth.month == 12 ? 1 : 0),
-        currentMonth.month == 12 ? 1 : currentMonth.month + 1
-      );
+          currentMonth.year + (currentMonth.month == 12 ? 1 : 0),
+          currentMonth.month == 12 ? 1 : currentMonth.month + 1);
     }
-    
+
     // 按时间顺序添加月份
     monthsToAdd = monthsToAdd.reversed.toList();
-    
+
     // 批量加载月份
     setState(() {
       _loadedMonths.insertAll(0, monthsToAdd);
     });
-    
+
     // 预加载所有新月份的SVG
-    await Future.wait(
-      monthsToAdd.map((month) => _preloadSvgForMonth(month))
-    );
+    await Future.wait(monthsToAdd.map((month) => _preloadSvgForMonth(month)));
   }
 
   List<DateTime?> _getDaysInMonth(DateTime month) {
     final List<DateTime?> days = List.filled(42, null); // 保持42个格子的大小，但用null填充
-    
+
     // 获取当月第一天是星期几
     final firstDayOfMonth = DateTime(month.year, month.month, 1);
     final firstWeekday = firstDayOfMonth.weekday;
-    
+
     // 获取当月天数
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    
+
     // 只添加当月的日期
     for (int i = 0; i < daysInMonth; i++) {
       days[firstWeekday - 1 + i] = DateTime(month.year, month.month, i + 1);
@@ -424,9 +431,10 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
     return days;
   }
 
-  Widget _buildMonthGrid(DateTime month, Color textColor, Color otherMonthTextColor) {
+  Widget _buildMonthGrid(
+      DateTime month, Color textColor, Color otherMonthTextColor) {
     final days = _getDaysInMonth(month);
-    
+
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -441,11 +449,11 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
         final isToday = day.year == DateTime.now().year &&
             day.month == DateTime.now().month &&
             day.day == DateTime.now().day;
-            
+
         final isSelected = day.year == _selectedDate.year &&
             day.month == _selectedDate.month &&
             day.day == _selectedDate.day;
-            
+
         final isWeekend = day.weekday == 6 || day.weekday == 7;
 
         // 构建日期格子
@@ -485,7 +493,8 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                     child: _buildDayIcon(day, isSelected),
                   ),
                 ),
@@ -498,9 +507,10 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
   }
 
   Widget _buildDayIcon(DateTime day, bool isSelected) {
-    String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
+    String formattedDate =
+        '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
     String svgPath = 'assets/$formattedDate';
-    
+
     // 如果SVG缓存中没有该日期，或者缓存显示该SVG不存在，使用默认笑脸图标
     if (!_svgCache.containsKey(svgPath) || !_svgCache[svgPath]!) {
       return Icon(
@@ -528,13 +538,14 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
     } else if (month.month == 13) {
       month = DateTime(month.year + 1, 1);
     }
-    
+
     final List<DateTime?> days = _getDaysInMonth(month);
     final List<Future<void>> preloadTasks = [];
-    
+
     for (final day in days) {
       if (day == null) continue;
-      String formattedDate = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
+      String formattedDate =
+          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
       String svgPath = 'assets/$formattedDate';
 
       if (!_svgCache.containsKey(svgPath)) {
@@ -543,10 +554,10 @@ class _CalendarPageState extends State<CalendarPage> with SingleTickerProviderSt
         }));
       }
     }
-    
+
     // 批量处理所有预加载任务
     await Future.wait(preloadTasks);
-    
+
     if (mounted) {
       setState(() {});
     }
@@ -640,7 +651,9 @@ class _YearMonthPickerState extends State<YearMonthPicker> {
                   '$year',
                   style: TextStyle(
                     fontSize: year == _selectedYear ? 24 : 16,
-                    fontWeight: year == _selectedYear ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: year == _selectedYear
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               );
@@ -665,7 +678,9 @@ class _YearMonthPickerState extends State<YearMonthPicker> {
                   '$month月',
                   style: TextStyle(
                     fontSize: month == _selectedMonth ? 24 : 16,
-                    fontWeight: month == _selectedMonth ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: month == _selectedMonth
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               );
