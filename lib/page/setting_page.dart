@@ -22,7 +22,7 @@ class _SettingPageState extends State<SettingPage> {
   bool _isSyncing = false;
   double _syncProgress = 0.0;
   String _syncStatus = '';
-  final Map<String, bool> _processedFiles = {};
+  final Map<String, bool> _processedDates = {};
 
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _keyController = TextEditingController();
@@ -131,6 +131,7 @@ class _SettingPageState extends State<SettingPage> {
         await saveDir.create(recursive: true);
       }
 
+      // 按开始时间排序活动，确保每天处理最早的活动
       final activities = await StravaClientManager()
           .stravaClient
           .activities
@@ -140,6 +141,12 @@ class _SettingPageState extends State<SettingPage> {
             1,
             200,
           );
+
+      activities.sort((a, b) {
+        final dateA = DateTime.parse(a.startDate ?? '');
+        final dateB = DateTime.parse(b.startDate ?? '');
+        return dateA.compareTo(dateB);
+      });
 
       int totalActivities = activities.length;
       int processedCount = 0;
@@ -153,43 +160,28 @@ class _SettingPageState extends State<SettingPage> {
         try {
           if (activity.map?.summaryPolyline != null) {
             final date = DateTime.parse(activity.startDate ?? '');
-            final fileName = DateFormat('yyyy-MM-dd').format(date) + '.svg';
+            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+            final fileName = '$dateStr.svg';
             final filePath = '${saveDir.path}/$fileName';
 
-            // 检查是否已处理过该文件
-            if (!_processedFiles.containsKey(fileName)) {
-              _processedFiles[fileName] = true;
+            // 检查是否已处理过该日期
+            if (!_processedDates.containsKey(dateStr)) {
+              _processedDates[dateStr] = true;
               
               setState(() {
-                _syncStatus = '正在处理: ${activity.name ?? fileName}';
+                _syncStatus = '正在处理: ${activity.name ?? fileName} ($dateStr)';
               });
 
-              // 检查文件是否已存在且有效
-              bool needsGeneration = true;
-              if (await File(filePath).exists()) {
-                try {
-                  final content = await File(filePath).readAsString();
-                  if (_isValidSvg(content)) {
-                    needsGeneration = false;
-                    successCount++;
-                  }
-                } catch (e) {
-                  print('读取文件失败: $e');
-                }
-              }
+              // 生成SVG文件
+              final svgContent = PolylineToSVG.generateAndSaveSVG(
+                activity.map!.summaryPolyline!,
+                filePath,
+                strokeColor: 'green',
+                strokeWidth: 10,
+              );
 
-              if (needsGeneration) {
-                final svgContent = PolylineToSVG.generateAndSaveSVG(
-                  activity.map!.summaryPolyline!,
-                  filePath,
-                  strokeColor: 'green',
-                  strokeWidth: 10,
-                );
-
-                if (svgContent != null) {
-                  successCount++;
-                  print('成功生成 SVG: $fileName');
-                }
+              if (svgContent != null) {
+                successCount++;
               }
             }
           }
