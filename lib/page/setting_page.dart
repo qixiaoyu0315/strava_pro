@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:strava_client/strava_client.dart';
 import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import '../service/strava_client_manager.dart';
+import '../utils/poly2svg.dart';
 
 class SettingPage extends StatefulWidget {
   const SettingPage({Key? key}) : super(key: key);
@@ -56,21 +58,21 @@ class _SettingPageState extends State<SettingPage> {
     try {
       String id = _idController.text;
       String key = _keyController.text;
-      
+
       // 保存 API 密钥
       await _apiKeyModel.insertApiKey(id, key);
-      
+
       // 初始化 StravaClientManager
       await StravaClientManager().initialize(id, key);
-      
+
       // 进行认证
       final tokenResponse = await StravaClientManager().authenticate();
-      
+
       setState(() {
         token = tokenResponse;
         _textEditingController.text = tokenResponse.accessToken;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('认证成功')),
       );
@@ -81,23 +83,91 @@ class _SettingPageState extends State<SettingPage> {
 
   Future<void> testDeauth() async {
     try {
-      await ExampleAuthentication(StravaClientManager().stravaClient).testDeauthorize();
-      
+      await ExampleAuthentication(StravaClientManager().stravaClient)
+          .testDeauthorize();
+
       setState(() {
         token = null;
         _textEditingController.clear();
         _idController.clear();
         _keyController.clear();
       });
-      
+
       // 清除存储的 API 密钥
       await _apiKeyModel.deleteApiKey();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已取消认证')),
       );
     } catch (e) {
       showErrorMessage(e, null);
+    }
+  }
+
+  Future<void> syncActivities() async {
+    try {
+      // 获取当前时间并转换为 UTC
+      final now = DateTime.now().toUtc();
+      // 获取一年前的时间
+      final oneYearAgo = now.subtract(Duration(days: 365));
+
+      print('开始时间: ${oneYearAgo.toIso8601String()}');
+      print('结束时间: ${now.toIso8601String()}');
+      print('Access Token: ${token?.accessToken}');
+
+      // 创建保存目录
+      final saveDir = Directory('/storage/emulated/0/Download/strava_pro/svg');
+      if (!await saveDir.exists()) {
+        await saveDir.create(recursive: true);
+      }
+
+      final activities = await StravaClientManager()
+          .stravaClient
+          .activities
+          .listLoggedInAthleteActivities(
+            now,
+            oneYearAgo,
+            1,
+            50,
+          );
+
+      print('获取到 ${activities.length} 个活动');
+
+      int successCount = 0;
+      for (var activity in activities) {
+        try {
+          if (activity.map?.summaryPolyline != null) {
+            // 格式化活动日期
+            final date = DateTime.parse(activity.startDate ?? '');
+            final fileName = DateFormat('yyyy-MM-dd').format(date) + '.svg';
+            final filePath = '${saveDir.path}/$fileName';
+
+            // 生成并保存 SVG
+            final svgContent = PolylineToSVG.generateAndSaveSVG(
+              activity.map!.summaryPolyline!,
+              filePath,
+              strokeColor: '#FF0000', // 红色线条
+              strokeWidth: 3,
+            );
+
+            if (svgContent != null) {
+              successCount++;
+              print('成功生成 SVG: $fileName');
+            }
+          }
+        } catch (e) {
+          print('处理活动 ${activity.name} 时出错: $e');
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('同步完成，成功生成 $successCount 个 SVG 文件')),
+      );
+    } catch (e) {
+      print('同步失败错误: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('同步失败: $e')),
+      );
     }
   }
 
@@ -140,10 +210,10 @@ class _SettingPageState extends State<SettingPage> {
                   icon: Icon(Icons.copy),
                   onPressed: () {
                     Clipboard.setData(
-                      ClipboardData(text: _textEditingController.text)
-                    ).then((_) => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("已复制到剪贴板")),
-                    ));
+                            ClipboardData(text: _textEditingController.text))
+                        .then((_) => ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("已复制到剪贴板")),
+                            ));
                   },
                 ),
               ),
@@ -174,6 +244,17 @@ class _SettingPageState extends State<SettingPage> {
               ],
             ),
             const Divider(height: 40),
+            if (token != null)
+              ElevatedButton.icon(
+                onPressed: syncActivities,
+                icon: Icon(Icons.sync),
+                label: const Text('同步数据'),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
           ],
         ),
       ),
