@@ -7,12 +7,13 @@ import 'model/api_key_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   final apiKeyModel = ApiKeyModel();
   final apiKey = await apiKeyModel.getApiKey();
-  
+
   if (apiKey != null) {
-    await StravaClientManager().initialize(apiKey['api_id']!, apiKey['api_key']!);
+    await StravaClientManager()
+        .initialize(apiKey['api_id']!, apiKey['api_key']!);
   }
   runApp(const MainApp());
 }
@@ -50,7 +51,10 @@ class _MainAppState extends State<MainApp> {
       ),
       themeMode: ThemeMode.system,
       home: Scaffold(
-        body: _pages[_selectedIndex],
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
