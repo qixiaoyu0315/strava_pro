@@ -23,14 +23,14 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
   /// [strokeWidth] - 线条宽度（默认 5）
   ///
   /// 返回生成的 SVG 内容字符串，如果发生错误则返回 null
-  String? _generateAndSaveSVG(
+  Future<String?> _generateAndSaveSVG(
     String polylineStr,
     String outputPath, {
     double width = 800,
     double height = 600,
     String strokeColor = "green",
     double strokeWidth = 5,
-  }) {
+  }) async {
     try {
       // 解码 polyline
       List<List<double>> points = _decodePolyline(polylineStr);
@@ -45,13 +45,21 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
       double minY = points.map((p) => p[1]).reduce(min);
       double maxY = points.map((p) => p[1]).reduce(max);
 
+      // 计算中心点
+      double centerX = (minX + maxX) / 2;
+      double centerY = (minY + maxY) / 2;
+
       // 计算缩放比例
       double scale = min(width / (maxX - minX), height / (maxY - minY));
 
+      // 计算偏移量，使路线居中
+      double offsetX = width / 2 - centerX * scale;
+      double offsetY = height / 2 - centerY * scale;
+
       // 生成路径数据
       List<String> pathData = points.map((p) {
-        double x = (p[0] - minX) * scale;
-        double y = (maxY - p[1]) * scale;
+        double x = p[0] * scale + offsetX;
+        double y = height - (p[1] * scale + offsetY); // 反转 Y 轴方向
         return "${x.toStringAsFixed(2)},${y.toStringAsFixed(2)}";
       }).toList();
 
@@ -62,8 +70,15 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
         </svg>
       ''';
 
-      // 保存文件
-      File(outputPath).writeAsStringSync(svgContent);
+      // 确保目录存在
+      final directory = Directory(outputPath).parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      // 保存文件（覆盖已存在的文件）
+      final file = File(outputPath);
+      await file.writeAsString(svgContent);
       print('SVG 文件已保存到: $outputPath');
 
       return svgContent;
@@ -95,7 +110,7 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
     return [x, y];
   }
 
-  void _generateSVG() {
+  void _generateSVG() async {
     String polylineStr = _controller.text.trim();
     if (polylineStr.isEmpty) {
       setState(() {
@@ -104,7 +119,7 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
       return;
     }
 
-    String? svgContent = _generateAndSaveSVG(polylineStr, "output.svg");
+    String? svgContent = await _generateAndSaveSVG(polylineStr, "output.svg");
     if (svgContent == null) {
       setState(() {
         _svgData = "<svg><text>错误：无效的Polyline字符串</text></svg>";
@@ -168,14 +183,14 @@ class PolylineToSVG {
   /// [strokeWidth] - 线条宽度（默认 5）
   ///
   /// 返回生成的 SVG 内容字符串，如果发生错误则返回 null
-  static String? generateAndSaveSVG(
+  static Future<String?> generateAndSaveSVG(
     String polylineStr,
     String outputPath, {
     double width = 800,
     double height = 600,
     String strokeColor = "green",
-    double strokeWidth = 5,
-  }) {
+    double strokeWidth = 10,
+  }) async {
     try {
       // 解码 polyline
       List<List<double>> points = _decodePolyline(polylineStr);
@@ -190,13 +205,21 @@ class PolylineToSVG {
       double minY = points.map((p) => p[1]).reduce(min);
       double maxY = points.map((p) => p[1]).reduce(max);
 
+      // 计算中心点
+      double centerX = (minX + maxX) / 2;
+      double centerY = (minY + maxY) / 2;
+
       // 计算缩放比例
       double scale = min(width / (maxX - minX), height / (maxY - minY));
 
+      // 计算偏移量，使路线居中
+      double offsetX = width / 2 - centerX * scale;
+      double offsetY = height / 2 - centerY * scale;
+
       // 生成路径数据
       List<String> pathData = points.map((p) {
-        double x = (p[0] - minX) * scale;
-        double y = (maxY - p[1]) * scale;
+        double x = p[0] * scale + offsetX;
+        double y = height - (p[1] * scale + offsetY); // 反转 Y 轴方向
         return "${x.toStringAsFixed(2)},${y.toStringAsFixed(2)}";
       }).toList();
 
@@ -207,8 +230,15 @@ class PolylineToSVG {
         </svg>
       ''';
 
-      // 保存文件
-      File(outputPath).writeAsStringSync(svgContent);
+      // 确保目录存在
+      final directory = Directory(outputPath).parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      // 保存文件（覆盖已存在的文件）
+      final file = File(outputPath);
+      await file.writeAsString(svgContent);
       print('SVG 文件已保存到: $outputPath');
 
       return svgContent;

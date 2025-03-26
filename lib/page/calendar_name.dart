@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'dart:io';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -509,7 +510,8 @@ class _CalendarPageState extends State<CalendarPage>
   Widget _buildDayIcon(DateTime day, bool isSelected) {
     String formattedDate =
         '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
-    String svgPath = 'assets/$formattedDate';
+    String svgPath =
+        '/storage/emulated/0/Download/strava_pro/svg/$formattedDate';
 
     // 如果SVG缓存中没有该日期，或者缓存显示该SVG不存在，使用默认笑脸图标
     if (!_svgCache.containsKey(svgPath) || !_svgCache[svgPath]!) {
@@ -521,8 +523,8 @@ class _CalendarPageState extends State<CalendarPage>
     }
 
     // 如果有对应的SVG图标，则使用SVG
-    return SvgPicture.asset(
-      svgPath,
+    return SvgPicture.file(
+      File(svgPath),
       colorFilter: ColorFilter.mode(
         isSelected ? Colors.white : Colors.green,
         BlendMode.srcIn,
@@ -546,7 +548,8 @@ class _CalendarPageState extends State<CalendarPage>
       if (day == null) continue;
       String formattedDate =
           '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
-      String svgPath = 'assets/$formattedDate';
+      String svgPath =
+          '/storage/emulated/0/Download/strava_pro/svg/$formattedDate';
 
       if (!_svgCache.containsKey(svgPath)) {
         preloadTasks.add(_doesSvgExist(svgPath).then((exists) {
@@ -563,13 +566,13 @@ class _CalendarPageState extends State<CalendarPage>
     }
   }
 
-  Future<bool> _doesSvgExist(String assetPath) async {
-    if (_svgCache.containsKey(assetPath)) {
-      return _svgCache[assetPath]!;
+  Future<bool> _doesSvgExist(String filePath) async {
+    if (_svgCache.containsKey(filePath)) {
+      return _svgCache[filePath]!;
     }
     try {
-      await rootBundle.load(assetPath);
-      return true;
+      final file = File(filePath);
+      return await file.exists();
     } catch (_) {
       return false;
     }

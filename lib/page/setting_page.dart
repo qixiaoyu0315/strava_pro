@@ -146,8 +146,8 @@ class _SettingPageState extends State<SettingPage> {
             final svgContent = PolylineToSVG.generateAndSaveSVG(
               activity.map!.summaryPolyline!,
               filePath,
-              strokeColor: '#FF0000', // 红色线条
-              strokeWidth: 3,
+              strokeColor: 'green', // 红色线条
+              strokeWidth: 10,
             );
 
             if (svgContent != null) {
