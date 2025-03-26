@@ -114,7 +114,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       // 获取下载目录
       Directory directory;
       if (Platform.isAndroid) {
-        directory = Directory('/storage/emulated/0/Download/strava_pro');
+        directory = Directory('/storage/emulated/0/Download/strava_pro/gpx');
       } else {
         directory = await getApplicationDocumentsDirectory();
       }

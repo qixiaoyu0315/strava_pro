@@ -197,7 +197,7 @@ class _CalendarPageState extends State<CalendarPage>
     final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
 
     if (!_isInitialized) {
-      return Scaffold(
+    return Scaffold(
         body: Center(
           child: ScaleTransition(
             scale: CurvedAnimation(
@@ -220,11 +220,11 @@ class _CalendarPageState extends State<CalendarPage>
               opacity: _fadeAnimation,
               child: SafeArea(
                 child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           Text('一', style: TextStyle(color: weekdayTextColor)),
                           Text('二', style: TextStyle(color: weekdayTextColor)),
@@ -233,10 +233,10 @@ class _CalendarPageState extends State<CalendarPage>
                           Text('五', style: TextStyle(color: weekdayTextColor)),
                           Text('六', style: TextStyle(color: Colors.blue)),
                           Text('日', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
-                    ),
-                    Expanded(
+              ],
+            ),
+          ),
+          Expanded(
                       child: ListView.builder(
                         controller: _scrollController,
                         itemCount: _loadedMonths.length,
@@ -438,13 +438,13 @@ class _CalendarPageState extends State<CalendarPage>
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 7,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
         childAspectRatio: 0.85,
-      ),
-      itemCount: 42,
-      itemBuilder: (context, index) {
-        final day = days[index];
+              ),
+              itemCount: 42,
+              itemBuilder: (context, index) {
+                final day = days[index];
         if (day == null) return const SizedBox();
 
         final isToday = day.year == DateTime.now().year &&
@@ -458,28 +458,28 @@ class _CalendarPageState extends State<CalendarPage>
         final isWeekend = day.weekday == 6 || day.weekday == 7;
 
         // 构建日期格子
-        return GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedDate = day;
-            });
-          },
-          child: Container(
-            margin: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? Colors.blue
-                  : isToday
-                      ? Colors.blue.withOpacity(0.3)
-                      : null,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  day.day.toString(),
-                  style: TextStyle(
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = day;
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.blue
+                          : isToday
+                              ? Colors.blue.withOpacity(0.3)
+                              : null,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            day.day.toString(),
+                            style: TextStyle(
                     color: isSelected
                         ? Colors.white
                         : isWeekend
@@ -489,11 +489,11 @@ class _CalendarPageState extends State<CalendarPage>
                                     ? Colors.red
                                     : Colors.blue
                             : textColor,
-                    fontWeight: isToday ? FontWeight.bold : null,
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
+                              fontWeight: isToday ? FontWeight.bold : null,
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
                     padding:
                         const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                     child: _buildDayIcon(day, isSelected),
@@ -525,10 +525,10 @@ class _CalendarPageState extends State<CalendarPage>
     // 如果有对应的SVG图标，则使用SVG
     return SvgPicture.file(
       File(svgPath),
-      colorFilter: ColorFilter.mode(
-        isSelected ? Colors.white : Colors.green,
-        BlendMode.srcIn,
-      ),
+                                colorFilter: ColorFilter.mode(
+                                  isSelected ? Colors.white : Colors.green,
+                                  BlendMode.srcIn,
+                                ),
       fit: BoxFit.contain,
     );
   }

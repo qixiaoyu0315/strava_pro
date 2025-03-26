@@ -19,6 +19,10 @@ class SettingPage extends StatefulWidget {
 class _SettingPageState extends State<SettingPage> {
   final TextEditingController _textEditingController = TextEditingController();
   TokenResponse? token;
+  bool _isSyncing = false;
+  double _syncProgress = 0.0;
+  String _syncStatus = '';
+  final Map<String, bool> _processedFiles = {};
 
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _keyController = TextEditingController();
@@ -105,17 +109,23 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Future<void> syncActivities() async {
+    if (_isSyncing) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('同步正在进行中，请等待完成')),
+      );
+      return;
+    }
+
     try {
-      // 获取当前时间并转换为 UTC
+      setState(() {
+        _isSyncing = true;
+        _syncProgress = 0.0;
+        _syncStatus = '准备同步...';
+      });
+
       final now = DateTime.now().toUtc();
-      // 获取一年前的时间
       final oneYearAgo = now.subtract(Duration(days: 365));
 
-      print('开始时间: ${oneYearAgo.toIso8601String()}');
-      print('结束时间: ${now.toIso8601String()}');
-      print('Access Token: ${token?.accessToken}');
-
-      // 创建保存目录
       final saveDir = Directory('/storage/emulated/0/Download/strava_pro/svg');
       if (!await saveDir.exists()) {
         await saveDir.create(recursive: true);
@@ -131,44 +141,96 @@ class _SettingPageState extends State<SettingPage> {
             200,
           );
 
-      print('获取到 ${activities.length} 个活动');
-
+      int totalActivities = activities.length;
+      int processedCount = 0;
       int successCount = 0;
+
+      setState(() {
+        _syncStatus = '获取到 $totalActivities 个活动，开始生成SVG...';
+      });
+
       for (var activity in activities) {
         try {
           if (activity.map?.summaryPolyline != null) {
-            // 格式化活动日期
             final date = DateTime.parse(activity.startDate ?? '');
             final fileName = DateFormat('yyyy-MM-dd').format(date) + '.svg';
             final filePath = '${saveDir.path}/$fileName';
 
-            // 生成并保存 SVG
-            final svgContent = PolylineToSVG.generateAndSaveSVG(
-              activity.map!.summaryPolyline!,
-              filePath,
-              strokeColor: 'green', // 红色线条
-              strokeWidth: 10,
-            );
+            // 检查是否已处理过该文件
+            if (!_processedFiles.containsKey(fileName)) {
+              _processedFiles[fileName] = true;
+              
+              setState(() {
+                _syncStatus = '正在处理: ${activity.name ?? fileName}';
+              });
 
-            if (svgContent != null) {
-              successCount++;
-              print('成功生成 SVG: $fileName');
+              // 检查文件是否已存在且有效
+              bool needsGeneration = true;
+              if (await File(filePath).exists()) {
+                try {
+                  final content = await File(filePath).readAsString();
+                  if (_isValidSvg(content)) {
+                    needsGeneration = false;
+                    successCount++;
+                  }
+                } catch (e) {
+                  print('读取文件失败: $e');
+                }
+              }
+
+              if (needsGeneration) {
+                final svgContent = PolylineToSVG.generateAndSaveSVG(
+                  activity.map!.summaryPolyline!,
+                  filePath,
+                  strokeColor: 'green',
+                  strokeWidth: 10,
+                );
+
+                if (svgContent != null) {
+                  successCount++;
+                  print('成功生成 SVG: $fileName');
+                }
+              }
             }
           }
+
+          processedCount++;
+          setState(() {
+            _syncProgress = processedCount / totalActivities;
+            _syncStatus = '已处理: $processedCount/$totalActivities';
+          });
+
         } catch (e) {
           print('处理活动 ${activity.name} 时出错: $e');
         }
       }
 
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = '同步完成';
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('同步完成，成功生成 $successCount 个 SVG 文件')),
       );
     } catch (e) {
-      print('同步失败错误: $e');
+      setState(() {
+        _isSyncing = false;
+        _syncStatus = '同步失败: $e';
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('同步失败: $e')),
       );
     }
+  }
+
+  bool _isValidSvg(String content) {
+    if (content.isEmpty) return false;
+    if (!content.trim().startsWith('<svg') || !content.trim().endsWith('</svg>')) {
+      return false;
+    }
+    return true;
   }
 
   @override
@@ -244,17 +306,24 @@ class _SettingPageState extends State<SettingPage> {
               ],
             ),
             const Divider(height: 40),
-            if (token != null)
+            if (token != null) ...[
+              if (_isSyncing) ...[
+                LinearProgressIndicator(value: _syncProgress),
+                SizedBox(height: 8),
+                Text(_syncStatus),
+                SizedBox(height: 16),
+              ],
               ElevatedButton.icon(
-                onPressed: syncActivities,
+                onPressed: _isSyncing ? null : syncActivities,
                 icon: Icon(Icons.sync),
-                label: const Text('同步数据'),
+                label: Text(_isSyncing ? '同步中...' : '同步数据'),
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
                 ),
               ),
+            ],
           ],
         ),
       ),
