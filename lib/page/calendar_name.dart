@@ -516,7 +516,7 @@ class _CalendarPageState extends State<CalendarPage>
       return Icon(
         Icons.sentiment_satisfied_alt_rounded,
         color: isSelected ? Colors.white : Colors.grey[400],
-        size: 24,
+        size: 20,
       );
     }
 
