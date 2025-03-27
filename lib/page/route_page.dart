@@ -41,7 +41,7 @@ class RouteCard extends StatelessWidget {
           children: [
             // 上半部分：地图和路线名称
             Container(
-              height: 180, // 固定高度
+              height: 150, // 固定高度
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -77,13 +77,13 @@ class RouteCard extends StatelessWidget {
                   // 右侧信息区域
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(12.0),
+                      padding: const EdgeInsets.all(8.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // 路线名称
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
+                            padding: const EdgeInsets.only(bottom: 4.0),
                             child: Text(
                               routeData['name'],
                               style: TextStyle(
@@ -99,11 +99,11 @@ class RouteCard extends StatelessWidget {
                           Container(
                             margin: EdgeInsets.symmetric(vertical: 4),
                             padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              border: Border.all(color: Colors.red.shade200, width: 1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            // decoration: BoxDecoration(
+                            //   color: Colors.grey.shade100,
+                            //   border: Border.all(color: Colors.red.shade200, width: 1),
+                            //   borderRadius: BorderRadius.circular(8),
+                            // ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -144,11 +144,11 @@ class RouteCard extends StatelessWidget {
                           Container(
                             margin: EdgeInsets.symmetric(vertical: 4),
                             padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              border: Border.all(color: Colors.red.shade200, width: 1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            // decoration: BoxDecoration(
+                            //   color: Colors.grey.shade100,
+                            //   border: Border.all(color: Colors.red.shade200, width: 1),
+                            //   borderRadius: BorderRadius.circular(8),
+                            // ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -171,9 +171,9 @@ class RouteCard extends StatelessWidget {
                                 InkWell(
                                   onTap: onNavigate,
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    padding: EdgeInsets.symmetric(horizontal: 25, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.red,
+                                      color: Colors.deepOrangeAccent,
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Icon(
