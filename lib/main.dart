@@ -29,20 +29,44 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   int _selectedIndex = 0;
   bool _isHorizontalLayout = true;
-  late List<Widget> _pages;
+  List<Widget> _pages = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _initDefaultPages();
     _loadSettings();
   }
 
+  void _initDefaultPages() {
+    _pages = [
+      const CalendarPage(isHorizontalLayout: true),
+      const RoutePage(),
+      SettingPage(onLayoutChanged: _onLayoutChanged),
+    ];
+  }
+
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
-      _initPages();
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedLayout = prefs.getBool('isHorizontalLayout');
+
+      if (mounted) {
+        setState(() {
+          _isHorizontalLayout = savedLayout ?? true;
+          _initPages();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      debugPrint('加载设置出错: $e');
+    }
   }
 
   void _initPages() {
@@ -53,11 +77,16 @@ class _MainAppState extends State<MainApp> {
     ];
   }
 
-  void _onLayoutChanged(bool isHorizontal) {
-    setState(() {
-      _isHorizontalLayout = isHorizontal;
-      _initPages(); // 重新初始化页面以应用新布局
-    });
+  void _onLayoutChanged(bool isHorizontal) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isHorizontalLayout', isHorizontal);
+
+    if (mounted) {
+      setState(() {
+        _isHorizontalLayout = isHorizontal;
+        _initPages();
+      });
+    }
   }
 
   void _onItemTapped(int index) {
@@ -77,30 +106,36 @@ class _MainAppState extends State<MainApp> {
         colorScheme: ThemeData.dark().colorScheme,
       ),
       themeMode: ThemeMode.system,
-      home: Scaffold(
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: _pages,
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month),
-              label: '日历',
+      home: _isLoading
+          ? const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : Scaffold(
+              body: IndexedStack(
+                index: _selectedIndex,
+                children: _pages,
+              ),
+              bottomNavigationBar: BottomNavigationBar(
+                items: const <BottomNavigationBarItem>[
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.calendar_month),
+                    label: '日历',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.route),
+                    label: '路线',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.settings),
+                    label: '设置',
+                  ),
+                ],
+                currentIndex: _selectedIndex,
+                onTap: _onItemTapped,
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.route),
-              label: '路线',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: '设置',
-            ),
-          ],
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-        ),
-      ),
     );
   }
 }
