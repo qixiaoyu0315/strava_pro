@@ -10,6 +10,196 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'route_detail_page.dart'; // 导入新页面
 import '../service/strava_client_manager.dart';
 
+// 提取出路线组件
+class RouteCard extends StatelessWidget {
+  final Map<String, dynamic> routeData;
+  final VoidCallback onTap;
+  final VoidCallback onNavigate;
+
+  const RouteCard({
+    Key? key,
+    required this.routeData,
+    required this.onTap,
+    required this.onNavigate,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      elevation: 4,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          children: [
+            // 上半部分：地图和路线名称
+            Container(
+              height: 180, // 固定高度
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 左侧地图，约占卡片总宽度的40%
+                  SizedBox(
+                    width: screenWidth * 0.35,
+                    child: Container(
+                      color: Colors.grey.shade200,
+                      child: Image.network(
+                        routeData['mapUrl'] != '无地图链接'
+                            ? isDarkMode
+                                ? routeData['mapDarkUrl']!
+                                : routeData['mapUrl']!
+                            : 'https://via.placeholder.com/150',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => 
+                            Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey)),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded / 
+                                    loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  
+                  // 右侧信息区域
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 路线名称
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              routeData['name'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          
+                          // 红框1：距离和时间（水平排列在一行）
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 4),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              border: Border.all(color: Colors.red.shade200, width: 1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // 左侧：距离
+                                Row(
+                                  children: [
+                                    Icon(Icons.directions_bike, size: 18, color: Colors.black54),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '${routeData['distance']?.toStringAsFixed(1)} km',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                // 右侧：时间
+                                Row(
+                                  children: [
+                                    Icon(Icons.access_time, size: 18, color: Colors.black54),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          // 红框2：爬升和导航按钮
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 4),
+                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              border: Border.all(color: Colors.red.shade200, width: 1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // 左侧：爬升信息
+                                Row(
+                                  children: [
+                                    Icon(Icons.trending_up, size: 18, color: Colors.black54),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '${routeData['elevationGain']?.toStringAsFixed(0)} m',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                // 右侧：导航按钮
+                                InkWell(
+                                  onTap: onNavigate,
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Icon(
+                                      Icons.navigation,
+                                      size: 20,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class RoutePage extends StatefulWidget {
   final bool isAuthenticated;
   final Function(bool, DetailedAthlete?)? onAuthenticationChanged;
@@ -162,6 +352,17 @@ class _RoutePageState extends State<RoutePage> {
         fontSize: 16.0);
   }
 
+  // 导航到路线详情页面
+  void _navigateToRouteDetail(String routeId, {bool startNavigation = false}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RouteDetailPage(idStr: routeId),
+        settings: RouteSettings(arguments: {'startNavigation': startNavigation}),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,149 +393,19 @@ class _RoutePageState extends State<RoutePage> {
                       slivers: [
                         SliverAppBar(
                           title: const Text('STRAVA-路线'),
-                          floating: true, // 向上滑动时隐藏，向下滑动时显示
-                          snap: true, // 确保完全显示或完全隐藏
+                          floating: true,
+                          snap: true,
                         ),
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 0),
+                          padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
-                                return InkWell(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => RouteDetailPage(
-                                            idStr: routeList[index]['idStr']!),
-                                      ),
-                                    );
-                                  },
-                                  child: Card(
-                                    margin: const EdgeInsets.symmetric(
-                                        vertical: 8.0),
-                                    elevation: 4,
-                                    clipBehavior: Clip.antiAlias,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: IntrinsicHeight(
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          SizedBox(
-                                            width: MediaQuery.of(context)
-                                                        .size
-                                                        .width *
-                                                    0.38 -
-                                                16,
-                                            child: Image.network(
-                                              routeList[index]['mapUrl'] !=
-                                                      '无地图链接'
-                                                  ? Theme.of(context)
-                                                              .brightness ==
-                                                          Brightness.dark
-                                                      ? routeList[index]
-                                                          ['mapDarkUrl']!
-                                                      : routeList[index]
-                                                          ['mapUrl']!
-                                                  : 'https://via.placeholder.com/100',
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.all(16.0),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    routeList[index]['name'],
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 18,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  SizedBox(height: 12),
-                                                  Row(
-                                                    children: [
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Row(
-                                                              children: [
-                                                                Icon(Icons
-                                                                    .directions_bike),
-                                                                SizedBox(
-                                                                    width: 4),
-                                                                Text(
-                                                                    '${routeList[index]['distance']?.toStringAsFixed(1)} km'),
-                                                              ],
-                                                            ),
-                                                            SizedBox(height: 8),
-                                                            Row(
-                                                              children: [
-                                                                Icon(Icons
-                                                                    .trending_up),
-                                                                SizedBox(
-                                                                    width: 4),
-                                                                Text(
-                                                                    '${routeList[index]['elevationGain']?.toStringAsFixed(0)} m'),
-                                                              ],
-                                                            ),
-                                                            SizedBox(
-                                                                height: 24),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .start,
-                                                          children: [
-                                                            Row(
-                                                              children: [
-                                                                Icon(Icons
-                                                                    .access_time),
-                                                                SizedBox(
-                                                                    width: 4),
-                                                                Text(
-                                                                    '${routeList[index]['estimatedMovingTime']?.toStringAsFixed(2)} h'),
-                                                              ],
-                                                            ),
-                                                            SizedBox(height: 8),
-                                                            SizedBox(
-                                                                height: 24),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                final routeData = routeList[index];
+                                return RouteCard(
+                                  routeData: routeData,
+                                  onTap: () => _navigateToRouteDetail(routeData['idStr']!),
+                                  onNavigate: () => _navigateToRouteDetail(routeData['idStr']!, startNavigation: true),
                                 );
                               },
                               childCount: routeList.length,

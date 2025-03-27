@@ -43,6 +43,16 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
     super.initState();
     _checkExistingGPXFile();
     WidgetsBinding.instance.addObserver(this);
+    
+    // 检查是否需要自动开启导航模式
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args != null && args is Map<String, dynamic> && args['startNavigation'] == true) {
+          _startNavigationWhenReady();
+        }
+      }
+    });
   }
 
   @override
@@ -1160,6 +1170,43 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
         ],
       ),
     );
+  }
+
+  // 准备好GPX文件后自动开启导航模式
+  void _startNavigationWhenReady() {
+    if (gpxFilePath != null) {
+      // GPX文件已加载，直接开启导航
+      setState(() {
+        isNavigationMode = true;
+      });
+      _checkLocationPermission();
+    } else {
+      // GPX文件未加载，先等待加载完成
+      // 设置一个延迟检查，等待GPX文件下载和解析
+      Future.delayed(Duration(seconds: 1), () {
+        if (mounted) {
+          if (gpxFilePath != null) {
+            setState(() {
+              isNavigationMode = true;
+            });
+            _checkLocationPermission();
+          } else if (_isDataLoaded) {
+            // 数据已加载但没有GPX文件，尝试下载
+            _exportGPX(_routeData).then((_) {
+              if (mounted && gpxFilePath != null) {
+                setState(() {
+                  isNavigationMode = true;
+                });
+                _checkLocationPermission();
+              }
+            });
+          } else {
+            // 再次尝试
+            _startNavigationWhenReady();
+          }
+        }
+      });
+    }
   }
 }
 
