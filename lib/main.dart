@@ -5,6 +5,7 @@ import 'page/calendar_name.dart';
 import 'service/strava_client_manager.dart';
 import 'model/api_key_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:strava_client/strava_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +16,15 @@ void main() async {
   if (apiKey != null) {
     await StravaClientManager()
         .initialize(apiKey['api_id']!, apiKey['api_key']!);
+
+    // 尝试加载现有的token
+    try {
+      await StravaClientManager().loadExistingAuthentication();
+    } catch (e) {
+      print('无法加载现有认证: $e');
+    }
   }
+
   runApp(const MainApp());
 }
 
@@ -31,19 +40,31 @@ class _MainAppState extends State<MainApp> {
   bool _isHorizontalLayout = true;
   List<Widget> _pages = [];
   bool _isLoading = true;
+  // 添加认证状态
+  bool _isAuthenticated = false;
+  DetailedAthlete? _athlete;
 
   @override
   void initState() {
     super.initState();
     _initDefaultPages();
     _loadSettings();
+    _checkAuthenticationStatus();
   }
 
   void _initDefaultPages() {
     _pages = [
       const CalendarPage(isHorizontalLayout: true),
-      const RoutePage(),
-      SettingPage(onLayoutChanged: _onLayoutChanged),
+      RoutePage(
+        isAuthenticated: _isAuthenticated,
+        onAuthenticationChanged: _handleAuthenticationChanged,
+      ),
+      SettingPage(
+        onLayoutChanged: _onLayoutChanged,
+        isAuthenticated: _isAuthenticated,
+        athlete: _athlete,
+        onAuthenticationChanged: _handleAuthenticationChanged,
+      ),
     ];
   }
 
@@ -55,9 +76,9 @@ class _MainAppState extends State<MainApp> {
       if (mounted) {
         setState(() {
           _isHorizontalLayout = savedLayout ?? true;
-          _initPages();
           _isLoading = false;
         });
+        _initPages();
       }
     } catch (e) {
       if (mounted) {
@@ -69,11 +90,60 @@ class _MainAppState extends State<MainApp> {
     }
   }
 
+  // 检查认证状态
+  Future<void> _checkAuthenticationStatus() async {
+    try {
+      final manager = StravaClientManager();
+      final isAuthenticated = await manager.isAuthenticated();
+
+      // 如果已认证，获取运动员信息
+      DetailedAthlete? athlete;
+      if (isAuthenticated) {
+        try {
+          athlete =
+              await manager.stravaClient.athletes.getAuthenticatedAthlete();
+        } catch (e) {
+          print('获取运动员信息失败: $e');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isAuthenticated = isAuthenticated;
+          _athlete = athlete;
+          _initPages();
+        });
+      }
+    } catch (e) {
+      print('检查认证状态失败: $e');
+    }
+  }
+
+  // 处理认证状态变化
+  void _handleAuthenticationChanged(
+      bool isAuthenticated, DetailedAthlete? athlete) {
+    if (mounted) {
+      setState(() {
+        _isAuthenticated = isAuthenticated;
+        _athlete = athlete;
+        _initPages();
+      });
+    }
+  }
+
   void _initPages() {
     _pages = [
       CalendarPage(isHorizontalLayout: _isHorizontalLayout),
-      const RoutePage(),
-      SettingPage(onLayoutChanged: _onLayoutChanged),
+      RoutePage(
+        isAuthenticated: _isAuthenticated,
+        onAuthenticationChanged: _handleAuthenticationChanged,
+      ),
+      SettingPage(
+        onLayoutChanged: _onLayoutChanged,
+        isAuthenticated: _isAuthenticated,
+        athlete: _athlete,
+        onAuthenticationChanged: _handleAuthenticationChanged,
+      ),
     ];
   }
 

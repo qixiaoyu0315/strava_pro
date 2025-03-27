@@ -13,10 +13,16 @@ import '../utils/poly2svg.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
+  final bool isAuthenticated;
+  final DetailedAthlete? athlete;
+  final Function(bool, DetailedAthlete?)? onAuthenticationChanged;
 
   const SettingPage({
     Key? key,
     this.onLayoutChanged,
+    this.isAuthenticated = false,
+    this.athlete,
+    this.onAuthenticationChanged,
   }) : super(key: key);
 
   @override
@@ -42,6 +48,35 @@ class _SettingPageState extends State<SettingPage> {
     super.initState();
     _loadApiKey();
     _loadSettings();
+
+    // 使用外部传入的认证状态和运动员信息
+    if (widget.isAuthenticated && widget.athlete != null) {
+      setState(() {
+        _athlete = widget.athlete;
+        token = StravaClientManager().token;
+        _textEditingController.text = token?.accessToken ?? '';
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(SettingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当认证状态或用户信息从外部变化时更新内部状态
+    if (widget.isAuthenticated != oldWidget.isAuthenticated ||
+        widget.athlete != oldWidget.athlete) {
+      setState(() {
+        if (widget.isAuthenticated && widget.athlete != null) {
+          _athlete = widget.athlete;
+          token = StravaClientManager().token;
+          _textEditingController.text = token?.accessToken ?? '';
+        } else {
+          _athlete = null;
+          token = null;
+          _textEditingController.clear();
+        }
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -92,6 +127,9 @@ class _SettingPageState extends State<SettingPage> {
         setState(() {
           _athlete = athlete;
         });
+
+        // 通知主应用认证状态和用户信息已更新
+        widget.onAuthenticationChanged?.call(true, athlete);
       }
     } catch (e) {
       debugPrint('获取运动员信息失败: $e');
@@ -130,8 +168,7 @@ class _SettingPageState extends State<SettingPage> {
 
   Future<void> testDeauth() async {
     try {
-      await ExampleAuthentication(StravaClientManager().stravaClient)
-          .testDeauthorize();
+      await StravaClientManager().deAuthenticate();
 
       setState(() {
         token = null;
@@ -143,6 +180,9 @@ class _SettingPageState extends State<SettingPage> {
 
       // 清除存储的 API 密钥
       await _apiKeyModel.deleteApiKey();
+
+      // 通知主应用认证状态已更新
+      widget.onAuthenticationChanged?.call(false, null);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已取消认证')),
