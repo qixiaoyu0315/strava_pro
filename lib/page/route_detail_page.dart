@@ -196,7 +196,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
       if (response.statusCode != 200) {
         throw Exception('获取 GPX 数据失败: ${response.statusCode}');
       }
-
+      
       // 写入二进制数据
       await file.writeAsBytes(response.bodyBytes);
       
@@ -411,13 +411,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
 
   Widget _buildMap(List<LatLng> points, LatLng center) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: points.isNotEmpty
-          ? FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: center,
-                initialZoom: 8.0,
+                          borderRadius: BorderRadius.circular(20),
+                        child: points.isNotEmpty
+                            ? FlutterMap(
+                                mapController: _mapController,
+                                options: MapOptions(
+                                  initialCenter: center,
+                                  initialZoom: 8.0,
                 onMapReady: () {
                   // 计算路线的边界
                   double minLat = points.map((p) => p.latitude).reduce(math.min);
@@ -448,30 +448,30 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                     );
                   });
                 },
-              ),
-              children: [
-                TileLayer(
+                                ),
+                                children: [
+                                  TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: const ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.app',
-                ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: points,
-                      strokeWidth: 4.0,
-                      color: Colors.blue,
-                    ),
-                  ],
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: points.first,
+                                    subdomains: const ['a', 'b', 'c'],
+                                    userAgentPackageName: 'com.example.app',
+                                  ),
+                                  PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: points,
+                                        strokeWidth: 4.0,
+                                        color: Colors.blue,
+                                      ),
+                                    ],
+                                  ),
+                                  MarkerLayer(
+                                    markers: [
+                                        Marker(
+                                          point: points.first,
                       child: Icon(Icons.location_on, color: Colors.green, size: 40.0),
-                    ),
-                    Marker(
-                      point: points.last,
+                                        ),
+                                        Marker(
+                                          point: points.last,
                       child: Icon(Icons.flag, color: Colors.red, size: 40.0),
                     ),
                   ],
@@ -972,9 +972,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
                                               color: gradient != null ? _getGradientColor(gradient) : Theme.of(context).colorScheme.onSurface,
-                                            ),
                                           ),
-                                        ],
+                                        ),
+                                      ],
                                       ),
                                     ],
                                   );
@@ -1059,7 +1059,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                         ),
                       ),
                     ),
-                  // 路线信息部分
+                // 路线信息部分
                   Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
@@ -1082,11 +1082,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                                 ),
                               ),
                               if (gpxFilePath == null)
-                                IconButton(
+                              IconButton(
                                   onPressed: () => _exportGPX(_routeData),
-                                  icon: Icon(Icons.download),
-                                  tooltip: '导出GPX文件',
-                                ),
+                                icon: Icon(Icons.download),
+                                tooltip: '导出GPX文件',
+                              ),
                             ],
                           ),
                           SizedBox(height: 16),
@@ -1096,23 +1096,23 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                               // 左侧列
                               Expanded(
                                 child: Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.directions_bike),
-                                        SizedBox(width: 8),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.directions_bike),
+                                  SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
                                               '${((_routeData.distance ?? 0) / 1000).toStringAsFixed(2)} km',
-                                              style: TextStyle(fontSize: 16),
-                                            ),
-                                            Text('距离', style: TextStyle(color: Colors.grey)),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                        style: TextStyle(fontSize: 16),
+                                      ),
+                                      Text('距离', style: TextStyle(color: Colors.grey)),
+                                    ],
+                                  ),
+                                ],
+                              ),
                                   ],
                                 ),
                               ),
@@ -1120,20 +1120,20 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                               Expanded(
                                 child: Column(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.access_time),
-                                        SizedBox(width: 8),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
+                              Row(
+                                children: [
+                                  Icon(Icons.access_time),
+                                  SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
                                               '${((_routeData.estimatedMovingTime ?? 0) / 3600).toStringAsFixed(2)} h',
-                                              style: TextStyle(fontSize: 16),
-                                            ),
-                                            Text('预计时间', style: TextStyle(color: Colors.grey)),
-                                          ],
-                                        ),
+                                        style: TextStyle(fontSize: 16),
+                                      ),
+                                      Text('预计时间', style: TextStyle(color: Colors.grey)),
+                                    ],
+                                  ),
                                       ],
                                     ),
                                   ],
@@ -1160,10 +1160,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> with WidgetsBindingOb
                             ],
                           ),
                         ],
-                      ),
                     ),
                   ),
-                ],
+                ),
+              ],
               ]),
             ),
           ),
