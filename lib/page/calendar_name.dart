@@ -40,14 +40,31 @@ class _CalendarPageState extends State<CalendarPage>
     _initializeCalendar();
   }
 
+  @override
+  void didUpdateWidget(CalendarPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 如果布局类型改变，重新应用动画
+    if (oldWidget.isHorizontalLayout != widget.isHorizontalLayout) {
+      _animationController.reset();
+      _animationController.forward();
+    }
+  }
+
   Future<void> _initializeCalendar() async {
     if (!mounted) return;
 
-    // 预加载当前月份和前两个月的SVG
-    final now = DateTime.now();
-    for (int i = -2; i <= 0; i++) {
-      final month = DateTime(now.year, now.month + i);
-      final monthCache = await CalendarUtils.preloadSvgForMonth(month);
+    // 预加载当前月份和前两个月的SVG，仅在垂直布局时需要
+    if (!widget.isHorizontalLayout) {
+      final now = DateTime.now();
+      for (int i = -2; i <= 0; i++) {
+        final month = DateTime(now.year, now.month + i);
+        final monthCache = await CalendarUtils.preloadSvgForMonth(month);
+        _svgCache.addAll(monthCache);
+      }
+    } else {
+      // 对于水平布局，我们只预加载当前月份
+      final now = DateTime.now();
+      final monthCache = await CalendarUtils.preloadSvgForMonth(now);
       _svgCache.addAll(monthCache);
     }
 
@@ -85,15 +102,22 @@ class _CalendarPageState extends State<CalendarPage>
 
     return Scaffold(
       body: SafeArea(
-        child: widget.isHorizontalLayout
-            ? HorizontalCalendar(
-                svgCache: _svgCache,
-                onDateSelected: _onDateSelected,
-              )
-            : VerticalCalendar(
-                svgCache: _svgCache,
-                onDateSelected: _onDateSelected,
-              ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 500),
+          switchInCurve: Curves.easeInOut,
+          switchOutCurve: Curves.easeInOut,
+          child: widget.isHorizontalLayout
+              ? HorizontalCalendar(
+                  key: const ValueKey('horizontal'),
+                  svgCache: _svgCache,
+                  onDateSelected: _onDateSelected,
+                )
+              : VerticalCalendar(
+                  key: const ValueKey('vertical'),
+                  svgCache: _svgCache,
+                  onDateSelected: _onDateSelected,
+                ),
+        ),
       ),
     );
   }

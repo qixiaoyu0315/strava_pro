@@ -4,6 +4,7 @@ import 'page/setting_page.dart';
 import 'page/calendar_name.dart';
 import 'service/strava_client_manager.dart';
 import 'model/api_key_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,11 +28,37 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> {
   int _selectedIndex = 0;
-  final List<Widget> _pages = [
-    const CalendarPage(),
-    const RoutePage(),
-    const SettingPage(),
-  ];
+  bool _isHorizontalLayout = true;
+  late List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
+      _initPages();
+    });
+  }
+
+  void _initPages() {
+    _pages = [
+      CalendarPage(isHorizontalLayout: _isHorizontalLayout),
+      const RoutePage(),
+      SettingPage(onLayoutChanged: _onLayoutChanged),
+    ];
+  }
+
+  void _onLayoutChanged(bool isHorizontal) {
+    setState(() {
+      _isHorizontalLayout = isHorizontal;
+      _initPages(); // 重新初始化页面以应用新布局
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {

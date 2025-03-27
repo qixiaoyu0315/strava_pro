@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'month_view.dart';
 import 'month_picker.dart';
+import '../widgets/calendar_utils.dart';
 
 class HorizontalCalendar extends StatefulWidget {
   final Map<String, bool> svgCache;
@@ -24,7 +25,9 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   late AnimationController _animationController;
   late Animation<double> _animation;
   late int _totalMonths; // 显示的总月数
-  final List<DateTime> _months = []; // 所有可用月份
+
+  // 用于存储当前可见月份的缓存
+  final Map<int, Map<String, bool>> _monthSvgCaches = {};
 
   @override
   void initState() {
@@ -38,19 +41,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     _totalMonths =
         (now.year - startDate.year) * 12 + now.month - startDate.month + 1;
 
-    // 生成所有月份
-    for (int i = 0; i < _totalMonths; i++) {
-      final month = DateTime(startDate.year, startDate.month + i);
-      _months.add(month);
-    }
+    // 计算当前月份的索引
+    final currentMonthIndex =
+        (now.year - startDate.year) * 12 + (now.month - startDate.month);
 
-    // 计算初始页面索引
-    final initialIndex = _months.indexWhere((month) =>
-        month.year == _displayedMonth.year &&
-        month.month == _displayedMonth.month);
-
+    // 初始化PageController
     _pageController = PageController(
-      initialPage: initialIndex,
+      initialPage: currentMonthIndex,
       viewportFraction: 1.0,
     );
 
@@ -64,6 +61,9 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
       curve: Curves.easeInOut,
     );
 
+    // 预加载当前月份的数据
+    _loadMonthSvgData(currentMonthIndex);
+
     _animationController.forward();
   }
 
@@ -72,6 +72,44 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  // 根据索引获取对应的月份
+  DateTime _getMonthFromIndex(int index) {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year - 2, now.month);
+    return DateTime(startDate.year, startDate.month + index);
+  }
+
+  // 加载指定月份的SVG数据
+  Future<void> _loadMonthSvgData(int monthIndex) async {
+    // 如果已经加载过，则跳过
+    if (_monthSvgCaches.containsKey(monthIndex)) {
+      return;
+    }
+
+    final month = _getMonthFromIndex(monthIndex);
+
+    // 先从全局缓存中查找该月的数据
+    Map<String, bool> monthCache = {};
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+
+    for (int day = 1; day <= daysInMonth; day++) {
+      final dateStr =
+          '${month.year}-${month.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      if (widget.svgCache.containsKey(dateStr)) {
+        monthCache[dateStr] = widget.svgCache[dateStr]!;
+      } else {
+        // 如果全局缓存中没有，则从文件系统加载
+        monthCache[dateStr] = await CalendarUtils.doesSvgExist(dateStr);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _monthSvgCaches[monthIndex] = monthCache;
+      });
+    }
   }
 
   Future<void> _selectMonth(DateTime initialMonth) async {
@@ -84,11 +122,15 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     );
 
     if (picked != null) {
-      // 找到选择的月份索引
-      final monthIndex = _months.indexWhere(
-          (month) => month.year == picked.year && month.month == picked.month);
+      // 计算选择的月份索引
+      final startDate = DateTime(now.year - 2, now.month);
+      final monthIndex = (picked.year - startDate.year) * 12 +
+          (picked.month - startDate.month);
 
-      if (monthIndex != -1) {
+      if (monthIndex >= 0 && monthIndex < _totalMonths) {
+        // 确保该月份的数据已加载
+        await _loadMonthSvgData(monthIndex);
+
         _pageController.animateToPage(
           monthIndex,
           duration: const Duration(milliseconds: 300),
@@ -133,21 +175,37 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) {
-              final newMonth = _months[index];
+              final newMonth = _getMonthFromIndex(index);
               setState(() {
                 _displayedMonth = newMonth;
               });
+
+              // 加载当前月份的数据
+              _loadMonthSvgData(index);
+
+              // 预加载下一个月的数据（如果不是最后一个月）
+              if (index < _totalMonths - 1) {
+                _loadMonthSvgData(index + 1);
+              }
+
+              // 预加载上一个月的数据（如果不是第一个月）
+              if (index > 0) {
+                _loadMonthSvgData(index - 1);
+              }
+
               _animationController.forward(from: 0.0);
             },
-            itemCount: _months.length,
+            itemCount: _totalMonths,
             itemBuilder: (context, index) {
-              final month = _months[index];
+              final month = _getMonthFromIndex(index);
+              // 使用缓存的SVG数据，如果还没加载则使用空Map
+              final svgCache = _monthSvgCaches[index] ?? {};
 
               return MonthView(
                 month: month,
                 selectedDate: _selectedDate,
                 displayedMonth: _displayedMonth,
-                svgCache: widget.svgCache,
+                svgCache: svgCache,
                 onDateSelected: (date) {
                   setState(() {
                     _selectedDate = date;
