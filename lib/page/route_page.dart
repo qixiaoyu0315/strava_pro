@@ -365,6 +365,9 @@ class _RoutePageState extends State<RoutePage> {
 
   @override
   Widget build(BuildContext context) {
+    // 检测是否为横屏模式
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+
     return Scaffold(
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -398,23 +401,51 @@ class _RoutePageState extends State<RoutePage> {
                         ),
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final routeData = routeList[index];
-                                return RouteCard(
-                                  routeData: routeData,
-                                  onTap: () => _navigateToRouteDetail(routeData['idStr']!),
-                                  onNavigate: () => _navigateToRouteDetail(routeData['idStr']!, startNavigation: true),
-                                );
-                              },
-                              childCount: routeList.length,
-                            ),
-                          ),
+                          sliver: isLandscape 
+                            // 横屏模式：并排显示两个路线
+                            ? _buildLandscapeRouteList() 
+                            // 竖屏模式：单列显示路线
+                            : SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final routeData = routeList[index];
+                                    return RouteCard(
+                                      routeData: routeData,
+                                      onTap: () => _navigateToRouteDetail(routeData['idStr']!),
+                                      onNavigate: () => _navigateToRouteDetail(routeData['idStr']!, startNavigation: true),
+                                    );
+                                  },
+                                  childCount: routeList.length,
+                                ),
+                              ),
                         ),
                       ],
                     ),
             ),
+    );
+  }
+
+  // 横屏模式下的路线列表构建方法
+  Widget _buildLandscapeRouteList() {
+    return SliverGrid(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, // 两列
+        childAspectRatio: 2.5, // 宽高比
+        crossAxisSpacing: 8.0,
+        mainAxisSpacing: 8.0,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          if (index >= routeList.length) return null;
+          final routeData = routeList[index];
+          return RouteCard(
+            routeData: routeData,
+            onTap: () => _navigateToRouteDetail(routeData['idStr']!),
+            onNavigate: () => _navigateToRouteDetail(routeData['idStr']!, startNavigation: true),
+          );
+        },
+        childCount: routeList.length,
+      ),
     );
   }
 }

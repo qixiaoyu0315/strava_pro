@@ -4,23 +4,25 @@ import 'month_grid.dart';
 class MonthView extends StatelessWidget {
   final DateTime month;
   final DateTime selectedDate;
-  final DateTime displayedMonth;
+  final DateTime? displayedMonth;
   final Map<String, bool> svgCache;
   final Function(DateTime) onDateSelected;
-  final VoidCallback onMonthTap;
+  final VoidCallback? onMonthTap;
   final bool isAnimated;
   final Animation<double>? animation;
+  final bool isCurrentMonth;
 
   const MonthView({
     Key? key,
     required this.month,
     required this.selectedDate,
-    required this.displayedMonth,
+    this.displayedMonth,
     required this.svgCache,
     required this.onDateSelected,
-    required this.onMonthTap,
+    this.onMonthTap,
     this.isAnimated = false,
     this.animation,
+    this.isCurrentMonth = false,
   }) : super(key: key);
 
   @override
@@ -44,8 +46,9 @@ class MonthView extends StatelessWidget {
               ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: displayedMonth.year == month.year &&
-                        displayedMonth.month == month.month
+                color: (displayedMonth != null && 
+                       displayedMonth!.year == month.year &&
+                       displayedMonth!.month == month.month) || isCurrentMonth
                     ? Colors.blue.withOpacity(0.1)
                     : null,
               ),
@@ -57,8 +60,9 @@ class MonthView extends StatelessWidget {
                     style: TextStyle(
                       color: textColor,
                       fontSize: 16,
-                      fontWeight: displayedMonth.year == month.year &&
-                              displayedMonth.month == month.month
+                      fontWeight: (displayedMonth != null &&
+                              displayedMonth!.year == month.year &&
+                              displayedMonth!.month == month.month) || isCurrentMonth
                           ? FontWeight.bold
                           : FontWeight.w500,
                     ),

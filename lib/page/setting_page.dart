@@ -312,206 +312,271 @@ class _SettingPageState extends State<SettingPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 检测是否为横屏模式
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
+        child: isLandscape 
+            // 横屏布局
+            ? _buildLandscapeLayout(context)
+            // 竖屏布局
+            : _buildPortraitLayout(context),
+      ),
+    );
+  }
+
+  // 竖屏布局
+  Widget _buildPortraitLayout(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 用户信息卡片
+        if (_athlete != null) ...[
+          _buildUserInfoCard(context),
+          const SizedBox(height: 24),
+        ],
+        // 布局切换开关
+        _buildLayoutSwitchCard(),
+        const SizedBox(height: 24),
+        // API设置卡片
+        _buildApiSettingsCard(context),
+        const SizedBox(height: 24),
+        // 同步按钮和进度
+        if (token != null) ...[
+          _buildSyncCard(),
+        ],
+      ],
+    );
+  }
+
+  // 横屏布局
+  Widget _buildLandscapeLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 左侧用户信息
+        if (_athlete != null) 
+          Expanded(
+            flex: 1,
+            child: _buildUserInfoCard(context),
+          ),
+        
+        // 右侧设置项
+        Expanded(
+          flex: 2,
+          child: Padding(
+            padding: EdgeInsets.only(left: _athlete != null ? 16.0 : 0.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildLayoutSwitchCard(),
+                const SizedBox(height: 24),
+                _buildApiSettingsCard(context),
+                const SizedBox(height: 24),
+                if (token != null) _buildSyncCard(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 用户信息卡片
+  Widget _buildUserInfoCard(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // 头像
+            CircleAvatar(
+              radius: 50,
+              backgroundImage: _athlete?.profile != null
+                  ? NetworkImage(_athlete!.profile!)
+                  : null,
+              child: _athlete?.profile == null
+                  ? Icon(Icons.person, size: 50)
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            // 用户名
+            Text(
+              '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            // 用户所在城市和国家
+            if (_athlete?.city != null || _athlete?.country != null)
+              Text(
+                '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            const SizedBox(height: 16),
+            // 运动统计
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildStatItem(
+                  context,
+                  '关注者',
+                  '${_athlete?.followerCount ?? 0}',
+                ),
+                _buildStatItem(
+                  context,
+                  '关注中',
+                  '${_athlete?.friendCount ?? 0}',
+                ),
+                _buildStatItem(
+                  context,
+                  '活动',
+                  '${_athlete?.resourceState ?? 0}',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 布局切换卡片
+  Widget _buildLayoutSwitchCard() {
+    return Card(
+      elevation: 2,
+      child: SwitchListTile(
+        title: const Text('使用水平布局'),
+        subtitle: const Text('切换日历的显示方式'),
+        value: _isHorizontalLayout,
+        onChanged: (bool value) {
+          setState(() {
+            _isHorizontalLayout = value;
+          });
+          _saveSettings();
+        },
+      ),
+    );
+  }
+
+  // API设置卡片
+  Widget _buildApiSettingsCard(BuildContext context) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 用户信息卡片
-            if (_athlete != null) ...[
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      // 头像
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage: _athlete?.profile != null
-                            ? NetworkImage(_athlete!.profile!)
-                            : null,
-                        child: _athlete?.profile == null
-                            ? Icon(Icons.person, size: 50)
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      // 用户名
-                      Text(
-                        '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      // 用户所在城市和国家
-                      if (_athlete?.city != null || _athlete?.country != null)
-                        Text(
-                          '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      const SizedBox(height: 16),
-                      // 运动统计
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatItem(
-                            context,
-                            '关注者',
-                            '${_athlete?.followerCount ?? 0}',
-                          ),
-                          _buildStatItem(
-                            context,
-                            '关注中',
-                            '${_athlete?.friendCount ?? 0}',
-                          ),
-                          _buildStatItem(
-                            context,
-                            '活动',
-                            '${_athlete?.resourceState ?? 0}',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-            // 布局切换开关
-            Card(
-              elevation: 2,
-              child: SwitchListTile(
-                title: const Text('使用水平布局'),
-                subtitle: const Text('切换日历的显示方式'),
-                value: _isHorizontalLayout,
-                onChanged: (bool value) {
-                  setState(() {
-                    _isHorizontalLayout = value;
-                  });
-                  _saveSettings();
-                },
+            Text(
+              'API 设置',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _idController,
+              decoration: const InputDecoration(
+                labelText: '请输入 API ID',
+                border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 24),
-            // API设置卡片
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'API 设置',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _idController,
-                      decoration: const InputDecoration(
-                        labelText: '请输入 API ID',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _keyController,
-                      decoration: const InputDecoration(
-                        labelText: '请输入 API Key',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      minLines: 1,
-                      maxLines: 3,
-                      controller: _textEditingController,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: "Access Token",
-                        suffixIcon: IconButton(
-                          icon: Icon(Icons.copy),
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: _textEditingController.text),
-                            ).then((_) =>
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("已复制到剪贴板")),
-                                ));
-                          },
-                        ),
-                      ),
-                      readOnly: true,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: testAuthentication,
-                          icon: Icon(Icons.login),
-                          label: const Text('认证'),
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: testDeauth,
-                          icon: Icon(Icons.logout),
-                          label: const Text('取消认证'),
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _keyController,
+              decoration: const InputDecoration(
+                labelText: '请输入 API Key',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              minLines: 1,
+              maxLines: 3,
+              controller: _textEditingController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: "Access Token",
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.copy),
+                  onPressed: () {
+                    Clipboard.setData(
+                      ClipboardData(text: _textEditingController.text),
+                    ).then((_) =>
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("已复制到剪贴板")),
+                        ));
+                  },
                 ),
               ),
+              readOnly: true,
             ),
-            const SizedBox(height: 24),
-            // 同步按钮和进度
-            if (token != null) ...[
-              Card(
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_isSyncing) ...[
-                        LinearProgressIndicator(value: _syncProgress),
-                        SizedBox(height: 8),
-                        Text(_syncStatus),
-                        SizedBox(height: 16),
-                      ],
-                      ElevatedButton.icon(
-                        onPressed: _isSyncing ? null : syncActivities,
-                        icon: Icon(Icons.sync),
-                        label: Text(_isSyncing ? '同步中...' : '同步数据'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: testAuthentication,
+                  icon: Icon(Icons.login),
+                  label: const Text('认证'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                   ),
                 ),
-              ),
+                ElevatedButton.icon(
+                  onPressed: testDeauth,
+                  icon: Icon(Icons.logout),
+                  label: const Text('取消认证'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 同步卡片
+  Widget _buildSyncCard() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isSyncing) ...[
+              LinearProgressIndicator(value: _syncProgress),
+              SizedBox(height: 8),
+              Text(_syncStatus),
+              SizedBox(height: 16),
             ],
+            ElevatedButton.icon(
+              onPressed: _isSyncing ? null : syncActivities,
+              icon: Icon(Icons.sync),
+              label: Text(_isSyncing ? '同步中...' : '同步数据'),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            ),
           ],
         ),
       ),

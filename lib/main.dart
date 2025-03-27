@@ -182,29 +182,69 @@ class _MainAppState extends State<MainApp> {
                 child: CircularProgressIndicator(),
               ),
             )
-          : Scaffold(
-              body: IndexedStack(
-                index: _selectedIndex,
-                children: _pages,
-              ),
-              bottomNavigationBar: BottomNavigationBar(
-                items: const <BottomNavigationBarItem>[
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.calendar_month),
-                    label: '日历',
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final isLandscape = constraints.maxWidth > constraints.maxHeight;
+                
+                return Scaffold(
+                  body: Row(
+                    children: [
+                      // 横屏时显示左侧导航栏，竖屏时隐藏
+                      if (isLandscape)
+                        NavigationRail(
+                          selectedIndex: _selectedIndex,
+                          onDestinationSelected: _onItemTapped,
+                          labelType: NavigationRailLabelType.selected,
+                          destinations: const [
+                            NavigationRailDestination(
+                              icon: Icon(Icons.calendar_month),
+                              label: Text('日历'),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.route),
+                              label: Text('路线'),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.settings),
+                              label: Text('设置'),
+                            ),
+                          ],
+                          minWidth: 60,
+                          useIndicator: true,
+                        ),
+                      
+                      // 内容区域
+                      Expanded(
+                        child: IndexedStack(
+                          index: _selectedIndex,
+                          children: _pages,
+                        ),
+                      ),
+                    ],
                   ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.route),
-                    label: '路线',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Icon(Icons.settings),
-                    label: '设置',
-                  ),
-                ],
-                currentIndex: _selectedIndex,
-                onTap: _onItemTapped,
-              ),
+                  // 竖屏时显示底部导航栏
+                  bottomNavigationBar: isLandscape
+                      ? null
+                      : BottomNavigationBar(
+                          items: const <BottomNavigationBarItem>[
+                            BottomNavigationBarItem(
+                              icon: Icon(Icons.calendar_month),
+                              label: '日历',
+                            ),
+                            BottomNavigationBarItem(
+                              icon: Icon(Icons.route),
+                              label: '路线',
+                            ),
+                            BottomNavigationBarItem(
+                              icon: Icon(Icons.settings),
+                              label: '设置',
+                            ),
+                          ],
+                          currentIndex: _selectedIndex,
+                          onTap: _onItemTapped,
+                        ),
+                );
+              },
             ),
     );
   }

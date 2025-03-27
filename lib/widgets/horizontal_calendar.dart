@@ -74,152 +74,266 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     super.dispose();
   }
 
-  // 根据索引获取对应的月份
-  DateTime _getMonthFromIndex(int index) {
+  // 加载指定索引月份的SVG数据
+  void _loadMonthSvgData(int monthIndex) {
+    if (_monthSvgCaches.containsKey(monthIndex)) return;
+
     final now = DateTime.now();
     final startDate = DateTime(now.year - 2, now.month);
-    return DateTime(startDate.year, startDate.month + index);
-  }
-
-  // 加载指定月份的SVG数据
-  Future<void> _loadMonthSvgData(int monthIndex) async {
-    // 如果已经加载过，则跳过
-    if (_monthSvgCaches.containsKey(monthIndex)) {
-      return;
-    }
-
-    final month = _getMonthFromIndex(monthIndex);
-
-    // 先从全局缓存中查找该月的数据
-    Map<String, bool> monthCache = {};
-    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-
-    for (int day = 1; day <= daysInMonth; day++) {
-      final dateStr =
-          '${month.year}-${month.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
-      if (widget.svgCache.containsKey(dateStr)) {
-        monthCache[dateStr] = widget.svgCache[dateStr]!;
-      } else {
-        // 如果全局缓存中没有，则从文件系统加载
-        monthCache[dateStr] = await CalendarUtils.doesSvgExist(dateStr);
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _monthSvgCaches[monthIndex] = monthCache;
-      });
-    }
-  }
-
-  Future<void> _selectMonth(DateTime initialMonth) async {
-    final now = DateTime.now();
-    final DateTime? picked = await MonthPicker.show(
-      context,
-      initialDate: initialMonth,
-      firstDate: DateTime(now.year - 2, now.month),
-      lastDate: DateTime(now.year, now.month),
+    final targetMonth = DateTime(
+      startDate.year,
+      startDate.month + monthIndex,
     );
 
-    if (picked != null) {
-      // 计算选择的月份索引
-      final startDate = DateTime(now.year - 2, now.month);
-      final monthIndex = (picked.year - startDate.year) * 12 +
-          (picked.month - startDate.month);
-
-      if (monthIndex >= 0 && monthIndex < _totalMonths) {
-        // 确保该月份的数据已加载
-        await _loadMonthSvgData(monthIndex);
-
-        _pageController.animateToPage(
-          monthIndex,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
+    // 预加载数据
+    CalendarUtils.preloadSvgForMonth(targetMonth).then((monthCache) {
+      if (mounted) {
+        setState(() {
+          _monthSvgCaches[monthIndex] = Map.from(monthCache);
+        });
       }
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // 检测是否是横屏模式
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+
+    if (isLandscape) {
+      // 横屏模式：并排显示两个月份
+      return _buildLandscapeLayout();
+    } else {
+      // 竖屏模式：单月份翻页视图
+      return _buildPortraitLayout();
+    }
+  }
+
+  // 横屏布局：并排显示两个月
+  Widget _buildLandscapeLayout() {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year - 2, now.month);
+    final currentMonthIndex = (now.year - startDate.year) * 12 + (now.month - startDate.month);
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          children: [
+            // 月份选择器和标题
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "日历视图",
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  TextButton(
+                    onPressed: _selectMonth,
+                    child: Text(
+                      "${_displayedMonth.year}年${_displayedMonth.month}月",
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // 并排显示两个月
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  // 预加载前后月份的数据
+                  _loadMonthSvgData(index - 1);
+                  _loadMonthSvgData(index);
+                  _loadMonthSvgData(index + 1);
+                  
+                  // 更新显示的月份
+                  final month = DateTime(
+                    startDate.year,
+                    startDate.month + index,
+                  );
+                  setState(() {
+                    _displayedMonth = month;
+                  });
+                },
+                itemCount: _totalMonths,
+                itemBuilder: (context, index) {
+                  final month = DateTime(
+                    startDate.year,
+                    startDate.month + index,
+                  );
+                  
+                  // 如果是当前索引，显示当月和下个月
+                  final nextMonth = DateTime(month.year, month.month + 1);
+                  
+                  // 获取月份缓存
+                  final monthCache = _monthSvgCaches[index] ?? widget.svgCache;
+                  final nextMonthCache = _monthSvgCaches[index + 1] ?? widget.svgCache;
+                  
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 当前月
+                      Expanded(
+                        child: MonthView(
+                          month: month,
+                          selectedDate: _selectedDate,
+                          onDateSelected: (date) {
+                            setState(() {
+                              _selectedDate = date;
+                            });
+                            widget.onDateSelected(date);
+                          },
+                          svgCache: monthCache,
+                          isCurrentMonth: month.year == now.year && month.month == now.month,
+                          displayedMonth: _displayedMonth,
+                          onMonthTap: _selectMonth,
+                        ),
+                      ),
+                      
+                      // 分隔线
+                      Container(
+                        width: 1,
+                        color: Colors.grey.withOpacity(0.3),
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      
+                      // 下个月
+                      Expanded(
+                        child: MonthView(
+                          month: nextMonth,
+                          selectedDate: _selectedDate,
+                          onDateSelected: (date) {
+                            setState(() {
+                              _selectedDate = date;
+                            });
+                            widget.onDateSelected(date);
+                          },
+                          svgCache: nextMonthCache,
+                          isCurrentMonth: nextMonth.year == now.year && nextMonth.month == now.month,
+                          displayedMonth: _displayedMonth,
+                          onMonthTap: _selectMonth,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 竖屏布局：单月份翻页视图
+  Widget _buildPortraitLayout() {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year - 2, now.month);
+    
     return Column(
       children: [
-        // 星期标题行
+        // 月份选择器和标题
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.all(16.0),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('一',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color)),
-              Text('二',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color)),
-              Text('三',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color)),
-              Text('四',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color)),
-              Text('五',
-                  style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color)),
-              Text('六', style: const TextStyle(color: Colors.blue)),
-              Text('日', style: const TextStyle(color: Colors.red)),
+              Text(
+                "日历视图",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              TextButton(
+                onPressed: _selectMonth,
+                child: Text(
+                  "${_displayedMonth.year}年${_displayedMonth.month}月",
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
             ],
           ),
         ),
-        // 月份PageView
+        
+        // 月份视图
         Expanded(
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) {
-              final newMonth = _getMonthFromIndex(index);
-              setState(() {
-                _displayedMonth = newMonth;
-              });
-
-              // 加载当前月份的数据
+              // 预加载前后月份的数据
+              _loadMonthSvgData(index - 1);
               _loadMonthSvgData(index);
-
-              // 预加载下一个月的数据（如果不是最后一个月）
-              if (index < _totalMonths - 1) {
-                _loadMonthSvgData(index + 1);
-              }
-
-              // 预加载上一个月的数据（如果不是第一个月）
-              if (index > 0) {
-                _loadMonthSvgData(index - 1);
-              }
-
-              _animationController.forward(from: 0.0);
+              _loadMonthSvgData(index + 1);
+              
+              // 更新显示的月份
+              final month = DateTime(
+                startDate.year,
+                startDate.month + index,
+              );
+              setState(() {
+                _displayedMonth = month;
+              });
             },
             itemCount: _totalMonths,
             itemBuilder: (context, index) {
-              final month = _getMonthFromIndex(index);
-              // 使用缓存的SVG数据，如果还没加载则使用空Map
-              final svgCache = _monthSvgCaches[index] ?? {};
-
+              final month = DateTime(
+                startDate.year,
+                startDate.month + index,
+              );
+              
+              // 获取月份缓存
+              final monthCache = _monthSvgCaches[index] ?? widget.svgCache;
+              
               return MonthView(
                 month: month,
                 selectedDate: _selectedDate,
-                displayedMonth: _displayedMonth,
-                svgCache: svgCache,
                 onDateSelected: (date) {
                   setState(() {
                     _selectedDate = date;
                   });
                   widget.onDateSelected(date);
                 },
-                onMonthTap: () => _selectMonth(month),
-                isAnimated: true,
-                animation: _animation,
+                svgCache: monthCache,
+                isCurrentMonth: month.year == now.year && month.month == now.month,
+                displayedMonth: _displayedMonth,
+                onMonthTap: _selectMonth,
               );
             },
           ),
         ),
       ],
     );
+  }
+
+  // 显示月份选择器
+  void _selectMonth() async {
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => Dialog(
+        child: MonthPicker(
+          initialDate: _displayedMonth,
+          firstDate: DateTime(DateTime.now().year - 2, 1),
+          lastDate: DateTime.now(),
+          onMonthSelected: (date) {
+            Navigator.of(context).pop(date);
+          },
+        ),
+      ),
+    );
+    
+    if (picked != null) {
+      final now = DateTime.now();
+      final startDate = DateTime(now.year - 2, now.month);
+      final targetIndex = (picked.year - startDate.year) * 12 + (picked.month - startDate.month);
+      
+      // 滚动到选中的月份
+      _pageController.animateToPage(
+        targetIndex,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 }
