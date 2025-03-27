@@ -57,9 +57,14 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     try {
       Directory directory;
       if (Platform.isAndroid) {
-        directory = Directory('/storage/emulated/0/Download/strava_pro');
+        directory = Directory('/storage/emulated/0/Download/strava_pro/gpx');
       } else {
         directory = await getApplicationDocumentsDirectory();
+      }
+
+      // 检查目录是否存在
+      if (!await directory.exists()) {
+        return;
       }
 
       final file = File('${directory.path}/${widget.idStr}.gpx');
@@ -81,6 +86,34 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
   Future<void> _exportGPX(strava.Route routeData) async {
     try {
+      // 首先检查文件是否已经存在
+      Directory directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download/strava_pro/gpx');
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+      
+      final fileName = '${routeData.idStr}.gpx';
+      final file = File('${directory.path}/$fileName');
+      
+      // 如果文件已存在，直接解析它
+      if (await directory.exists() && await file.exists()) {
+        final data = await ElevationData.fromGPXFile(file.path);
+        if (data != null) {
+          setState(() {
+            gpxFilePath = file.path;
+            elevationData = data;
+            gpxPoints = data.elevationPoints.map((point) => point.position).toList();
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('GPX文件已存在，直接解析完成')),
+          );
+          return; // 文件已存在，直接返回
+        }
+      }
+      
       // 检查 Android 版本并请求相应权限
       if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
@@ -112,21 +145,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       }
 
       // 获取下载目录
-      Directory directory;
-      if (Platform.isAndroid) {
-        directory = Directory('/storage/emulated/0/Download/strava_pro/gpx');
-      } else {
-        directory = await getApplicationDocumentsDirectory();
-      }
-
-      // 确保目录存在
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
-
-      // 创建文件名
-      final fileName = '${routeData.idStr}.gpx';
-      final file = File('${directory.path}/$fileName');
 
       // 获取访问令牌
       final tokenResponse = await StravaClientManager().authenticate();
