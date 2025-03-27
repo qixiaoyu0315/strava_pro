@@ -5,13 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:strava_client/strava_client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
 
 class SettingPage extends StatefulWidget {
-  const SettingPage({Key? key}) : super(key: key);
+  final Function(bool)? onLayoutChanged;
+
+  const SettingPage({
+    Key? key,
+    this.onLayoutChanged,
+  }) : super(key: key);
+
   @override
   _SettingPageState createState() => _SettingPageState();
 }
@@ -27,11 +34,26 @@ class _SettingPageState extends State<SettingPage> {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _keyController = TextEditingController();
   final ApiKeyModel _apiKeyModel = ApiKeyModel();
+  bool _isHorizontalLayout = true;
 
   @override
   void initState() {
     super.initState();
     _loadApiKey();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isHorizontalLayout', _isHorizontalLayout);
+    widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
 
   Future<void> _loadApiKey() async {
@@ -167,7 +189,7 @@ class _SettingPageState extends State<SettingPage> {
             // 检查是否已处理过该日期
             if (!_processedDates.containsKey(dateStr)) {
               _processedDates[dateStr] = true;
-              
+
               setState(() {
                 _syncStatus = '正在处理: ${activity.name ?? fileName} ($dateStr)';
               });
@@ -191,7 +213,6 @@ class _SettingPageState extends State<SettingPage> {
             _syncProgress = processedCount / totalActivities;
             _syncStatus = '已处理: $processedCount/$totalActivities';
           });
-
         } catch (e) {
           print('处理活动 ${activity.name} 时出错: $e');
         }
@@ -219,7 +240,8 @@ class _SettingPageState extends State<SettingPage> {
 
   bool _isValidSvg(String content) {
     if (content.isEmpty) return false;
-    if (!content.trim().startsWith('<svg') || !content.trim().endsWith('</svg>')) {
+    if (!content.trim().startsWith('<svg') ||
+        !content.trim().endsWith('</svg>')) {
       return false;
     }
     return true;
@@ -231,92 +253,125 @@ class _SettingPageState extends State<SettingPage> {
       appBar: AppBar(
         title: const Text('设置'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _idController,
-              decoration: const InputDecoration(
-                labelText: '请输入 API ID',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _keyController,
-              decoration: const InputDecoration(
-                labelText: '请输入 API Key',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              minLines: 1,
-              maxLines: 3,
-              controller: _textEditingController,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: "Access Token",
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.copy),
-                  onPressed: () {
-                    Clipboard.setData(
-                            ClipboardData(text: _textEditingController.text))
-                        .then((_) => ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("已复制到剪贴板")),
-                            ));
-                  },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '日历布局设置',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              readOnly: true,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: testAuthentication,
-                  icon: Icon(Icons.login),
-                  label: const Text('认证'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                title: const Text('水平滑动布局'),
+                subtitle: const Text('开启后可以左右滑动切换月份'),
+                value: _isHorizontalLayout,
+                onChanged: (bool value) {
+                  setState(() {
+                    _isHorizontalLayout = value;
+                  });
+                  _saveSettings();
+                },
+              ),
+              const Divider(),
+              const Text(
+                'Strava API设置',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _idController,
+                decoration: const InputDecoration(
+                  labelText: '请输入 API ID',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: _keyController,
+                decoration: const InputDecoration(
+                  labelText: '请输入 API Key',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                minLines: 1,
+                maxLines: 3,
+                controller: _textEditingController,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: "Access Token",
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.copy),
+                    onPressed: () {
+                      Clipboard.setData(
+                              ClipboardData(text: _textEditingController.text))
+                          .then(
+                              (_) => ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text("已复制到剪贴板")),
+                                  ));
+                    },
                   ),
                 ),
+                readOnly: true,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: testAuthentication,
+                    icon: Icon(Icons.login),
+                    label: const Text('认证'),
+                    style: ElevatedButton.styleFrom(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: testDeauth,
+                    icon: Icon(Icons.logout),
+                    label: const Text('取消认证'),
+                    style: ElevatedButton.styleFrom(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 40),
+              if (token != null) ...[
+                if (_isSyncing) ...[
+                  LinearProgressIndicator(value: _syncProgress),
+                  SizedBox(height: 8),
+                  Text(_syncStatus),
+                  SizedBox(height: 16),
+                ],
                 ElevatedButton.icon(
-                  onPressed: testDeauth,
-                  icon: Icon(Icons.logout),
-                  label: const Text('取消认证'),
+                  onPressed: _isSyncing ? null : syncActivities,
+                  icon: Icon(Icons.sync),
+                  label: Text(_isSyncing ? '同步中...' : '同步数据'),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    backgroundColor: Colors.red,
+                    backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
                   ),
                 ),
               ],
-            ),
-            const Divider(height: 40),
-            if (token != null) ...[
-              if (_isSyncing) ...[
-                LinearProgressIndicator(value: _syncProgress),
-                SizedBox(height: 8),
-                Text(_syncStatus),
-                SizedBox(height: 16),
-              ],
-              ElevatedButton.icon(
-                onPressed: _isSyncing ? null : syncActivities,
-                icon: Icon(Icons.sync),
-                label: Text(_isSyncing ? '同步中...' : '同步数据'),
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );
