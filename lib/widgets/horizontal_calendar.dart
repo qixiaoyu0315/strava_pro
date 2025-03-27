@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
 import 'month_view.dart';
 import 'month_picker.dart';
 import '../widgets/calendar_utils.dart';
 
 class HorizontalCalendar extends StatefulWidget {
+
   final Map<String, bool> svgCache;
   final Function(DateTime) onDateSelected;
 
@@ -19,6 +21,7 @@ class HorizontalCalendar extends StatefulWidget {
 
 class _HorizontalCalendarState extends State<HorizontalCalendar>
     with SingleTickerProviderStateMixin {
+
   late DateTime _selectedDate;
   late DateTime _displayedMonth;
   late PageController _pageController;
@@ -28,6 +31,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
   // 用于存储当前可见月份的缓存
   final Map<int, Map<String, bool>> _monthSvgCaches = {};
+
 
   @override
   void initState() {
@@ -48,6 +52,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     // 初始化PageController
     _pageController = PageController(
       initialPage: currentMonthIndex,
+
       viewportFraction: 1.0,
     );
 
@@ -73,6 +78,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     _animationController.dispose();
     super.dispose();
   }
+
 
   // 根据索引获取对应的月份
   DateTime _getMonthFromIndex(int index) {
@@ -144,7 +150,6 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 星期标题行
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: Row(
@@ -170,11 +175,11 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
             ],
           ),
         ),
-        // 月份PageView
         Expanded(
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) {
+
               final newMonth = _getMonthFromIndex(index);
               setState(() {
                 _displayedMonth = newMonth;
@@ -206,6 +211,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                 selectedDate: _selectedDate,
                 displayedMonth: _displayedMonth,
                 svgCache: svgCache,
+
                 onDateSelected: (date) {
                   setState(() {
                     _selectedDate = date;
@@ -213,6 +219,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                   widget.onDateSelected(date);
                 },
                 onMonthTap: () => _selectMonth(month),
+
                 isAnimated: true,
                 animation: _animation,
               );

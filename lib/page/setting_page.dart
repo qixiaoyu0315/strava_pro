@@ -10,6 +10,7 @@ import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -17,12 +18,15 @@ class SettingPage extends StatefulWidget {
   final DetailedAthlete? athlete;
   final Function(bool, DetailedAthlete?)? onAuthenticationChanged;
 
+
   const SettingPage({
     Key? key,
     this.onLayoutChanged,
+
     this.isAuthenticated = false,
     this.athlete,
     this.onAuthenticationChanged,
+
   }) : super(key: key);
 
   @override
@@ -90,6 +94,7 @@ class _SettingPageState extends State<SettingPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isHorizontalLayout', _isHorizontalLayout);
     widget.onLayoutChanged?.call(_isHorizontalLayout);
+
   }
 
   Future<void> _loadApiKey() async {
@@ -100,6 +105,19 @@ class _SettingPageState extends State<SettingPage> {
         _keyController.text = apiKey['api_key']!;
       });
     }
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isHorizontalLayout', _isHorizontalLayout);
+    widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
 
   FutureOr<Null> showErrorMessage(dynamic error, dynamic stackTrace) {
@@ -388,6 +406,7 @@ class _SettingPageState extends State<SettingPage> {
               child: SwitchListTile(
                 title: const Text('使用水平布局'),
                 subtitle: const Text('切换日历的显示方式'),
+
                 value: _isHorizontalLayout,
                 onChanged: (bool value) {
                   setState(() {
@@ -396,6 +415,7 @@ class _SettingPageState extends State<SettingPage> {
                   _saveSettings();
                 },
               ),
+
             ),
             const SizedBox(height: 24),
             // API设置卡片
@@ -510,8 +530,9 @@ class _SettingPageState extends State<SettingPage> {
                   ),
                 ),
               ),
+
             ],
-          ],
+          ),
         ),
       ),
     );

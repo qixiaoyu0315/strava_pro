@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'page/route_page.dart';
 import 'page/setting_page.dart';
 import 'page/calendar_name.dart';
@@ -38,6 +39,7 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   int _selectedIndex = 0;
   bool _isHorizontalLayout = true;
+
   List<Widget> _pages = [];
   bool _isLoading = true;
   // 添加认证状态
@@ -159,14 +161,33 @@ class _MainAppState extends State<MainApp> {
     }
   }
 
-  void _onItemTapped(int index) {
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedIndex = index;
+      _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
+    });
+  }
+
+  void _updateCalendarLayout(bool value) {
+    setState(() {
+      _isHorizontalLayout = value;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      CalendarPage(isHorizontalLayout: _isHorizontalLayout),
+      const RoutePage(),
+      SettingPage(onLayoutChanged: _updateCalendarLayout),
+    ];
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.light(useMaterial3: true).copyWith(

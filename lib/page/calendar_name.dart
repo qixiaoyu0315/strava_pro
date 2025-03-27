@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
+
 import '../widgets/vertical_calendar.dart';
 import '../widgets/horizontal_calendar.dart';
 import '../widgets/calendar_utils.dart';
@@ -9,6 +10,7 @@ class CalendarPage extends StatefulWidget {
   final bool isHorizontalLayout;
 
   const CalendarPage({
+
     Key? key,
     this.isHorizontalLayout = true,
   }) : super(key: key);
@@ -53,6 +55,7 @@ class _CalendarPageState extends State<CalendarPage>
   Future<void> _initializeCalendar() async {
     if (!mounted) return;
 
+
     // 预加载当前月份和前两个月的SVG，仅在垂直布局时需要
     if (!widget.isHorizontalLayout) {
       final now = DateTime.now();
@@ -67,6 +70,7 @@ class _CalendarPageState extends State<CalendarPage>
       final monthCache = await CalendarUtils.preloadSvgForMonth(now);
       _svgCache.addAll(monthCache);
     }
+
 
     if (!mounted) return;
 
@@ -83,6 +87,7 @@ class _CalendarPageState extends State<CalendarPage>
       _selectedDate = date;
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
