@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'page/route_page.dart';
 import 'page/setting_page.dart';
 import 'page/calendar_name.dart';
@@ -27,20 +28,35 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> {
   int _selectedIndex = 0;
-  final List<Widget> _pages = [
-    const CalendarPage(),
-    const RoutePage(),
-    const SettingPage(),
-  ];
+  bool _isHorizontalLayout = true;
 
-  void _onItemTapped(int index) {
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedIndex = index;
+      _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
+    });
+  }
+
+  void _updateCalendarLayout(bool value) {
+    setState(() {
+      _isHorizontalLayout = value;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      CalendarPage(isHorizontalLayout: _isHorizontalLayout),
+      const RoutePage(),
+      SettingPage(onLayoutChanged: _updateCalendarLayout),
+    ];
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.light(useMaterial3: true).copyWith(
@@ -53,7 +69,7 @@ class _MainAppState extends State<MainApp> {
       home: Scaffold(
         body: IndexedStack(
           index: _selectedIndex,
-          children: _pages,
+          children: pages,
         ),
         bottomNavigationBar: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
@@ -71,7 +87,11 @@ class _MainAppState extends State<MainApp> {
             ),
           ],
           currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
         ),
       ),
     );

@@ -4,9 +4,15 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 import '../widgets/month_calendar.dart';
 import '../widgets/month_picker.dart';
+import '../widgets/horizontal_calendar.dart';
 
 class CalendarPage extends StatefulWidget {
-  const CalendarPage({super.key});
+  final bool isHorizontalLayout;
+
+  const CalendarPage({
+    super.key,
+    this.isHorizontalLayout = false,
+  });
 
   @override
   State<CalendarPage> createState() => _CalendarPageState();
@@ -345,87 +351,100 @@ class _CalendarPageState extends State<CalendarPage>
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: SafeArea(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: widget.isHorizontalLayout
+                    ? HorizontalCalendar(
+                        initialDate: _selectedDate,
+                        svgCache: _svgCache,
+                        onDateSelected: (date) {
+                          setState(() {
+                            _selectedDate = date;
+                          });
+                        },
+                      )
+                    : Column(
                         children: [
-                          Text('一',
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.color)),
-                          Text('二',
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.color)),
-                          Text('三',
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.color)),
-                          Text('四',
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.color)),
-                          Text('五',
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.color)),
-                          Text('六', style: const TextStyle(color: Colors.blue)),
-                          Text('日', style: const TextStyle(color: Colors.red)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Text('一',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.color)),
+                                Text('二',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.color)),
+                                Text('三',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.color)),
+                                Text('四',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.color)),
+                                Text('五',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.color)),
+                                Text('六',
+                                    style: const TextStyle(color: Colors.blue)),
+                                Text('日',
+                                    style: const TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              itemCount: _loadedMonths.length,
+                              itemBuilder: (context, index) {
+                                final currentMonth = _loadedMonths[index];
+                                final delay =
+                                    (index / _loadedMonths.length) * 0.5;
+                                final itemAnimation = CurvedAnimation(
+                                  parent: _animationController,
+                                  curve: Interval(
+                                    delay,
+                                    delay + 0.5,
+                                    curve: Curves.easeOutBack,
+                                  ),
+                                );
+
+                                return MonthCalendar(
+                                  month: currentMonth,
+                                  selectedDate: _selectedDate,
+                                  displayedMonth: _displayedMonth,
+                                  onDateSelected: (date) {
+                                    if (date.year == currentMonth.year &&
+                                        date.month == currentMonth.month) {
+                                      setState(() {
+                                        _selectedDate = date;
+                                      });
+                                    } else {
+                                      _selectMonth(date);
+                                    }
+                                  },
+                                  svgCache: _svgCache,
+                                  isAnimated: true,
+                                  animation: itemAnimation,
+                                );
+                              },
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        itemCount: _loadedMonths.length,
-                        itemBuilder: (context, index) {
-                          final currentMonth = _loadedMonths[index];
-                          final delay = (index / _loadedMonths.length) * 0.5;
-                          final itemAnimation = CurvedAnimation(
-                            parent: _animationController,
-                            curve: Interval(
-                              delay,
-                              delay + 0.5,
-                              curve: Curves.easeOutBack,
-                            ),
-                          );
-
-                          return MonthCalendar(
-                            month: currentMonth,
-                            selectedDate: _selectedDate,
-                            displayedMonth: _displayedMonth,
-                            onDateSelected: (date) {
-                              if (date.year == currentMonth.year &&
-                                  date.month == currentMonth.month) {
-                                setState(() {
-                                  _selectedDate = date;
-                                });
-                              } else {
-                                _selectMonth(date);
-                              }
-                            },
-                            svgCache: _svgCache,
-                            isAnimated: true,
-                            animation: itemAnimation,
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           );
