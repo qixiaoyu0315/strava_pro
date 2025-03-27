@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
+import '../widgets/month_calendar.dart';
+import '../widgets/month_picker.dart';
 
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
@@ -34,7 +36,7 @@ class _CalendarPageState extends State<CalendarPage>
 
     // 初始化动画控制器，增加动画时长
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1200), // 从800ms增加到1200ms
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
@@ -81,9 +83,6 @@ class _CalendarPageState extends State<CalendarPage>
   Future<void> _initializeCalendar() async {
     if (!mounted) return;
 
-    // 预加载默认图标
-    await _preloadDefaultIcon();
-
     // 预加载最近三个月的SVG
     await Future.wait(_loadedMonths.map((month) => _preloadSvgForMonth(month)));
 
@@ -101,11 +100,6 @@ class _CalendarPageState extends State<CalendarPage>
       if (!mounted || !_scrollController.hasClients) return;
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     });
-  }
-
-  Future<void> _preloadDefaultIcon() async {
-    // 不再需要预加载默认SVG，因为使用系统图标
-    return;
   }
 
   void _onScroll() {
@@ -188,180 +182,33 @@ class _CalendarPageState extends State<CalendarPage>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final isDark = brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final otherMonthTextColor = isDark ? Colors.white38 : Colors.black38;
-    final weekdayTextColor = isDark ? Colors.white54 : Colors.black54;
-
-    if (!_isInitialized) {
-    return Scaffold(
-        body: Center(
-          child: ScaleTransition(
-            scale: CurvedAnimation(
-              parent: _animationController,
-              curve: Curves.elasticOut,
-            ),
-            child: const CircularProgressIndicator(),
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SafeArea(
-                child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          Text('一', style: TextStyle(color: weekdayTextColor)),
-                          Text('二', style: TextStyle(color: weekdayTextColor)),
-                          Text('三', style: TextStyle(color: weekdayTextColor)),
-                          Text('四', style: TextStyle(color: weekdayTextColor)),
-                          Text('五', style: TextStyle(color: weekdayTextColor)),
-                          Text('六', style: TextStyle(color: Colors.blue)),
-                          Text('日', style: TextStyle(color: Colors.red)),
-              ],
-            ),
-          ),
-          Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        itemCount: _loadedMonths.length,
-                        itemBuilder: (context, index) {
-                          final currentMonth = _loadedMonths[index];
-                          return AnimatedBuilder(
-                            animation: _animationController,
-                            builder: (context, child) {
-                              final delay =
-                                  (index / _loadedMonths.length) * 0.5;
-                              final itemAnimation = CurvedAnimation(
-                                parent: _animationController,
-                                curve: Interval(
-                                  delay,
-                                  delay + 0.5,
-                                  curve: Curves.easeOutBack,
-                                ),
-                              );
-
-                              return Transform.scale(
-                                scale: 0.8 + (0.2 * itemAnimation.value),
-                                child: Opacity(
-                                  opacity: itemAnimation.value.clamp(0.0, 1.0),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: Container(
-                              height: 420,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Column(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => _selectMonth(currentMonth),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
-                                        horizontal: 16,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                        color: _displayedMonth.year ==
-                                                    currentMonth.year &&
-                                                _displayedMonth.month ==
-                                                    currentMonth.month
-                                            ? Colors.blue.withOpacity(0.1)
-                                            : null,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            '${currentMonth.year}年${currentMonth.month}月',
-                                            style: TextStyle(
-                                              color: textColor,
-                                              fontSize: 16,
-                                              fontWeight: _displayedMonth
-                                                              .year ==
-                                                          currentMonth.year &&
-                                                      _displayedMonth.month ==
-                                                          currentMonth.month
-                                                  ? FontWeight.bold
-                                                  : FontWeight.w500,
-                                            ),
-                                          ),
-                                          Icon(
-                                            Icons.arrow_drop_down,
-                                            color: textColor,
-                                            size: 20,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildMonthGrid(currentMonth,
-                                        textColor, otherMonthTextColor),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _selectMonth(DateTime initialMonth) async {
     final now = DateTime.now();
-    final DateTime? picked = await showDialog<DateTime>(
+    final result = await showDialog<DateTime>(
       context: context,
       builder: (BuildContext context) {
-        return Dialog(
-          child: SizedBox(
-            width: 300,
-            height: 400,
-            child: YearMonthPicker(
-              initialDate: initialMonth,
-              firstDate: DateTime(2000, 1),
-              lastDate: DateTime(now.year, now.month),
-            ),
-          ),
+        return MonthPicker(
+          initialDate: initialMonth,
+          firstDate: DateTime(2000, 1),
+          lastDate: DateTime(now.year, now.month),
+          onMonthSelected: (DateTime date) {
+            Navigator.pop(context, date);
+          },
         );
       },
     );
 
-    if (picked != null && picked != _displayedMonth) {
+    if (result != null && result != _displayedMonth) {
       // 检查是否需要加载选中月份之前的月份
-      await _loadMonthsUntil(picked);
+      await _loadMonthsUntil(result);
 
       setState(() {
-        _displayedMonth = picked;
+        _displayedMonth = result;
       });
 
       // 计算选中月份在列表中的位置
       final monthIndex = _loadedMonths
-          .indexWhere((m) => m.year == picked.year && m.month == picked.month);
+          .indexWhere((m) => m.year == result.year && m.month == result.month);
 
       if (monthIndex != -1) {
         // 滚动到选中的月份
@@ -414,125 +261,6 @@ class _CalendarPageState extends State<CalendarPage>
     await Future.wait(monthsToAdd.map((month) => _preloadSvgForMonth(month)));
   }
 
-  List<DateTime?> _getDaysInMonth(DateTime month) {
-    final List<DateTime?> days = List.filled(42, null); // 保持42个格子的大小，但用null填充
-
-    // 获取当月第一天是星期几
-    final firstDayOfMonth = DateTime(month.year, month.month, 1);
-    final firstWeekday = firstDayOfMonth.weekday;
-
-    // 获取当月天数
-    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-
-    // 只添加当月的日期
-    for (int i = 0; i < daysInMonth; i++) {
-      days[firstWeekday - 1 + i] = DateTime(month.year, month.month, i + 1);
-    }
-
-    return days;
-  }
-
-  Widget _buildMonthGrid(
-      DateTime month, Color textColor, Color otherMonthTextColor) {
-    final days = _getDaysInMonth(month);
-
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-        childAspectRatio: 0.85,
-              ),
-              itemCount: 42,
-              itemBuilder: (context, index) {
-                final day = days[index];
-        if (day == null) return const SizedBox();
-
-        final isToday = day.year == DateTime.now().year &&
-            day.month == DateTime.now().month &&
-            day.day == DateTime.now().day;
-
-        final isSelected = day.year == _selectedDate.year &&
-            day.month == _selectedDate.month &&
-            day.day == _selectedDate.day;
-
-        final isWeekend = day.weekday == 6 || day.weekday == 7;
-
-        // 构建日期格子
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedDate = day;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.blue
-                          : isToday
-                              ? Colors.blue.withOpacity(0.3)
-                              : null,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            day.day.toString(),
-                            style: TextStyle(
-                    color: isSelected
-                        ? Colors.white
-                        : isWeekend
-                            ? isToday
-                                ? Colors.blue
-                                : day.weekday == 7
-                                    ? Colors.red
-                                    : Colors.blue
-                            : textColor,
-                              fontWeight: isToday ? FontWeight.bold : null,
-                            ),
-                          ),
-                          Expanded(
-                            child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                    child: _buildDayIcon(day, isSelected),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDayIcon(DateTime day, bool isSelected) {
-    String formattedDate =
-        '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.svg';
-    String svgPath =
-        '/storage/emulated/0/Download/strava_pro/svg/$formattedDate';
-
-    // 如果SVG缓存中没有该日期，或者缓存显示该SVG不存在，使用默认笑脸图标
-    if (!_svgCache.containsKey(svgPath) || !_svgCache[svgPath]!) {
-      return Icon(
-        Icons.sentiment_satisfied_alt_rounded,
-        color: isSelected ? Colors.white : Colors.grey[400],
-        size: 20,
-      );
-    }
-
-    // 如果有对应的SVG图标，则使用SVG
-    return SvgPicture.file(
-      File(svgPath),
-                                colorFilter: ColorFilter.mode(
-                                  isSelected ? Colors.white : Colors.green,
-                                  BlendMode.srcIn,
-                                ),
-      fit: BoxFit.contain,
-    );
-  }
-
   Future<void> _preloadSvgForMonth(DateTime month) async {
     // 处理月份跨年的情况
     if (month.month == 0) {
@@ -578,138 +306,138 @@ class _CalendarPageState extends State<CalendarPage>
     }
   }
 
+  List<DateTime?> _getDaysInMonth(DateTime month) {
+    final List<DateTime?> days = List.filled(42, null);
+
+    final firstDayOfMonth = DateTime(month.year, month.month, 1);
+    final firstWeekday = firstDayOfMonth.weekday;
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+
+    for (int i = 0; i < daysInMonth; i++) {
+      days[firstWeekday - 1 + i] = DateTime(month.year, month.month, i + 1);
+    }
+
+    return days;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return Scaffold(
+        body: Center(
+          child: ScaleTransition(
+            scale: CurvedAnimation(
+              parent: _animationController,
+              curve: Curves.elasticOut,
+            ),
+            child: const CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Text('一',
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color)),
+                          Text('二',
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color)),
+                          Text('三',
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color)),
+                          Text('四',
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color)),
+                          Text('五',
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color)),
+                          Text('六', style: const TextStyle(color: Colors.blue)),
+                          Text('日', style: const TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        itemCount: _loadedMonths.length,
+                        itemBuilder: (context, index) {
+                          final currentMonth = _loadedMonths[index];
+                          final delay = (index / _loadedMonths.length) * 0.5;
+                          final itemAnimation = CurvedAnimation(
+                            parent: _animationController,
+                            curve: Interval(
+                              delay,
+                              delay + 0.5,
+                              curve: Curves.easeOutBack,
+                            ),
+                          );
+
+                          return MonthCalendar(
+                            month: currentMonth,
+                            selectedDate: _selectedDate,
+                            displayedMonth: _displayedMonth,
+                            onDateSelected: (date) {
+                              if (date.year == currentMonth.year &&
+                                  date.month == currentMonth.month) {
+                                setState(() {
+                                  _selectedDate = date;
+                                });
+                              } else {
+                                _selectMonth(date);
+                              }
+                            },
+                            svgCache: _svgCache,
+                            isAnimated: true,
+                            animation: itemAnimation,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-}
-
-class YearMonthPicker extends StatefulWidget {
-  final DateTime initialDate;
-  final DateTime firstDate;
-  final DateTime lastDate;
-
-  const YearMonthPicker({
-    super.key,
-    required this.initialDate,
-    required this.firstDate,
-    required this.lastDate,
-  });
-
-  @override
-  State<YearMonthPicker> createState() => _YearMonthPickerState();
-}
-
-class _YearMonthPickerState extends State<YearMonthPicker> {
-  late int _selectedYear;
-  late int _selectedMonth;
-  late PageController _yearController;
-  late PageController _monthController;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedYear = widget.initialDate.year;
-    _selectedMonth = widget.initialDate.month;
-    _yearController = PageController(
-      initialPage: widget.initialDate.year - widget.firstDate.year,
-      viewportFraction: 0.3,
-    );
-    _monthController = PageController(
-      initialPage: widget.initialDate.month - 1,
-      viewportFraction: 0.3,
-    );
-  }
-
-  @override
-  void dispose() {
-    _yearController.dispose();
-    _monthController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 20),
-        const Text('选择年份', style: TextStyle(fontSize: 16)),
-        SizedBox(
-          height: 100,
-          child: PageView.builder(
-            controller: _yearController,
-            onPageChanged: (int index) {
-              setState(() {
-                _selectedYear = widget.firstDate.year + index;
-              });
-            },
-            itemCount: widget.lastDate.year - widget.firstDate.year + 1,
-            itemBuilder: (context, index) {
-              final year = widget.firstDate.year + index;
-              return Center(
-                child: Text(
-                  '$year',
-                  style: TextStyle(
-                    fontSize: year == _selectedYear ? 24 : 16,
-                    fontWeight: year == _selectedYear
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const Text('选择月份', style: TextStyle(fontSize: 16)),
-        SizedBox(
-          height: 100,
-          child: PageView.builder(
-            controller: _monthController,
-            onPageChanged: (int index) {
-              setState(() {
-                _selectedMonth = index + 1;
-              });
-            },
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              final month = index + 1;
-              return Center(
-                child: Text(
-                  '$month月',
-                  style: TextStyle(
-                    fontSize: month == _selectedMonth ? 24 : 16,
-                    fontWeight: month == _selectedMonth
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  DateTime(_selectedYear, _selectedMonth),
-                );
-              },
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-      ],
-    );
   }
 }
