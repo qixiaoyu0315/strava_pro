@@ -14,6 +14,33 @@ class MonthPicker extends StatefulWidget {
     required this.onMonthSelected,
   }) : super(key: key);
 
+  static Future<DateTime?> show(
+    BuildContext context, {
+    required DateTime initialDate,
+    required DateTime firstDate,
+    required DateTime lastDate,
+  }) async {
+    return showDialog<DateTime>(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: SizedBox(
+            width: 300,
+            height: 400,
+            child: MonthPicker(
+              initialDate: initialDate,
+              firstDate: firstDate,
+              lastDate: lastDate,
+              onMonthSelected: (date) {
+                Navigator.of(context).pop(date);
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   State<MonthPicker> createState() => _MonthPickerState();
 }
@@ -48,89 +75,81 @@ class _MonthPickerState extends State<MonthPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: SizedBox(
-        width: 300,
-        height: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 20),
+        const Text('选择年份', style: TextStyle(fontSize: 16)),
+        SizedBox(
+          height: 100,
+          child: PageView.builder(
+            controller: _yearController,
+            onPageChanged: (int index) {
+              setState(() {
+                _selectedYear = widget.firstDate.year + index;
+              });
+            },
+            itemCount: widget.lastDate.year - widget.firstDate.year + 1,
+            itemBuilder: (context, index) {
+              final year = widget.firstDate.year + index;
+              return Center(
+                child: Text(
+                  '$year',
+                  style: TextStyle(
+                    fontSize: year == _selectedYear ? 24 : 16,
+                    fontWeight: year == _selectedYear
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const Text('选择月份', style: TextStyle(fontSize: 16)),
+        SizedBox(
+          height: 100,
+          child: PageView.builder(
+            controller: _monthController,
+            onPageChanged: (int index) {
+              setState(() {
+                _selectedMonth = index + 1;
+              });
+            },
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              final month = index + 1;
+              return Center(
+                child: Text(
+                  '$month月',
+                  style: TextStyle(
+                    fontSize: month == _selectedMonth ? 24 : 16,
+                    fontWeight: month == _selectedMonth
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            const SizedBox(height: 20),
-            const Text('选择年份', style: TextStyle(fontSize: 16)),
-            SizedBox(
-              height: 100,
-              child: PageView.builder(
-                controller: _yearController,
-                onPageChanged: (int index) {
-                  setState(() {
-                    _selectedYear = widget.firstDate.year + index;
-                  });
-                },
-                itemCount: widget.lastDate.year - widget.firstDate.year + 1,
-                itemBuilder: (context, index) {
-                  final year = widget.firstDate.year + index;
-                  return Center(
-                    child: Text(
-                      '$year',
-                      style: TextStyle(
-                        fontSize: year == _selectedYear ? 24 : 16,
-                        fontWeight: year == _selectedYear
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                  );
-                },
-              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
             ),
-            const Text('选择月份', style: TextStyle(fontSize: 16)),
-            SizedBox(
-              height: 100,
-              child: PageView.builder(
-                controller: _monthController,
-                onPageChanged: (int index) {
-                  setState(() {
-                    _selectedMonth = index + 1;
-                  });
-                },
-                itemCount: 12,
-                itemBuilder: (context, index) {
-                  final month = index + 1;
-                  return Center(
-                    child: Text(
-                      '$month月',
-                      style: TextStyle(
-                        fontSize: month == _selectedMonth ? 24 : 16,
-                        fontWeight: month == _selectedMonth
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    widget.onMonthSelected(
-                        DateTime(_selectedYear, _selectedMonth));
-                    Navigator.pop(context);
-                  },
-                  child: const Text('确定'),
-                ),
-              ],
+            ElevatedButton(
+              onPressed: () {
+                widget.onMonthSelected(DateTime(_selectedYear, _selectedMonth));
+              },
+              child: const Text('确定'),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }

@@ -5,18 +5,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:strava_client/strava_client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
+  final bool isAuthenticated;
+  final DetailedAthlete? athlete;
+  final Function(bool, DetailedAthlete?)? onAuthenticationChanged;
 
   const SettingPage({
     Key? key,
     this.onLayoutChanged,
+    this.isAuthenticated = false,
+    this.athlete,
+    this.onAuthenticationChanged,
   }) : super(key: key);
 
   @override
@@ -26,6 +32,7 @@ class SettingPage extends StatefulWidget {
 class _SettingPageState extends State<SettingPage> {
   final TextEditingController _textEditingController = TextEditingController();
   TokenResponse? token;
+  DetailedAthlete? _athlete;
   bool _isSyncing = false;
   double _syncProgress = 0.0;
   String _syncStatus = '';
@@ -41,14 +48,33 @@ class _SettingPageState extends State<SettingPage> {
     super.initState();
     _loadApiKey();
     _loadSettings();
+
+    // 使用外部传入的认证状态和运动员信息
+    if (widget.isAuthenticated && widget.athlete != null) {
+      setState(() {
+        _athlete = widget.athlete;
+        token = StravaClientManager().token;
+        _textEditingController.text = token?.accessToken ?? '';
+      });
+    }
   }
 
-  Future<void> _loadApiKey() async {
-    final apiKey = await _apiKeyModel.getApiKey();
-    if (apiKey != null) {
+  @override
+  void didUpdateWidget(SettingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当认证状态或用户信息从外部变化时更新内部状态
+    if (widget.isAuthenticated != oldWidget.isAuthenticated ||
+        widget.athlete != oldWidget.athlete) {
       setState(() {
-        _idController.text = apiKey['api_id']!;
-        _keyController.text = apiKey['api_key']!;
+        if (widget.isAuthenticated && widget.athlete != null) {
+          _athlete = widget.athlete;
+          token = StravaClientManager().token;
+          _textEditingController.text = token?.accessToken ?? '';
+        } else {
+          _athlete = null;
+          token = null;
+          _textEditingController.clear();
+        }
       });
     }
   }
@@ -66,6 +92,16 @@ class _SettingPageState extends State<SettingPage> {
     widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
 
+  Future<void> _loadApiKey() async {
+    final apiKey = await _apiKeyModel.getApiKey();
+    if (apiKey != null) {
+      setState(() {
+        _idController.text = apiKey['api_id']!;
+        _keyController.text = apiKey['api_key']!;
+      });
+    }
+  }
+
   FutureOr<Null> showErrorMessage(dynamic error, dynamic stackTrace) {
     if (error is Fault) {
       showDialog(
@@ -77,6 +113,26 @@ class _SettingPageState extends State<SettingPage> {
                   "错误信息: ${error.message}\n-----------------\n详细信息:\n${(error.errors ?? []).map((e) => "代码: ${e.code}\n资源: ${e.resource}\n字段: ${e.field}\n").toList().join("\n----------\n")}"),
             );
           });
+    }
+  }
+
+  Future<void> _loadAthleteInfo() async {
+    try {
+      final athlete = await StravaClientManager()
+          .stravaClient
+          .athletes
+          .getAuthenticatedAthlete();
+
+      if (mounted) {
+        setState(() {
+          _athlete = athlete;
+        });
+
+        // 通知主应用认证状态和用户信息已更新
+        widget.onAuthenticationChanged?.call(true, athlete);
+      }
+    } catch (e) {
+      debugPrint('获取运动员信息失败: $e');
     }
   }
 
@@ -99,6 +155,9 @@ class _SettingPageState extends State<SettingPage> {
         _textEditingController.text = tokenResponse.accessToken;
       });
 
+      // 认证成功后加载运动员信息
+      await _loadAthleteInfo();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('认证成功')),
       );
@@ -109,11 +168,11 @@ class _SettingPageState extends State<SettingPage> {
 
   Future<void> testDeauth() async {
     try {
-      await ExampleAuthentication(StravaClientManager().stravaClient)
-          .testDeauthorize();
+      await StravaClientManager().deAuthenticate();
 
       setState(() {
         token = null;
+        _athlete = null;
         _textEditingController.clear();
         _idController.clear();
         _keyController.clear();
@@ -121,6 +180,9 @@ class _SettingPageState extends State<SettingPage> {
 
       // 清除存储的 API 密钥
       await _apiKeyModel.deleteApiKey();
+
+      // 通知主应用认证状态已更新
+      widget.onAuthenticationChanged?.call(false, null);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已取消认证')),
@@ -213,6 +275,7 @@ class _SettingPageState extends State<SettingPage> {
             _syncProgress = processedCount / totalActivities;
             _syncStatus = '已处理: $processedCount/$totalActivities';
           });
+
         } catch (e) {
           print('处理活动 ${activity.name} 时出错: $e');
         }
@@ -253,23 +316,79 @@ class _SettingPageState extends State<SettingPage> {
       appBar: AppBar(
         title: const Text('设置'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '日历布局设置',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 用户信息卡片
+            if (_athlete != null) ...[
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      // 头像
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundImage: _athlete?.profile != null
+                            ? NetworkImage(_athlete!.profile!)
+                            : null,
+                        child: _athlete?.profile == null
+                            ? Icon(Icons.person, size: 50)
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      // 用户名
+                      Text(
+                        '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      // 用户所在城市和国家
+                      if (_athlete?.city != null || _athlete?.country != null)
+                        Text(
+                          '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      const SizedBox(height: 16),
+                      // 运动统计
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildStatItem(
+                            context,
+                            '关注者',
+                            '${_athlete?.followerCount ?? 0}',
+                          ),
+                          _buildStatItem(
+                            context,
+                            '关注中',
+                            '${_athlete?.friendCount ?? 0}',
+                          ),
+                          _buildStatItem(
+                            context,
+                            '活动',
+                            '${_athlete?.resourceState ?? 0}',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                title: const Text('水平滑动布局'),
-                subtitle: const Text('开启后可以左右滑动切换月份'),
+              const SizedBox(height: 24),
+            ],
+            // 布局切换开关
+            Card(
+              elevation: 2,
+              child: SwitchListTile(
+                title: const Text('使用水平布局'),
+                subtitle: const Text('切换日历的显示方式'),
                 value: _isHorizontalLayout,
                 onChanged: (bool value) {
                   setState(() {
@@ -278,102 +397,142 @@ class _SettingPageState extends State<SettingPage> {
                   _saveSettings();
                 },
               ),
-              const Divider(),
-              const Text(
-                'Strava API设置',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _idController,
-                decoration: const InputDecoration(
-                  labelText: '请输入 API ID',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _keyController,
-                decoration: const InputDecoration(
-                  labelText: '请输入 API Key',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                minLines: 1,
-                maxLines: 3,
-                controller: _textEditingController,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: "Access Token",
-                  suffixIcon: IconButton(
-                    icon: Icon(Icons.copy),
-                    onPressed: () {
-                      Clipboard.setData(
-                              ClipboardData(text: _textEditingController.text))
-                          .then(
-                              (_) => ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("已复制到剪贴板")),
-                                  ));
-                    },
-                  ),
-                ),
-                readOnly: true,
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: testAuthentication,
-                    icon: Icon(Icons.login),
-                    label: const Text('认证'),
-                    style: ElevatedButton.styleFrom(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            const SizedBox(height: 24),
+            // API设置卡片
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'API 设置',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: testDeauth,
-                    icon: Icon(Icons.logout),
-                    label: const Text('取消认证'),
-                    style: ElevatedButton.styleFrom(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _idController,
+                      decoration: const InputDecoration(
+                        labelText: '请输入 API ID',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _keyController,
+                      decoration: const InputDecoration(
+                        labelText: '请输入 API Key',
+                        border: OutlineInputBorder(),
+                      ),
+                      obscureText: true,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      minLines: 1,
+                      maxLines: 3,
+                      controller: _textEditingController,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: "Access Token",
+                        suffixIcon: IconButton(
+                          icon: Icon(Icons.copy),
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: _textEditingController.text),
+                            ).then((_) =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("已复制到剪贴板")),
+                                ));
+                          },
+                        ),
+                      ),
+                      readOnly: true,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: testAuthentication,
+                          icon: Icon(Icons.login),
+                          label: const Text('认证'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: testDeauth,
+                          icon: Icon(Icons.logout),
+                          label: const Text('取消认证'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 12),
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const Divider(height: 40),
-              if (token != null) ...[
-                if (_isSyncing) ...[
-                  LinearProgressIndicator(value: _syncProgress),
-                  SizedBox(height: 8),
-                  Text(_syncStatus),
-                  SizedBox(height: 16),
-                ],
-                ElevatedButton.icon(
-                  onPressed: _isSyncing ? null : syncActivities,
-                  icon: Icon(Icons.sync),
-                  label: Text(_isSyncing ? '同步中...' : '同步数据'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+            ),
+            const SizedBox(height: 24),
+            // 同步按钮和进度
+            if (token != null) ...[
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_isSyncing) ...[
+                        LinearProgressIndicator(value: _syncProgress),
+                        SizedBox(height: 8),
+                        Text(_syncStatus),
+                        SizedBox(height: 16),
+                      ],
+                      ElevatedButton.icon(
+                        onPressed: _isSyncing ? null : syncActivities,
+                        icon: Icon(Icons.sync),
+                        label: Text(_isSyncing ? '同步中...' : '同步数据'),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
       ),
+    );
+  }
+
+  // 构建统计项小部件
+  Widget _buildStatItem(BuildContext context, String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }
