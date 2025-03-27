@@ -119,27 +119,6 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
       builder: (context, constraints) {
         return Column(
           children: [
-            // 月份选择器和标题
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "日历视图",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  TextButton(
-                    onPressed: _selectMonth,
-                    child: Text(
-                      "${_displayedMonth.year}年${_displayedMonth.month}月",
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
             // 并排显示两个月
             Expanded(
               child: PageView.builder(
@@ -236,27 +215,6 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     
     return Column(
       children: [
-        // 月份选择器和标题
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "日历视图",
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              TextButton(
-                onPressed: _selectMonth,
-                child: Text(
-                  "${_displayedMonth.year}年${_displayedMonth.month}月",
-                  style: const TextStyle(fontSize: 18),
-                ),
-              ),
-            ],
-          ),
-        ),
-        
         // 月份视图
         Expanded(
           child: PageView.builder(
@@ -309,16 +267,27 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
   // 显示月份选择器
   void _selectMonth() async {
+    final screenSize = MediaQuery.of(context).size;
+    final isLandscape = screenSize.width > screenSize.height;
+    
+    // 调整对话框大小以适应屏幕
+    final dialogWidth = isLandscape ? screenSize.width * 0.4 : screenSize.width * 0.8;
+    final dialogHeight = isLandscape ? screenSize.height * 0.6 : screenSize.height * 0.4;
+    
     final picked = await showDialog<DateTime>(
       context: context,
       builder: (context) => Dialog(
-        child: MonthPicker(
-          initialDate: _displayedMonth,
-          firstDate: DateTime(DateTime.now().year - 2, 1),
-          lastDate: DateTime.now(),
-          onMonthSelected: (date) {
-            Navigator.of(context).pop(date);
-          },
+        child: Container(
+          width: dialogWidth,
+          height: dialogHeight,
+          child: MonthPicker(
+            initialDate: _displayedMonth,
+            firstDate: DateTime(DateTime.now().year - 2, 1),
+            lastDate: DateTime.now(),
+            onMonthSelected: (date) {
+              Navigator.of(context).pop(date);
+            },
+          ),
         ),
       ),
     );

@@ -27,6 +27,12 @@ class RouteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    
+    // 根据屏幕方向调整高度
+    final cardHeight = isLandscape ? 120.0 : 150.0;
+    // 根据屏幕方向调整图片宽度比例
+    final mapWidthRatio = isLandscape ? 0.3 : 0.35;
     
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -41,13 +47,13 @@ class RouteCard extends StatelessWidget {
           children: [
             // 上半部分：地图和路线名称
             Container(
-              height: 150, // 固定高度
+              height: cardHeight, // 动态高度
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 左侧地图，约占卡片总宽度的40%
+                  // 左侧地图，宽度根据屏幕方向调整
                   SizedBox(
-                    width: screenWidth * 0.35,
+                    width: screenWidth * mapWidthRatio,
                     child: Container(
                       color: Colors.grey.shade200,
                       child: Image.network(
@@ -80,6 +86,7 @@ class RouteCard extends StatelessWidget {
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           // 路线名称
                           Padding(
@@ -88,97 +95,107 @@ class RouteCard extends StatelessWidget {
                               routeData['name'],
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 18,
+                                fontSize: isLandscape ? 16 : 18,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           
-                          // 红框1：距离和时间（水平排列在一行）
+                          // 距离和时间信息
                           Container(
                             margin: EdgeInsets.symmetric(vertical: 4),
-                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                            // decoration: BoxDecoration(
-                            //   color: Colors.grey.shade100,
-                            //   border: Border.all(color: Colors.red.shade200, width: 1),
-                            //   borderRadius: BorderRadius.circular(8),
-                            // ),
+                            padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 // 左侧：距离
-                                Row(
-                                  children: [
-                                    Icon(Icons.directions_bike, size: 18, color: Colors.black54),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '${routeData['distance']?.toStringAsFixed(1)} km',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.directions_bike, size: 16, color: Colors.black54),
+                                      SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${routeData['distance']?.toStringAsFixed(1)} km',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: isLandscape ? 14 : 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                                 
+                                SizedBox(width: 8),
+                                
                                 // 右侧：时间
-                                Row(
-                                  children: [
-                                    Icon(Icons.access_time, size: 18, color: Colors.black54),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.access_time, size: 16, color: Colors.black54),
+                                      SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: isLandscape ? 14 : 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                           
-                          // 红框2：爬升和导航按钮
+                          // 爬升和导航按钮
                           Container(
                             margin: EdgeInsets.symmetric(vertical: 4),
-                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                            // decoration: BoxDecoration(
-                            //   color: Colors.grey.shade100,
-                            //   border: Border.all(color: Colors.red.shade200, width: 1),
-                            //   borderRadius: BorderRadius.circular(8),
-                            // ),
+                            padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 // 左侧：爬升信息
-                                Row(
-                                  children: [
-                                    Icon(Icons.trending_up, size: 18, color: Colors.black54),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '${routeData['elevationGain']?.toStringAsFixed(0)} m',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.trending_up, size: 16, color: Colors.black54),
+                                      SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${routeData['elevationGain']?.toStringAsFixed(0)} m',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: isLandscape ? 14 : 16,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                                 
                                 // 右侧：导航按钮
                                 InkWell(
                                   onTap: onNavigate,
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 25, vertical: 4),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isLandscape ? 15 : 25, 
+                                      vertical: isLandscape ? 2 : 4
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.deepOrangeAccent,
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Icon(
                                       Icons.navigation,
-                                      size: 20,
+                                      size: isLandscape ? 18 : 20,
                                       color: Colors.white,
                                     ),
                                   ),
@@ -430,7 +447,7 @@ class _RoutePageState extends State<RoutePage> {
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2, // 两列
-        childAspectRatio: 2.5, // 宽高比
+        childAspectRatio: 2.8, // 调整宽高比，使卡片更扁平
         crossAxisSpacing: 8.0,
         mainAxisSpacing: 8.0,
       ),

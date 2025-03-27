@@ -36,43 +36,23 @@ class MonthView extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         children: [
-          // 月份标题
-          GestureDetector(
-            onTap: onMonthTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-                horizontal: 16,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: (displayedMonth != null && 
-                       displayedMonth!.year == month.year &&
-                       displayedMonth!.month == month.month) || isCurrentMonth
-                    ? Colors.blue.withOpacity(0.1)
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${month.year}年${month.month}月',
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontWeight: (displayedMonth != null &&
-                              displayedMonth!.year == month.year &&
-                              displayedMonth!.month == month.month) || isCurrentMonth
-                          ? FontWeight.bold
-                          : FontWeight.w500,
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_drop_down,
-                    color: textColor,
-                    size: 20,
-                  ),
-                ],
+          // 简化的月份标题，只显示月份数据
+          Container(
+            padding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 16,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${month.year}年${month.month}月',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 16,
+                fontWeight: (displayedMonth != null &&
+                        displayedMonth!.year == month.year &&
+                        displayedMonth!.month == month.month) || isCurrentMonth
+                    ? FontWeight.bold
+                    : FontWeight.w500,
               ),
             ),
           ),
