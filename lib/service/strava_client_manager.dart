@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../utils/logger.dart';
 
 class StravaClientManager {
   static final StravaClientManager _instance = StravaClientManager._internal();
@@ -36,7 +37,7 @@ class StravaClientManager {
       final success = await loadExistingAuthentication();
       return success;
     } catch (e) {
-      debugPrint('检查认证状态时出错: $e');
+      Logger.e('检查认证状态时出错', error: e);
       return false;
     }
   }
@@ -65,7 +66,7 @@ class StravaClientManager {
       }
       return false;
     } catch (e) {
-      debugPrint('加载认证时出错: $e');
+      Logger.e('加载认证时出错', error: e);
       return false;
     }
   }
@@ -100,7 +101,7 @@ class StravaClientManager {
       }
       return false;
     } catch (e) {
-      debugPrint('刷新token时出错: $e');
+      Logger.e('刷新token时出错', error: e);
       return false;
     }
   }
@@ -112,7 +113,7 @@ class StravaClientManager {
       final tokenJson = json.encode(token.toJson());
       await prefs.setString('strava_token', tokenJson);
     } catch (e) {
-      debugPrint('保存token时出错: $e');
+      Logger.e('保存token时出错', error: e);
     }
   }
 
@@ -127,7 +128,7 @@ class StravaClientManager {
       _token = null;
       _isAuthenticated = false;
     } catch (e) {
-      debugPrint('清除认证信息时出错: $e');
+      Logger.e('清除认证信息时出错', error: e);
     }
   }
 

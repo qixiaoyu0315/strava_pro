@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 
 /// 日历相关工具类，提供SVG文件存在性检查和预加载功能
 class CalendarUtils {
@@ -12,7 +13,7 @@ class CalendarUtils {
       final file = File('$_svgPath/$dateStr.svg');
       return await file.exists();
     } catch (e) {
-      debugPrint('检查SVG文件存在时出错: $e');
+      Logger.e('检查SVG文件存在时出错', error: e, tag: 'Calendar');
       return false;
     }
   }

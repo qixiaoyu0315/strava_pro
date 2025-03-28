@@ -10,6 +10,7 @@ import '../model/api_key_model.dart';
 import '../service/strava_service.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
+import '../utils/logger.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -132,7 +133,7 @@ class _SettingPageState extends State<SettingPage> {
         widget.onAuthenticationChanged?.call(true, athlete);
       }
     } catch (e) {
-      debugPrint('获取运动员信息失败: $e');
+      Logger.e('获取运动员信息失败', error: e);
     }
   }
 
@@ -275,9 +276,8 @@ class _SettingPageState extends State<SettingPage> {
             _syncProgress = processedCount / totalActivities;
             _syncStatus = '已处理: $processedCount/$totalActivities';
           });
-
         } catch (e) {
-          print('处理活动 ${activity.name} 时出错: $e');
+          Logger.e('处理活动 ${activity.name} 时出错', error: e);
         }
       }
 
@@ -313,15 +313,16 @@ class _SettingPageState extends State<SettingPage> {
   @override
   Widget build(BuildContext context) {
     // 检测是否为横屏模式
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-    
+    final isLandscape =
+        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: isLandscape 
+        child: isLandscape
             // 横屏布局
             ? _buildLandscapeLayout(context)
             // 竖屏布局
@@ -360,12 +361,12 @@ class _SettingPageState extends State<SettingPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 左侧用户信息
-        if (_athlete != null) 
+        if (_athlete != null)
           Expanded(
             flex: 1,
             child: _buildUserInfoCard(context),
           ),
-        
+
         // 右侧设置项
         Expanded(
           flex: 2,
@@ -510,8 +511,7 @@ class _SettingPageState extends State<SettingPage> {
                   onPressed: () {
                     Clipboard.setData(
                       ClipboardData(text: _textEditingController.text),
-                    ).then((_) =>
-                        ScaffoldMessenger.of(context).showSnackBar(
+                    ).then((_) => ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text("已复制到剪贴板")),
                         ));
                   },
@@ -528,8 +528,7 @@ class _SettingPageState extends State<SettingPage> {
                   icon: Icon(Icons.login),
                   label: const Text('认证'),
                   style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
                 ),
                 ElevatedButton.icon(
@@ -537,8 +536,7 @@ class _SettingPageState extends State<SettingPage> {
                   icon: Icon(Icons.logout),
                   label: const Text('取消认证'),
                   style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
@@ -571,8 +569,7 @@ class _SettingPageState extends State<SettingPage> {
               icon: Icon(Icons.sync),
               label: Text(_isSyncing ? '同步中...' : '同步数据'),
               style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
               ),

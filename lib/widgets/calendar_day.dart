@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
+import '../utils/logger.dart';
 
 class CalendarDay extends StatelessWidget {
   final DateTime date;
@@ -72,7 +73,7 @@ class CalendarDay extends StatelessWidget {
         fit: BoxFit.contain,
       );
     } catch (e) {
-      print('Error loading SVG: $e');
+      Logger.e('SVG加载失败', error: e, tag: 'Calendar');
       return Icon(
         Icons.sentiment_satisfied_alt_rounded,
         color: isSelected ? Colors.white : Colors.grey[400],

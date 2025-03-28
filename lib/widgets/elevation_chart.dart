@@ -5,12 +5,13 @@ import 'package:xml/xml.dart';
 import 'package:great_circle_distance_calculator/great_circle_distance_calculator.dart';
 import 'dart:io';
 import 'dart:async';
+import '../utils/logger.dart';
 
 class ElevationPoint {
-  final double distance;  // 距离（公里）
-  final double elevation;  // 海拔（米）
-  final LatLng position;  // 地理位置
-  final double gradient;  // 坡度（百分比）
+  final double distance; // 距离（公里）
+  final double elevation; // 海拔（米）
+  final LatLng position; // 地理位置
+  final double gradient; // 坡度（百分比）
 
   ElevationPoint({
     required this.distance,
@@ -39,7 +40,7 @@ class ElevationData {
       final contents = await file.readAsString();
       final document = XmlDocument.parse(contents);
       final trackPoints = document.findAllElements('trkpt');
-      
+
       List<FlSpot> points = [];
       List<ElevationPoint> elevationPoints = [];
       double distance = 0;
@@ -47,13 +48,13 @@ class ElevationData {
       LatLng? previousPoint;
       double? previousElevation;
       double? previousDistance;
-      
+
       for (var point in trackPoints) {
         final lat = double.parse(point.getAttribute('lat')!);
         final lon = double.parse(point.getAttribute('lon')!);
         final ele = double.parse(point.findElements('ele').first.text);
         final currentPosition = LatLng(lat, lon);
-        
+
         if (previousPoint != null) {
           final distanceInMeters = GreatCircleDistance.fromDegrees(
             latitude1: previousPoint.latitude,
@@ -63,19 +64,20 @@ class ElevationData {
           ).haversineDistance();
           distance += distanceInMeters;
         }
-        
-        final currentDistance = distance / 1000;  // 转换为公里
-        
+
+        final currentDistance = distance / 1000; // 转换为公里
+
         // 计算坡度
         double gradient = 0.0;
         if (previousElevation != null && previousDistance != null) {
-          final elevationDiff = ele - previousElevation;  // 高度差（米）
-          final horizontalDist = (currentDistance - previousDistance) * 1000;  // 水平距离（米）
+          final elevationDiff = ele - previousElevation; // 高度差（米）
+          final horizontalDist =
+              (currentDistance - previousDistance) * 1000; // 水平距离（米）
           if (horizontalDist > 0) {
-            gradient = (elevationDiff / horizontalDist) * 100;  // 转换为百分比
+            gradient = (elevationDiff / horizontalDist) * 100; // 转换为百分比
           }
         }
-        
+
         points.add(FlSpot(currentDistance, ele));
         elevationPoints.add(ElevationPoint(
           distance: currentDistance,
@@ -83,13 +85,13 @@ class ElevationData {
           position: currentPosition,
           gradient: gradient,
         ));
-        
+
         if (ele > maxElevation) maxElevation = ele;
         previousPoint = currentPosition;
         previousElevation = ele;
         previousDistance = currentDistance;
       }
-      
+
       return ElevationData(
         points: points,
         elevationPoints: elevationPoints,
@@ -97,7 +99,7 @@ class ElevationData {
         totalDistance: distance / 1000,
       );
     } catch (e) {
-      print('解析GPX文件失败: $e');
+      Logger.e('解析GPX文件失败', error: e, tag: 'SVG');
       return null;
     }
   }
@@ -134,7 +136,8 @@ class _ElevationChartState extends State<ElevationChart> {
   void didUpdateWidget(ElevationChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 当位置发生变化时重置计时器
-    if (widget.currentSegmentIndex != _lastSegmentIndex && widget.currentSegmentIndex != null) {
+    if (widget.currentSegmentIndex != _lastSegmentIndex &&
+        widget.currentSegmentIndex != null) {
       _lastSegmentIndex = widget.currentSegmentIndex;
       setState(() {
         _showTooltip = true;
@@ -152,17 +155,17 @@ class _ElevationChartState extends State<ElevationChart> {
 
   Color _getGradientColor(double gradient) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     if (isDarkMode) {
       // 夜间模式下的颜色
-      if (gradient > 15) return Color(0xFFFF5252);      // 深红色
-      if (gradient > 10) return Color(0xFFFFB74D);      // 深橙色
-      if (gradient > 5) return Color(0xFFFFEB3B);       // 深黄色
-      if (gradient > 0) return Color(0xFF66BB6A);       // 深绿色
-      if (gradient < -15) return Color(0xFFE040FB);     // 深紫色
-      if (gradient < -10) return Color(0xFF448AFF);     // 深蓝色
-      if (gradient < -5) return Color(0xFF40C4FF);      // 浅蓝色
-      return Color(0xFF81D4FA);                         // 最浅蓝色
+      if (gradient > 15) return Color(0xFFFF5252); // 深红色
+      if (gradient > 10) return Color(0xFFFFB74D); // 深橙色
+      if (gradient > 5) return Color(0xFFFFEB3B); // 深黄色
+      if (gradient > 0) return Color(0xFF66BB6A); // 深绿色
+      if (gradient < -15) return Color(0xFFE040FB); // 深紫色
+      if (gradient < -10) return Color(0xFF448AFF); // 深蓝色
+      if (gradient < -5) return Color(0xFF40C4FF); // 浅蓝色
+      return Color(0xFF81D4FA); // 最浅蓝色
     } else {
       // 日间模式下的颜色
       if (gradient > 15) return Colors.red;
@@ -306,7 +309,8 @@ class _ElevationChartState extends State<ElevationChart> {
                           showTitles: true,
                           interval: widget.data.totalDistance / 5,
                           getTitlesWidget: (value, meta) {
-                            if (value == 0 || value >= widget.data.totalDistance - 0.1) {
+                            if (value == 0 ||
+                                value >= widget.data.totalDistance - 0.1) {
                               return Text('${value.toStringAsFixed(1)}');
                             }
                             return Text('${value.toInt()}');
@@ -347,12 +351,13 @@ class _ElevationChartState extends State<ElevationChart> {
                           getDotPainter: (spot, percent, barData, index) {
                             Color color = Colors.transparent;
                             double radius = 0;
-                            
-                            if (widget.currentSegmentIndex != null && index == widget.currentSegmentIndex) {
+
+                            if (widget.currentSegmentIndex != null &&
+                                index == widget.currentSegmentIndex) {
                               color = Colors.green;
                               radius = 4;
                             }
-                            
+
                             return FlDotCirclePainter(
                               radius: radius,
                               color: color,
@@ -363,7 +368,10 @@ class _ElevationChartState extends State<ElevationChart> {
                         ),
                         belowBarData: BarAreaData(
                           show: true,
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.2),
                         ),
                       ),
                     ],
@@ -382,8 +390,10 @@ class _ElevationChartState extends State<ElevationChart> {
                             // 找到最接近的点
                             int closestIndex = 0;
                             double minDistance = double.infinity;
-                            
-                            for (int i = 0; i < widget.data.points.length; i++) {
+
+                            for (int i = 0;
+                                i < widget.data.points.length;
+                                i++) {
                               final point = widget.data.points[i];
                               final distance = (point.x - spot.x).abs();
                               if (distance < minDistance) {
@@ -391,11 +401,14 @@ class _ElevationChartState extends State<ElevationChart> {
                                 closestIndex = i;
                               }
                             }
-                            
-                            final pointData = widget.data.elevationPoints[closestIndex];
-                            final gradientColor = _getGradientColor(pointData.gradient);
-                            final gradientText = _getGradientText(pointData.gradient);
-                            
+
+                            final pointData =
+                                widget.data.elevationPoints[closestIndex];
+                            final gradientColor =
+                                _getGradientColor(pointData.gradient);
+                            final gradientText =
+                                _getGradientText(pointData.gradient);
+
                             return LineTooltipItem(
                               '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
                               '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
@@ -420,14 +433,17 @@ class _ElevationChartState extends State<ElevationChart> {
                           }).toList();
                         },
                       ),
-                      touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
-                        if (event is FlTapUpEvent && response?.lineBarSpots != null && response!.lineBarSpots!.isNotEmpty) {
+                      touchCallback:
+                          (FlTouchEvent event, LineTouchResponse? response) {
+                        if (event is FlTapUpEvent &&
+                            response?.lineBarSpots != null &&
+                            response!.lineBarSpots!.isNotEmpty) {
                           final spot = response.lineBarSpots!.first;
-                          
+
                           // 找到最接近的点
                           int closestIndex = 0;
                           double minDistance = double.infinity;
-                          
+
                           for (int i = 0; i < widget.data.points.length; i++) {
                             final point = widget.data.points[i];
                             final distance = (point.x - spot.x).abs();
@@ -436,8 +452,9 @@ class _ElevationChartState extends State<ElevationChart> {
                               closestIndex = i;
                             }
                           }
-                          
-                          final pointData = widget.data.elevationPoints[closestIndex];
+
+                          final pointData =
+                              widget.data.elevationPoints[closestIndex];
                           widget.onPointSelected?.call(pointData);
                         }
                       },
@@ -445,14 +462,19 @@ class _ElevationChartState extends State<ElevationChart> {
                     ),
                   ),
                 ),
-                if (widget.currentSegmentIndex != null && 
-                    widget.currentSegmentIndex! < widget.data.elevationPoints.length && 
+                if (widget.currentSegmentIndex != null &&
+                    widget.currentSegmentIndex! <
+                        widget.data.elevationPoints.length &&
                     _showTooltip)
                   Positioned(
-                    left: (widget.data.points[widget.currentSegmentIndex!].x / widget.data.totalDistance) * 
-                          (MediaQuery.of(context).size.width - 32 - 32),
+                    left: (widget.data.points[widget.currentSegmentIndex!].x /
+                            widget.data.totalDistance) *
+                        (MediaQuery.of(context).size.width - 32 - 32),
                     top: 0,
-                    child: _buildTooltip(context, widget.data.elevationPoints[widget.currentSegmentIndex!]),
+                    child: _buildTooltip(
+                        context,
+                        widget
+                            .data.elevationPoints[widget.currentSegmentIndex!]),
                   ),
               ],
             ),
@@ -461,4 +483,4 @@ class _ElevationChartState extends State<ElevationChart> {
       ),
     );
   }
-} 
+}

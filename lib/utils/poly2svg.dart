@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'logger.dart';
 
 class PolylineToSVGScreen extends StatefulWidget {
   @override
@@ -35,7 +36,7 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
       // 解码 polyline
       List<List<double>> points = _decodePolyline(polylineStr);
       if (points.isEmpty) {
-        print('错误：无效的 Polyline 字符串');
+        Logger.w('错误：无效的 Polyline 字符串', tag: 'SVG');
         return null;
       }
 
@@ -79,11 +80,11 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
       // 保存文件（覆盖已存在的文件）
       final file = File(outputPath);
       await file.writeAsString(svgContent);
-      print('SVG 文件已保存到: $outputPath');
+      Logger.i('SVG 文件已保存到: $outputPath', tag: 'SVG');
 
       return svgContent;
     } catch (e) {
-      print('生成 SVG 时发生错误: $e');
+      Logger.e('生成 SVG 时发生错误', error: e, tag: 'SVG');
       return null;
     }
   }
@@ -97,7 +98,7 @@ class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {
           .map((p) => _wgs84ToWebMercator(p.longitude, p.latitude))
           .toList();
     } catch (e) {
-      print('Polyline 解码错误: $e');
+      Logger.e('Polyline 解码错误', error: e, tag: 'SVG');
       return [];
     }
   }
@@ -195,7 +196,7 @@ class PolylineToSVG {
       // 解码 polyline
       List<List<double>> points = _decodePolyline(polylineStr);
       if (points.isEmpty) {
-        print('错误：无效的 Polyline 字符串');
+        Logger.w('错误：无效的 Polyline 字符串', tag: 'SVG');
         return null;
       }
 
@@ -239,11 +240,11 @@ class PolylineToSVG {
       // 保存文件（覆盖已存在的文件）
       final file = File(outputPath);
       await file.writeAsString(svgContent);
-      print('SVG 文件已保存到: $outputPath');
+      Logger.i('SVG 文件已保存到: $outputPath', tag: 'SVG');
 
       return svgContent;
     } catch (e) {
-      print('生成 SVG 时发生错误: $e');
+      Logger.e('生成 SVG 时发生错误', error: e, tag: 'SVG');
       return null;
     }
   }
@@ -257,7 +258,7 @@ class PolylineToSVG {
           .map((p) => _wgs84ToWebMercator(p.longitude, p.latitude))
           .toList();
     } catch (e) {
-      print('Polyline 解码错误: $e');
+      Logger.e('Polyline 解码错误', error: e, tag: 'SVG');
       return [];
     }
   }

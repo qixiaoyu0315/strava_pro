@@ -6,6 +6,7 @@ import 'service/strava_client_manager.dart';
 import 'model/api_key_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:strava_client/strava_client.dart';
+import 'utils/logger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +22,7 @@ void main() async {
     try {
       await StravaClientManager().loadExistingAuthentication();
     } catch (e) {
-      print('无法加载现有认证: $e');
+      Logger.e('无法加载现有认证', error: e);
     }
   }
 
@@ -86,7 +87,7 @@ class _MainAppState extends State<MainApp> {
           _isLoading = false;
         });
       }
-      debugPrint('加载设置出错: $e');
+      Logger.e('加载设置出错', error: e);
     }
   }
 
@@ -103,7 +104,7 @@ class _MainAppState extends State<MainApp> {
           athlete =
               await manager.stravaClient.athletes.getAuthenticatedAthlete();
         } catch (e) {
-          print('获取运动员信息失败: $e');
+          Logger.e('获取运动员信息失败', error: e);
         }
       }
 
@@ -115,7 +116,7 @@ class _MainAppState extends State<MainApp> {
         });
       }
     } catch (e) {
-      print('检查认证状态失败: $e');
+      Logger.e('检查认证状态失败', error: e);
     }
   }
 
@@ -184,8 +185,9 @@ class _MainAppState extends State<MainApp> {
             )
           : LayoutBuilder(
               builder: (context, constraints) {
-                final isLandscape = constraints.maxWidth > constraints.maxHeight;
-                
+                final isLandscape =
+                    constraints.maxWidth > constraints.maxHeight;
+
                 return Scaffold(
                   body: Row(
                     children: [
@@ -212,7 +214,7 @@ class _MainAppState extends State<MainApp> {
                           minWidth: 60,
                           useIndicator: true,
                         ),
-                      
+
                       // 内容区域
                       Expanded(
                         child: IndexedStack(
