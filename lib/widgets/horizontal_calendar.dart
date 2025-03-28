@@ -98,7 +98,8 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   @override
   Widget build(BuildContext context) {
     // 检测是否是横屏模式
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    final isLandscape =
+        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     if (isLandscape) {
       // 横屏模式：并排显示两个月份
@@ -113,8 +114,9 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   Widget _buildLandscapeLayout() {
     final now = DateTime.now();
     final startDate = DateTime(now.year - 2, now.month);
-    final currentMonthIndex = (now.year - startDate.year) * 12 + (now.month - startDate.month);
-    
+    final currentMonthIndex =
+        (now.year - startDate.year) * 12 + (now.month - startDate.month);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return Column(
@@ -128,7 +130,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                   _loadMonthSvgData(index - 1);
                   _loadMonthSvgData(index);
                   _loadMonthSvgData(index + 1);
-                  
+
                   // 更新显示的月份
                   final month = DateTime(
                     startDate.year,
@@ -144,14 +146,15 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                     startDate.year,
                     startDate.month + index,
                   );
-                  
+
                   // 如果是当前索引，显示当月和下个月
                   final nextMonth = DateTime(month.year, month.month + 1);
-                  
+
                   // 获取月份缓存
                   final monthCache = _monthSvgCaches[index] ?? widget.svgCache;
-                  final nextMonthCache = _monthSvgCaches[index + 1] ?? widget.svgCache;
-                  
+                  final nextMonthCache =
+                      _monthSvgCaches[index + 1] ?? widget.svgCache;
+
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -167,19 +170,20 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                             widget.onDateSelected(date);
                           },
                           svgCache: monthCache,
-                          isCurrentMonth: month.year == now.year && month.month == now.month,
+                          isCurrentMonth: month.year == now.year &&
+                              month.month == now.month,
                           displayedMonth: _displayedMonth,
                           onMonthTap: _selectMonth,
                         ),
                       ),
-                      
+
                       // 分隔线
                       Container(
                         width: 1,
                         color: Colors.grey.withOpacity(0.3),
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-                      
+
                       // 下个月
                       Expanded(
                         child: MonthView(
@@ -192,7 +196,8 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                             widget.onDateSelected(date);
                           },
                           svgCache: nextMonthCache,
-                          isCurrentMonth: nextMonth.year == now.year && nextMonth.month == now.month,
+                          isCurrentMonth: nextMonth.year == now.year &&
+                              nextMonth.month == now.month,
                           displayedMonth: _displayedMonth,
                           onMonthTap: _selectMonth,
                         ),
@@ -212,7 +217,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   Widget _buildPortraitLayout() {
     final now = DateTime.now();
     final startDate = DateTime(now.year - 2, now.month);
-    
+
     return Column(
       children: [
         // 月份视图
@@ -224,7 +229,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
               _loadMonthSvgData(index - 1);
               _loadMonthSvgData(index);
               _loadMonthSvgData(index + 1);
-              
+
               // 更新显示的月份
               final month = DateTime(
                 startDate.year,
@@ -240,10 +245,10 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                 startDate.year,
                 startDate.month + index,
               );
-              
+
               // 获取月份缓存
               final monthCache = _monthSvgCaches[index] ?? widget.svgCache;
-              
+
               return MonthView(
                 month: month,
                 selectedDate: _selectedDate,
@@ -254,7 +259,8 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                   widget.onDateSelected(date);
                 },
                 svgCache: monthCache,
-                isCurrentMonth: month.year == now.year && month.month == now.month,
+                isCurrentMonth:
+                    month.year == now.year && month.month == now.month,
                 displayedMonth: _displayedMonth,
                 onMonthTap: _selectMonth,
               );
@@ -267,13 +273,17 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
   // 显示月份选择器
   void _selectMonth() async {
+    if (!mounted) return;
+
     final screenSize = MediaQuery.of(context).size;
     final isLandscape = screenSize.width > screenSize.height;
-    
+
     // 调整对话框大小以适应屏幕
-    final dialogWidth = isLandscape ? screenSize.width * 0.4 : screenSize.width * 0.8;
-    final dialogHeight = isLandscape ? screenSize.height * 0.6 : screenSize.height * 0.4;
-    
+    final dialogWidth =
+        isLandscape ? screenSize.width * 0.4 : screenSize.width * 0.8;
+    final dialogHeight =
+        isLandscape ? screenSize.height * 0.6 : screenSize.height * 0.4;
+
     final picked = await showDialog<DateTime>(
       context: context,
       builder: (context) => Dialog(
@@ -291,12 +301,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
         ),
       ),
     );
-    
-    if (picked != null) {
+
+    if (picked != null && mounted) {
       final now = DateTime.now();
       final startDate = DateTime(now.year - 2, now.month);
-      final targetIndex = (picked.year - startDate.year) * 12 + (picked.month - startDate.month);
-      
+      final targetIndex = (picked.year - startDate.year) * 12 +
+          (picked.month - startDate.month);
+
       // 滚动到选中的月份
       _pageController.animateToPage(
         targetIndex,

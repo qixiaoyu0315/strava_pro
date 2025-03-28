@@ -125,6 +125,8 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   }
 
   Future<void> _exportGPX(strava.Route routeData) async {
+    if (!mounted) return;
+
     try {
       // 首先检查文件是否已经存在
       Directory directory;
@@ -133,6 +135,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       } else {
         directory = await getApplicationDocumentsDirectory();
       }
+      if (!mounted) return;
 
       final fileName = '${routeData.idStr}.gpx';
       final file = File('${directory.path}/$fileName');
@@ -140,6 +143,8 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       // 如果文件已存在，直接解析它
       if (await directory.exists() && await file.exists()) {
         final data = await ElevationData.fromGPXFile(file.path);
+        if (!mounted) return;
+
         if (data != null) {
           setState(() {
             gpxFilePath = file.path;
@@ -158,27 +163,41 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       // 检查 Android 版本并请求相应权限
       if (Platform.isAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
+        if (!mounted) return;
+
         if (androidInfo.version.sdkInt >= 33) {
           // Android 13 及以上版本
           var status = await Permission.photos.status;
+          if (!mounted) return;
+
           if (!status.isGranted) {
             status = await Permission.photos.request();
+            if (!mounted) return;
+
             if (!status.isGranted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('需要存储权限才能导出文件')),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('需要存储权限才能导出文件')),
+                );
+              }
               return;
             }
           }
         } else {
           // Android 13 以下版本
           var status = await Permission.storage.status;
+          if (!mounted) return;
+
           if (!status.isGranted) {
             status = await Permission.storage.request();
+            if (!mounted) return;
+
             if (!status.isGranted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('需要存储权限才能导出文件')),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('需要存储权限才能导出文件')),
+                );
+              }
               return;
             }
           }
@@ -189,9 +208,12 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
+      if (!mounted) return;
 
       // 获取访问令牌
       final tokenResponse = await StravaClientManager().authenticate();
+      if (!mounted) return;
+
       final accessToken = tokenResponse.accessToken;
       if (accessToken == null) {
         throw Exception('未获取到访问令牌');
@@ -203,6 +225,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
             'https://www.strava.com/api/v3/routes/${routeData.id}/export_gpx'),
         headers: {'Authorization': 'Bearer $accessToken'},
       );
+      if (!mounted) return;
 
       if (response.statusCode != 200) {
         throw Exception('获取 GPX 数据失败: ${response.statusCode}');
@@ -210,9 +233,12 @@ class _RouteDetailPageState extends State<RouteDetailPage>
 
       // 写入二进制数据
       await file.writeAsBytes(response.bodyBytes);
+      if (!mounted) return;
 
       // 解析GPX文件
       final data = await ElevationData.fromGPXFile(file.path);
+      if (!mounted) return;
+
       if (data != null) {
         setState(() {
           gpxFilePath = file.path;
@@ -222,13 +248,17 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('GPX文件已保存并解析完成')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPX文件已保存并解析完成')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出失败: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e')),
+        );
+      }
     }
   }
 
@@ -301,39 +331,55 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   }
 
   Future<void> _checkLocationPermission() async {
+    if (!mounted) return;
+
     try {
       // 检查定位服务是否启用
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!mounted) return;
+
       if (!serviceEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请开启定位服务')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请开启定位服务')),
+          );
+        }
         await Geolocator.openLocationSettings();
         return;
       }
 
       // 检查权限
       LocationPermission permission = await Geolocator.checkPermission();
+      if (!mounted) return;
+
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (!mounted) return;
+
         if (permission == LocationPermission.denied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要定位权限才能获取位置')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('需要定位权限才能获取位置')),
+            );
+          }
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('定位权限被永久拒绝，请在设置中开启')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('定位权限被永久拒绝，请在设置中开启')),
+          );
+        }
         await Geolocator.openAppSettings();
         return;
       }
 
       // 权限获取成功后，开始位置更新
-      _startLocationUpdates();
+      if (mounted) {
+        _startLocationUpdates();
+      }
     } catch (e) {
       Logger.e('检查位置权限失败', error: e);
     }
@@ -447,12 +493,16 @@ class _RouteDetailPageState extends State<RouteDetailPage>
 
                   // 调整地图以适应边界
                   Future.delayed(Duration(milliseconds: 100), () {
+                    if (!mounted) return;
+
                     _mapController.move(
                       bounds.center,
                       _mapController.camera.zoom,
                     );
 
                     // 计算合适的缩放级别
+                    if (!mounted) return;
+
                     final latZoom = _calculateZoomLevel(bounds.south,
                         bounds.north, MediaQuery.of(context).size.height);
                     final lngZoom = _calculateZoomLevel(bounds.west,

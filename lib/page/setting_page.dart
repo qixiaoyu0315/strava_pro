@@ -138,18 +138,23 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Future<void> testAuthentication() async {
+    if (!mounted) return;
+
     try {
       String id = _idController.text;
       String key = _keyController.text;
 
       // 保存 API 密钥
       await _apiKeyModel.insertApiKey(id, key);
+      if (!mounted) return;
 
       // 初始化 StravaClientManager
       await StravaClientManager().initialize(id, key);
+      if (!mounted) return;
 
       // 进行认证
       final tokenResponse = await StravaClientManager().authenticate();
+      if (!mounted) return;
 
       setState(() {
         token = tokenResponse;
@@ -158,18 +163,24 @@ class _SettingPageState extends State<SettingPage> {
 
       // 认证成功后加载运动员信息
       await _loadAthleteInfo();
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('认证成功')),
       );
     } catch (e) {
-      showErrorMessage(e, null);
+      if (mounted) {
+        showErrorMessage(e, null);
+      }
     }
   }
 
   Future<void> testDeauth() async {
+    if (!mounted) return;
+
     try {
       await StravaClientManager().deAuthenticate();
+      if (!mounted) return;
 
       setState(() {
         token = null;
@@ -181,23 +192,32 @@ class _SettingPageState extends State<SettingPage> {
 
       // 清除存储的 API 密钥
       await _apiKeyModel.deleteApiKey();
+      if (!mounted) return;
 
       // 通知主应用认证状态已更新
       widget.onAuthenticationChanged?.call(false, null);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已取消认证')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已取消认证')),
+        );
+      }
     } catch (e) {
-      showErrorMessage(e, null);
+      if (mounted) {
+        showErrorMessage(e, null);
+      }
     }
   }
 
   Future<void> syncActivities() async {
+    if (!mounted) return;
+
     if (_isSyncing) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('同步正在进行中，请等待完成')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步正在进行中，请等待完成')),
+        );
+      }
       return;
     }
 
@@ -215,6 +235,7 @@ class _SettingPageState extends State<SettingPage> {
       if (!await saveDir.exists()) {
         await saveDir.create(recursive: true);
       }
+      if (!mounted) return;
 
       // 按开始时间排序活动，确保每天处理最早的活动
       final activities = await StravaClientManager()
@@ -226,6 +247,7 @@ class _SettingPageState extends State<SettingPage> {
             1,
             200,
           );
+      if (!mounted) return;
 
       activities.sort((a, b) {
         final dateA = DateTime.parse(a.startDate ?? '');
@@ -237,11 +259,15 @@ class _SettingPageState extends State<SettingPage> {
       int processedCount = 0;
       int successCount = 0;
 
-      setState(() {
-        _syncStatus = '获取到 $totalActivities 个活动，开始生成SVG...';
-      });
+      if (mounted) {
+        setState(() {
+          _syncStatus = '获取到 $totalActivities 个活动，开始生成SVG...';
+        });
+      }
 
       for (var activity in activities) {
+        if (!mounted) break;
+
         try {
           if (activity.map?.summaryPolyline != null) {
             final date = DateTime.parse(activity.startDate ?? '');
@@ -253,17 +279,20 @@ class _SettingPageState extends State<SettingPage> {
             if (!_processedDates.containsKey(dateStr)) {
               _processedDates[dateStr] = true;
 
-              setState(() {
-                _syncStatus = '正在处理: ${activity.name ?? fileName} ($dateStr)';
-              });
+              if (mounted) {
+                setState(() {
+                  _syncStatus = '正在处理: ${activity.name ?? fileName} ($dateStr)';
+                });
+              }
 
               // 生成SVG文件
-              final svgContent = PolylineToSVG.generateAndSaveSVG(
+              final svgContent = await PolylineToSVG.generateAndSaveSVG(
                 activity.map!.summaryPolyline!,
                 filePath,
                 strokeColor: 'green',
                 strokeWidth: 10,
               );
+              if (!mounted) break;
 
               if (svgContent != null) {
                 successCount++;
@@ -272,32 +301,38 @@ class _SettingPageState extends State<SettingPage> {
           }
 
           processedCount++;
-          setState(() {
-            _syncProgress = processedCount / totalActivities;
-            _syncStatus = '已处理: $processedCount/$totalActivities';
-          });
+          if (mounted) {
+            setState(() {
+              _syncProgress = processedCount / totalActivities;
+              _syncStatus = '已处理: $processedCount/$totalActivities';
+            });
+          }
         } catch (e) {
           Logger.e('处理活动 ${activity.name} 时出错', error: e);
         }
       }
 
-      setState(() {
-        _isSyncing = false;
-        _syncStatus = '同步完成';
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncStatus = '同步完成';
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('同步完成，成功生成 $successCount 个 SVG 文件')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步完成，成功生成 $successCount 个 SVG 文件')),
+        );
+      }
     } catch (e) {
-      setState(() {
-        _isSyncing = false;
-        _syncStatus = '同步失败: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+          _syncStatus = '同步失败: $e';
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('同步失败: $e')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步失败: $e')),
+        );
+      }
     }
   }
 
