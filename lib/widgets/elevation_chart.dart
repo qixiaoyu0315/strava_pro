@@ -118,7 +118,7 @@ class ElevationChart extends StatefulWidget {
   });
 
   @override
-  _ElevationChartState createState() => _ElevationChartState();
+  State<ElevationChart> createState() => _ElevationChartState();
 }
 
 class _ElevationChartState extends State<ElevationChart> {

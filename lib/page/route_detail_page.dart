@@ -149,9 +149,11 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                 data.elevationPoints.map((point) => point.position).toList();
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('GPX文件已存在，直接解析完成')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('GPX文件已存在，直接解析完成')),
+            );
+          }
           return; // 文件已存在，直接返回
         }
       }

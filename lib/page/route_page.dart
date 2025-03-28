@@ -231,7 +231,7 @@ class RoutePage extends StatefulWidget {
   });
 
   @override
-  _RoutePageState createState() => _RoutePageState();
+  State<RoutePage> createState() => _RoutePageState();
 }
 
 class _RoutePageState extends State<RoutePage> {
@@ -348,7 +348,7 @@ class _RoutePageState extends State<RoutePage> {
   }
 
   FutureOr<Null> showErrorMessage(dynamic error, dynamic stackTrace) {
-    if (error is Fault) {
+    if (error is Fault && mounted) {
       showDialog(
           context: context,
           builder: (context) {

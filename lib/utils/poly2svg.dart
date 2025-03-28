@@ -7,7 +7,7 @@ import 'logger.dart';
 
 class PolylineToSVGScreen extends StatefulWidget {
   @override
-  _PolylineToSVGScreenState createState() => _PolylineToSVGScreenState();
+  State<PolylineToSVGScreen> createState() => _PolylineToSVGScreenState();
 }
 
 class _PolylineToSVGScreenState extends State<PolylineToSVGScreen> {

@@ -26,7 +26,7 @@ class SettingPage extends StatefulWidget {
   });
 
   @override
-  _SettingPageState createState() => _SettingPageState();
+  State<SettingPage> createState() => _SettingPageState();
 }
 
 class _SettingPageState extends State<SettingPage> {
@@ -103,7 +103,7 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   FutureOr<Null> showErrorMessage(dynamic error, dynamic stackTrace) {
-    if (error is Fault) {
+    if (error is Fault && mounted) {
       showDialog(
           context: context,
           builder: (context) {
@@ -536,9 +536,13 @@ class _SettingPageState extends State<SettingPage> {
                   onPressed: () {
                     Clipboard.setData(
                       ClipboardData(text: _textEditingController.text),
-                    ).then((_) => ScaffoldMessenger.of(context).showSnackBar(
+                    ).then((_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text("已复制到剪贴板")),
-                        ));
+                        );
+                      }
+                    });
                   },
                 ),
               ),
