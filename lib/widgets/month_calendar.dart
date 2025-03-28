@@ -1,27 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
+import 'month_grid.dart';
+import 'month_picker.dart';
+import '../widgets/calendar_utils.dart';
 
-class MonthCalendar extends StatelessWidget {
-  final DateTime month;
-  final DateTime selectedDate;
-  final DateTime displayedMonth;
-  final Function(DateTime) onDateSelected;
+class MonthCalendar extends StatefulWidget {
+  final DateTime? month;
+  final DateTime? selectedDate;
+  final DateTime? displayedMonth;
+  final Function(DateTime)? onDateSelected;
   final Map<String, bool> svgCache;
   final bool isAnimated;
   final Animation<double>? animation;
 
   const MonthCalendar({
-    Key? key,
-    required this.month,
-    required this.selectedDate,
-    required this.displayedMonth,
-    required this.onDateSelected,
+    super.key,
+    this.month,
+    this.selectedDate,
+    this.displayedMonth,
+    this.onDateSelected,
     required this.svgCache,
     this.isAnimated = false,
     this.animation,
-  }) : super(key: key);
+  });
 
+  @override
+  _MonthCalendarState createState() => _MonthCalendarState();
+}
+
+class _MonthCalendarState extends State<MonthCalendar> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -42,14 +50,14 @@ class MonthCalendar extends StatelessWidget {
       ),
     );
 
-    if (isAnimated && animation != null) {
+    if (widget.isAnimated && widget.animation != null) {
       return AnimatedBuilder(
-        animation: animation!,
+        animation: widget.animation!,
         builder: (context, child) {
           return Transform.scale(
-            scale: 0.8 + (0.2 * animation!.value),
+            scale: 0.8 + (0.2 * widget.animation!.value),
             child: Opacity(
-              opacity: animation!.value.clamp(0.0, 1.0),
+              opacity: widget.animation!.value.clamp(0.0, 1.0),
               child: monthContent,
             ),
           );
@@ -62,7 +70,7 @@ class MonthCalendar extends StatelessWidget {
 
   Widget _buildMonthHeader(BuildContext context, Color textColor) {
     return GestureDetector(
-      onTap: () => onDateSelected(month),
+      onTap: () => widget.onDateSelected!(widget.month!),
       child: Container(
         padding: const EdgeInsets.symmetric(
           vertical: 8,
@@ -70,8 +78,8 @@ class MonthCalendar extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: displayedMonth.year == month.year &&
-                  displayedMonth.month == month.month
+          color: widget.displayedMonth!.year == widget.month!.year &&
+                  widget.displayedMonth!.month == widget.month!.month
               ? Colors.blue.withOpacity(0.1)
               : null,
         ),
@@ -79,12 +87,12 @@ class MonthCalendar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${month.year}年${month.month}月',
+              '${widget.month!.year}年${widget.month!.month}月',
               style: TextStyle(
                 color: textColor,
                 fontSize: 16,
-                fontWeight: displayedMonth.year == month.year &&
-                        displayedMonth.month == month.month
+                fontWeight: widget.displayedMonth!.year == widget.month!.year &&
+                        widget.displayedMonth!.month == widget.month!.month
                     ? FontWeight.bold
                     : FontWeight.w500,
               ),
@@ -102,7 +110,7 @@ class MonthCalendar extends StatelessWidget {
 
   Widget _buildMonthGrid(
       BuildContext context, Color textColor, Color otherMonthTextColor) {
-    final days = _getDaysInMonth(month);
+    final days = _getDaysInMonth(widget.month!);
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
@@ -119,14 +127,14 @@ class MonthCalendar extends StatelessWidget {
             day.month == DateTime.now().month &&
             day.day == DateTime.now().day;
 
-        final isSelected = day.year == selectedDate.year &&
-            day.month == selectedDate.month &&
-            day.day == selectedDate.day;
+        final isSelected = day.year == widget.selectedDate!.year &&
+            day.month == widget.selectedDate!.month &&
+            day.day == widget.selectedDate!.day;
 
         final isWeekend = day.weekday == 6 || day.weekday == 7;
 
         return GestureDetector(
-          onTap: () => onDateSelected(day),
+          onTap: () => widget.onDateSelected!(day),
           child: Container(
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
@@ -176,7 +184,7 @@ class MonthCalendar extends StatelessWidget {
     String svgPath =
         '/storage/emulated/0/Download/strava_pro/svg/$formattedDate';
 
-    if (!svgCache.containsKey(svgPath) || !svgCache[svgPath]!) {
+    if (!widget.svgCache.containsKey(svgPath) || !widget.svgCache[svgPath]!) {
       return Icon(
         Icons.sentiment_satisfied_alt_rounded,
         color: isSelected ? Colors.white : Colors.grey[400],

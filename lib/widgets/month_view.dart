@@ -4,26 +4,26 @@ import 'month_grid.dart';
 class MonthView extends StatelessWidget {
   final DateTime month;
   final DateTime selectedDate;
-  final DateTime? displayedMonth;
-  final Map<String, bool> svgCache;
   final Function(DateTime) onDateSelected;
-  final VoidCallback? onMonthTap;
+  final Map<String, bool> svgCache;
+  final VoidCallback onMonthTap;
+  final bool isCurrentMonth;
+  final DateTime displayedMonth;
   final bool isAnimated;
   final Animation<double>? animation;
-  final bool isCurrentMonth;
 
   const MonthView({
-    Key? key,
+    super.key,
     required this.month,
     required this.selectedDate,
-    this.displayedMonth,
-    required this.svgCache,
     required this.onDateSelected,
-    this.onMonthTap,
+    required this.svgCache,
+    required this.onMonthTap,
+    this.isCurrentMonth = false,
+    required this.displayedMonth,
     this.isAnimated = false,
     this.animation,
-    this.isCurrentMonth = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +49,9 @@ class MonthView extends StatelessWidget {
                 color: textColor,
                 fontSize: 16,
                 fontWeight: (displayedMonth != null &&
-                        displayedMonth!.year == month.year &&
-                        displayedMonth!.month == month.month) || isCurrentMonth
+                            displayedMonth!.year == month.year &&
+                            displayedMonth!.month == month.month) ||
+                        isCurrentMonth
                     ? FontWeight.bold
                     : FontWeight.w500,
               ),

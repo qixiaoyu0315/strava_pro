@@ -19,12 +19,12 @@ class SettingPage extends StatefulWidget {
   final Function(bool, DetailedAthlete?)? onAuthenticationChanged;
 
   const SettingPage({
-    Key? key,
+    super.key,
     this.onLayoutChanged,
     this.isAuthenticated = false,
     this.athlete,
     this.onAuthenticationChanged,
-  }) : super(key: key);
+  });
 
   @override
   _SettingPageState createState() => _SettingPageState();

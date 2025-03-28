@@ -21,7 +21,7 @@ class CalendarDay extends StatelessWidget {
   /// [isAnimated] 是否使用动画
   /// [animation] 动画控制器
   const CalendarDay({
-    Key? key,
+    super.key,
     required this.date,
     required this.selectedDate,
     required this.isSelected,
@@ -29,7 +29,7 @@ class CalendarDay extends StatelessWidget {
     required this.onTap,
     this.isAnimated = false,
     this.animation,
-  }) : super(key: key);
+  });
 
   bool get _isToday {
     final now = DateTime.now();

@@ -17,7 +17,7 @@ import '../utils/logger.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
-  const RouteDetailPage({Key? key, required this.idStr}) : super(key: key);
+  const RouteDetailPage({super.key, required this.idStr});
 
   @override
   State<RouteDetailPage> createState() => _RouteDetailPageState();
@@ -143,8 +143,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       // 如果文件已存在，直接解析它
       if (await directory.exists() && await file.exists()) {
         final data = await ElevationData.fromGPXFile(file.path);
-        if (!mounted) return;
-
         if (data != null) {
           setState(() {
             gpxFilePath = file.path;

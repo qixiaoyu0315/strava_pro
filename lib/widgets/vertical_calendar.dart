@@ -4,14 +4,20 @@ import 'month_picker.dart';
 import '../widgets/calendar_utils.dart';
 
 class VerticalCalendar extends StatefulWidget {
+  final DateTime? initialMonth;
+  final DateTime? selectedDate;
+  final Function(DateTime)? onDateSelected;
   final Map<String, bool> svgCache;
-  final Function(DateTime) onDateSelected;
+  final bool isAnimated;
 
   const VerticalCalendar({
-    Key? key,
+    super.key,
+    this.initialMonth,
+    this.selectedDate,
+    this.onDateSelected,
     required this.svgCache,
-    required this.onDateSelected,
-  }) : super(key: key);
+    this.isAnimated = false,
+  });
 
   @override
   State<VerticalCalendar> createState() => _VerticalCalendarState();
@@ -38,8 +44,8 @@ class _VerticalCalendarState extends State<VerticalCalendar>
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _selectedDate = now;
-    _displayedMonth = DateTime(now.year, now.month);
+    _selectedDate = widget.selectedDate ?? now;
+    _displayedMonth = widget.initialMonth ?? DateTime(now.year, now.month);
 
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
@@ -161,10 +167,10 @@ class _VerticalCalendarState extends State<VerticalCalendar>
           setState(() {
             _selectedDate = date;
           });
-          widget.onDateSelected(date);
+          widget.onDateSelected?.call(date);
         },
         onMonthTap: () => _selectMonth(month),
-        isAnimated: true,
+        isAnimated: widget.isAnimated,
         animation: _animation,
       ),
     );

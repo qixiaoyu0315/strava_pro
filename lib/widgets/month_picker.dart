@@ -7,12 +7,12 @@ class MonthPicker extends StatefulWidget {
   final Function(DateTime) onMonthSelected;
 
   const MonthPicker({
-    Key? key,
+    super.key,
     required this.initialDate,
     required this.firstDate,
     required this.lastDate,
     required this.onMonthSelected,
-  }) : super(key: key);
+  });
 
   static Future<DateTime?> show(
     BuildContext context, {
@@ -42,7 +42,7 @@ class MonthPicker extends StatefulWidget {
   }
 
   @override
-  State<MonthPicker> createState() => _MonthPickerState();
+  _MonthPickerState createState() => _MonthPickerState();
 }
 
 class _MonthPickerState extends State<MonthPicker> {

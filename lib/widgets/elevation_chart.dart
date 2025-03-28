@@ -107,18 +107,18 @@ class ElevationData {
 
 class ElevationChart extends StatefulWidget {
   final ElevationData data;
-  final Function(ElevationPoint point)? onPointSelected;
+  final Function(ElevationPoint) onPointSelected;
   final int? currentSegmentIndex;
 
   const ElevationChart({
-    Key? key,
+    super.key,
     required this.data,
-    this.onPointSelected,
+    required this.onPointSelected,
     this.currentSegmentIndex,
-  }) : super(key: key);
+  });
 
   @override
-  State<ElevationChart> createState() => _ElevationChartState();
+  _ElevationChartState createState() => _ElevationChartState();
 }
 
 class _ElevationChartState extends State<ElevationChart> {
@@ -455,7 +455,7 @@ class _ElevationChartState extends State<ElevationChart> {
 
                           final pointData =
                               widget.data.elevationPoints[closestIndex];
-                          widget.onPointSelected?.call(pointData);
+                          widget.onPointSelected.call(pointData);
                         }
                       },
                       handleBuiltInTouches: true,

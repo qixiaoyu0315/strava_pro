@@ -10,14 +10,14 @@ class MonthGrid extends StatelessWidget {
   final Animation<double>? animation;
 
   const MonthGrid({
-    Key? key,
+    super.key,
     required this.month,
     required this.selectedDate,
     required this.svgCache,
     required this.onDateSelected,
     this.isAnimated = false,
     this.animation,
-  }) : super(key: key);
+  });
 
   /// 获取月份的所有日期
   List<DateTime?> _getDaysInMonth() {
