@@ -263,6 +263,8 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   }
 
   void _selectMonth() {
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -271,11 +273,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
           firstDate: DateTime(DateTime.now().year - 2),
           lastDate: DateTime(DateTime.now().year + 2),
           onMonthSelected: (DateTime date) {
-            setState(() {
-              _displayedMonth = date;
-            });
-            // 选择月份后也更新选中的日期
-            _selectDate(date);
+            if (mounted) {
+              setState(() {
+                _displayedMonth = date;
+              });
+              // 选择月份后也更新选中的日期
+              _selectDate(date);
+            }
             Navigator.of(context).pop();
           },
         );

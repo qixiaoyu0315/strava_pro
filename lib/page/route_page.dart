@@ -374,6 +374,8 @@ class _RoutePageState extends State<RoutePage> {
 
   // 导航到路线详情页面
   void _navigateToRouteDetail(String routeId, {bool startNavigation = false}) {
+    if (!mounted) return;
+
     Navigator.push(
       context,
       MaterialPageRoute(

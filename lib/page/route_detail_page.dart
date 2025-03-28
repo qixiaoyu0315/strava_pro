@@ -306,7 +306,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       },
       onError: (error) {
         Logger.e('位置流错误', error: error);
-        if (error is LocationServiceDisabledException) {
+        if (error is LocationServiceDisabledException && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('请开启定位服务')),
           );

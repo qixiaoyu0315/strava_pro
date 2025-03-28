@@ -6,6 +6,8 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'logger.dart';
 
 class PolylineToSVGScreen extends StatefulWidget {
+  const PolylineToSVGScreen({super.key});
+
   @override
   State<PolylineToSVGScreen> createState() => _PolylineToSVGScreenState();
 }

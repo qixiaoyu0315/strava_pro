@@ -177,6 +177,8 @@ class _VerticalCalendarState extends State<VerticalCalendar>
   }
 
   Future<void> _selectMonth(DateTime initialMonth) async {
+    if (!mounted) return;
+
     final now = DateTime.now();
     final DateTime? picked = await MonthPicker.show(
       context,
@@ -189,12 +191,14 @@ class _VerticalCalendarState extends State<VerticalCalendar>
       // 确保我们有选择的月份数据
       await _loadMonthData(picked);
 
-      setState(() {
-        _displayedMonth = picked;
-      });
+      if (mounted) {
+        setState(() {
+          _displayedMonth = picked;
+        });
 
-      // 滚动到选择的月份
-      _scrollToMonth(picked);
+        // 滚动到选择的月份
+        _scrollToMonth(picked);
+      }
     }
   }
 
