@@ -29,7 +29,6 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   late DateTime _displayedMonth;
   late PageController _pageController;
   late AnimationController _animationController;
-  late Animation<double> _animation;
   late int _totalMonths; // 显示的总月数
 
   // 用于存储当前可见月份的缓存
@@ -60,11 +59,6 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
-    );
-
-    _animation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
     );
 
     // 预加载当前月份的数据

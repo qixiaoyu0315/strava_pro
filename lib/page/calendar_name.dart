@@ -17,7 +17,6 @@ class CalendarPage extends StatefulWidget {
 
 class _CalendarPageState extends State<CalendarPage>
     with SingleTickerProviderStateMixin {
-  late DateTime _selectedDate;
   late AnimationController _animationController;
   final Map<String, bool> _svgCache = {}; // 缓存 SVG 存在状态
   bool _isInitialized = false;
@@ -25,8 +24,6 @@ class _CalendarPageState extends State<CalendarPage>
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedDate = now;
 
     // 初始化动画控制器
     _animationController = AnimationController(
@@ -77,9 +74,7 @@ class _CalendarPageState extends State<CalendarPage>
   }
 
   void _onDateSelected(DateTime date) {
-    setState(() {
-      _selectedDate = date;
-    });
+    setState(() {});
   }
 
   @override

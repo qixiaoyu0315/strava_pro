@@ -76,9 +76,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   @override
   void didChangeMetrics() {
     // 屏幕尺寸变化时（如旋转屏幕），更新地图而不重新加载数据
-    if (_isDataLoaded &&
-        mounted &&
-        _mapController.camera.visibleBounds != null) {
+    if (_isDataLoaded && mounted) {
       // 只调整地图视图，不重新加载数据
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -213,9 +211,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       if (!mounted) return;
 
       final accessToken = tokenResponse.accessToken;
-      if (accessToken == null) {
-        throw Exception('未获取到访问令牌');
-      }
 
       // 直接从 Strava API 获取 GPX 数据
       final response = await http.get(
@@ -289,24 +284,21 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         // 检查新位置是否在地图视野内
         if (isNavigationMode) {
           final bounds = _mapController.camera.visibleBounds;
-          if (bounds != null) {
-            // 计算设备位置到视野边缘的距离比例
-            final distanceToEdge =
-                _calculateDistanceToEdge(newLocation, bounds);
+          // 计算设备位置到视野边缘的距离比例
+          final distanceToEdge = _calculateDistanceToEdge(newLocation, bounds);
 
-            // 如果距离边缘太近或已经超出视野，移动地图
-            if (distanceToEdge < 0.2 ||
-                !_isLocationInBounds(newLocation, bounds)) {
-              // 计算新的地图中心点，稍微向前偏移以显示更多前方区域
-              final bearing = position.heading;
-              final offset = _calculateMapOffset(newLocation, bearing);
+          // 如果距离边缘太近或已经超出视野，移动地图
+          if (distanceToEdge < 0.2 ||
+              !_isLocationInBounds(newLocation, bounds)) {
+            // 计算新的地图中心点，稍微向前偏移以显示更多前方区域
+            final bearing = position.heading;
+            final offset = _calculateMapOffset(newLocation, bearing);
 
-              _mapController.move(
-                offset,
-                _mapController.camera.zoom,
-                offset: Offset(0, -0.3), // 稍微向上偏移以显示更多前方区域
-              );
-            }
+            _mapController.move(
+              offset,
+              _mapController.camera.zoom,
+              offset: Offset(0, -0.3), // 稍微向上偏移以显示更多前方区域
+            );
           }
         }
       },
@@ -730,9 +722,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                   _stopLocationUpdates();
                 }
               },
-              child: Icon(isNavigationMode ? Icons.close : Icons.navigation),
               backgroundColor: isNavigationMode ? Colors.red : Colors.blue,
               foregroundColor: Colors.white,
+              child: Icon(isNavigationMode ? Icons.close : Icons.navigation),
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -759,9 +751,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
           )
         : LatLng(39.9042, 116.4074);
 
-    if (initialCenter == null) {
-      initialCenter = center;
-    }
+    initialCenter ??= center;
 
     return NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -808,7 +798,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                             // 右侧信息
                             Expanded(
                               flex: 2, // 减少信息区域比例
-                              child: Container(
+                              child: SizedBox(
                                 height: availableHeight,
                                 child: Column(
                                   children: [
@@ -1005,7 +995,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                         return Column(
                           children: [
                             // 地图组件 (6份)
-                            Container(
+                            SizedBox(
                               height: unit * 6, // 增加地图高度比例
                               child: _buildMap(points, center),
                             ),
@@ -1182,7 +1172,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                   ),
                 ] else ...[
                   // 地图组件
-                  Container(
+                  SizedBox(
                     height: MediaQuery.of(context).size.height * 0.45, // 增加地图高度
                     child: _buildMap(points, center),
                   ),

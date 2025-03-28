@@ -52,7 +52,7 @@ class ElevationData {
       for (var point in trackPoints) {
         final lat = double.parse(point.getAttribute('lat')!);
         final lon = double.parse(point.getAttribute('lon')!);
-        final ele = double.parse(point.findElements('ele').first.text);
+        final ele = double.parse(point.findElements('ele').first.innerText);
         final currentPosition = LatLng(lat, lon);
 
         if (previousPoint != null) {
@@ -255,7 +255,7 @@ class _ElevationChartState extends State<ElevationChart> {
       height: 200,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Theme.of(context).colorScheme.outlineVariant,

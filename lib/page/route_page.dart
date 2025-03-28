@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:strava_client/strava_client.dart';
 import '../model/api_key_model.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -45,7 +44,7 @@ class RouteCard extends StatelessWidget {
         child: Column(
           children: [
             // 上半部分：地图和路线名称
-            Container(
+            SizedBox(
               height: cardHeight, // 动态高度
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
