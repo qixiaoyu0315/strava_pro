@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:io';
 import '../widgets/vertical_calendar.dart';
 import '../widgets/horizontal_calendar.dart';
 import '../widgets/calendar_utils.dart';
@@ -9,9 +7,9 @@ class CalendarPage extends StatefulWidget {
   final bool isHorizontalLayout;
 
   const CalendarPage({
-    Key? key,
+    super.key,
     this.isHorizontalLayout = true,
-  }) : super(key: key);
+  });
 
   @override
   State<CalendarPage> createState() => _CalendarPageState();

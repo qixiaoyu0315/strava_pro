@@ -199,7 +199,7 @@ class _ElevationChartState extends State<ElevationChart> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: .1),
             blurRadius: 4,
             offset: Offset(0, 2),
           ),
@@ -311,7 +311,7 @@ class _ElevationChartState extends State<ElevationChart> {
                           getTitlesWidget: (value, meta) {
                             if (value == 0 ||
                                 value >= widget.data.totalDistance - 0.1) {
-                              return Text('${value.toStringAsFixed(1)}');
+                              return Text(value.toStringAsFixed(1));
                             }
                             return Text('${value.toInt()}');
                           },
@@ -371,7 +371,7 @@ class _ElevationChartState extends State<ElevationChart> {
                           color: Theme.of(context)
                               .colorScheme
                               .primary
-                              .withOpacity(0.2),
+                              .withValues(alpha: .2),
                         ),
                       ),
                     ],

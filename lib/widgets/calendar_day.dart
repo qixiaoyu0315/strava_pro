@@ -92,7 +92,7 @@ class CalendarDay extends StatelessWidget {
           color: isSelected
               ? Colors.blue
               : _isToday
-                  ? Colors.blue.withOpacity(0.3)
+                  ? Colors.blue.withValues(alpha: 0.3)
                   : null,
           borderRadius: BorderRadius.circular(8),
         ),

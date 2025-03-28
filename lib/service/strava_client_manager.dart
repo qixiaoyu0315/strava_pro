@@ -1,7 +1,6 @@
 import 'package:strava_client/strava_client.dart';
 import '../service/strava_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../utils/logger.dart';

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
 
 /// 日历相关工具类，提供SVG文件存在性检查和预加载功能

@@ -49,8 +49,8 @@ class MonthView extends StatelessWidget {
                 color: textColor,
                 fontSize: 16,
                 fontWeight: (displayedMonth != null &&
-                            displayedMonth!.year == month.year &&
-                            displayedMonth!.month == month.month) ||
+                            displayedMonth.year == month.year &&
+                            displayedMonth.month == month.month) ||
                         isCurrentMonth
                     ? FontWeight.bold
                     : FontWeight.w500,

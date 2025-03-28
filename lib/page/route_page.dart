@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:strava_client/strava_client.dart';
 import '../model/api_key_model.dart';
-import '../service/strava_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'route_detail_page.dart'; // 导入新页面
 import '../service/strava_client_manager.dart';
@@ -17,23 +15,24 @@ class RouteCard extends StatelessWidget {
   final VoidCallback onNavigate;
 
   const RouteCard({
-    Key? key,
+    super.key,
     required this.routeData,
     required this.onTap,
     required this.onNavigate,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-    
+    final isLandscape =
+        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+
     // 根据屏幕方向调整高度
     final cardHeight = isLandscape ? 120.0 : 150.0;
     // 根据屏幕方向调整图片宽度比例
     final mapWidthRatio = isLandscape ? 0.3 : 0.35;
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       elevation: 4,
@@ -63,15 +62,16 @@ class RouteCard extends StatelessWidget {
                                 : routeData['mapUrl']!
                             : 'https://via.placeholder.com/150',
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => 
-                            Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey)),
+                        errorBuilder: (context, error, stackTrace) => Center(
+                            child: Icon(Icons.broken_image,
+                                size: 50, color: Colors.grey)),
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
                           return Center(
                             child: CircularProgressIndicator(
                               value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded / 
-                                    loadingProgress.expectedTotalBytes!
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
                                   : null,
                             ),
                           );
@@ -79,7 +79,7 @@ class RouteCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  
+
                   // 右侧信息区域
                   Expanded(
                     child: Padding(
@@ -101,11 +101,12 @@ class RouteCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          
+
                           // 距离和时间信息
                           Container(
                             margin: EdgeInsets.symmetric(vertical: 4),
-                            padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            padding: EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 8),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -113,7 +114,8 @@ class RouteCard extends StatelessWidget {
                                 Expanded(
                                   child: Row(
                                     children: [
-                                      Icon(Icons.directions_bike, size: 16, color: Colors.black54),
+                                      Icon(Icons.directions_bike,
+                                          size: 16, color: Colors.black54),
                                       SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
@@ -128,14 +130,15 @@ class RouteCard extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                
+
                                 SizedBox(width: 8),
-                                
+
                                 // 右侧：时间
                                 Expanded(
                                   child: Row(
                                     children: [
-                                      Icon(Icons.access_time, size: 16, color: Colors.black54),
+                                      Icon(Icons.access_time,
+                                          size: 16, color: Colors.black54),
                                       SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
@@ -153,11 +156,12 @@ class RouteCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          
+
                           // 爬升和导航按钮
                           Container(
                             margin: EdgeInsets.symmetric(vertical: 4),
-                            padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            padding: EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 8),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -165,7 +169,8 @@ class RouteCard extends StatelessWidget {
                                 Expanded(
                                   child: Row(
                                     children: [
-                                      Icon(Icons.trending_up, size: 16, color: Colors.black54),
+                                      Icon(Icons.trending_up,
+                                          size: 16, color: Colors.black54),
                                       SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
@@ -180,15 +185,14 @@ class RouteCard extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                
+
                                 // 右侧：导航按钮
                                 InkWell(
                                   onTap: onNavigate,
                                   child: Container(
                                     padding: EdgeInsets.symmetric(
-                                      horizontal: isLandscape ? 15 : 25, 
-                                      vertical: isLandscape ? 2 : 4
-                                    ),
+                                        horizontal: isLandscape ? 15 : 25,
+                                        vertical: isLandscape ? 2 : 4),
                                     decoration: BoxDecoration(
                                       color: Colors.deepOrangeAccent,
                                       borderRadius: BorderRadius.circular(16),
@@ -222,10 +226,10 @@ class RoutePage extends StatefulWidget {
   final Function(bool, DetailedAthlete?)? onAuthenticationChanged;
 
   const RoutePage({
-    Key? key,
+    super.key,
     this.isAuthenticated = false,
     this.onAuthenticationChanged,
-  }) : super(key: key);
+  });
 
   @override
   _RoutePageState createState() => _RoutePageState();
@@ -375,7 +379,8 @@ class _RoutePageState extends State<RoutePage> {
       context,
       MaterialPageRoute(
         builder: (context) => RouteDetailPage(idStr: routeId),
-        settings: RouteSettings(arguments: {'startNavigation': startNavigation}),
+        settings:
+            RouteSettings(arguments: {'startNavigation': startNavigation}),
       ),
     );
   }
@@ -383,7 +388,8 @@ class _RoutePageState extends State<RoutePage> {
   @override
   Widget build(BuildContext context) {
     // 检测是否为横屏模式
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    final isLandscape =
+        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     return Scaffold(
       body: _isLoading
@@ -418,23 +424,27 @@ class _RoutePageState extends State<RoutePage> {
                         ),
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
-                          sliver: isLandscape 
-                            // 横屏模式：并排显示两个路线
-                            ? _buildLandscapeRouteList() 
-                            // 竖屏模式：单列显示路线
-                            : SliverList(
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final routeData = routeList[index];
-                                    return RouteCard(
-                                      routeData: routeData,
-                                      onTap: () => _navigateToRouteDetail(routeData['idStr']!),
-                                      onNavigate: () => _navigateToRouteDetail(routeData['idStr']!, startNavigation: true),
-                                    );
-                                  },
-                                  childCount: routeList.length,
+                          sliver: isLandscape
+                              // 横屏模式：并排显示两个路线
+                              ? _buildLandscapeRouteList()
+                              // 竖屏模式：单列显示路线
+                              : SliverList(
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                      final routeData = routeList[index];
+                                      return RouteCard(
+                                        routeData: routeData,
+                                        onTap: () => _navigateToRouteDetail(
+                                            routeData['idStr']!),
+                                        onNavigate: () =>
+                                            _navigateToRouteDetail(
+                                                routeData['idStr']!,
+                                                startNavigation: true),
+                                      );
+                                    },
+                                    childCount: routeList.length,
+                                  ),
                                 ),
-                              ),
                         ),
                       ],
                     ),
@@ -458,7 +468,8 @@ class _RoutePageState extends State<RoutePage> {
           return RouteCard(
             routeData: routeData,
             onTap: () => _navigateToRouteDetail(routeData['idStr']!),
-            onNavigate: () => _navigateToRouteDetail(routeData['idStr']!, startNavigation: true),
+            onNavigate: () => _navigateToRouteDetail(routeData['idStr']!,
+                startNavigation: true),
           );
         },
         childCount: routeList.length,

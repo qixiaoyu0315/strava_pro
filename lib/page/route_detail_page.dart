@@ -82,7 +82,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       // 只调整地图视图，不重新加载数据
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          final bounds = _mapController.camera.visibleBounds!;
+          final bounds = _mapController.camera.visibleBounds;
           _mapController.move(
             bounds.center,
             _mapController.camera.zoom,
@@ -576,7 +576,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                         color: (isNearRoute
                                                 ? Colors.green
                                                 : Colors.red)
-                                            .withOpacity(0.3),
+                                            .withValues(alpha: .3),
                                         spreadRadius: 4,
                                         blurRadius: 4,
                                       ),
@@ -824,7 +824,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                           BoxShadow(
                                             color: Theme.of(context)
                                                 .shadowColor
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                             blurRadius: 10,
                                             spreadRadius: 1,
                                           ),
@@ -884,7 +884,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                 width: 1,
                                                 color: Theme.of(context)
                                                     .dividerColor
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                               ),
                                               Column(
                                                 mainAxisAlignment:
@@ -946,7 +946,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                             BoxShadow(
                                               color: Theme.of(context)
                                                   .shadowColor
-                                                  .withOpacity(0.1),
+                                                  .withValues(alpha: 0.1),
                                               blurRadius: 10,
                                               spreadRadius: 1,
                                             ),
@@ -1023,7 +1023,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                   BoxShadow(
                                     color: Theme.of(context)
                                         .shadowColor
-                                        .withOpacity(0.1),
+                                        .withValues(alpha: 0.1),
                                     blurRadius: 10,
                                     spreadRadius: 1,
                                   ),
@@ -1079,7 +1079,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                         width: 1,
                                         color: Theme.of(context)
                                             .dividerColor
-                                            .withOpacity(0.3),
+                                            .withValues(alpha: 0.3),
                                       ),
                                       Column(
                                         mainAxisAlignment:
@@ -1138,7 +1138,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                   BoxShadow(
                                     color: Theme.of(context)
                                         .shadowColor
-                                        .withOpacity(0.1),
+                                        .withValues(alpha: 0.1),
                                     blurRadius: 10,
                                     spreadRadius: 1,
                                   ),
@@ -1197,8 +1197,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                         borderRadius: BorderRadius.circular(15),
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                Theme.of(context).shadowColor.withOpacity(0.1),
+                            color: Theme.of(context)
+                                .shadowColor
+                                .withValues(alpha: 0.1),
                             blurRadius: 10,
                             spreadRadius: 1,
                           ),

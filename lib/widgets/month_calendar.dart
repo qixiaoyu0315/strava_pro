@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
-import 'month_grid.dart';
-import 'month_picker.dart';
-import '../widgets/calendar_utils.dart';
 
 class MonthCalendar extends StatefulWidget {
   final DateTime? month;
@@ -80,7 +77,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
           borderRadius: BorderRadius.circular(20),
           color: widget.displayedMonth!.year == widget.month!.year &&
                   widget.displayedMonth!.month == widget.month!.month
-              ? Colors.blue.withOpacity(0.1)
+              ? Colors.blue.withValues(alpha: 0.1)
               : null,
         ),
         child: Row(
@@ -141,7 +138,7 @@ class _MonthCalendarState extends State<MonthCalendar> {
               color: isSelected
                   ? Colors.blue
                   : isToday
-                      ? Colors.blue.withOpacity(0.3)
+                      ? Colors.blue.withValues(alpha: .3)
                       : null,
               borderRadius: BorderRadius.circular(8),
             ),

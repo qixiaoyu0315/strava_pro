@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:strava_client/strava_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/api_key_model.dart';
-import '../service/strava_service.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
 import '../utils/logger.dart';
@@ -334,15 +333,6 @@ class _SettingPageState extends State<SettingPage> {
         );
       }
     }
-  }
-
-  bool _isValidSvg(String content) {
-    if (content.isEmpty) return false;
-    if (!content.trim().startsWith('<svg') ||
-        !content.trim().endsWith('</svg>')) {
-      return false;
-    }
-    return true;
   }
 
   @override

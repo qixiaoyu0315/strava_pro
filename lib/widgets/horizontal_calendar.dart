@@ -179,7 +179,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                       // 分隔线
                       Container(
                         width: 1,
-                        color: Colors.grey.withOpacity(0.3),
+                        color: Colors.grey.withValues(alpha: 0.3),
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                       ),
 
