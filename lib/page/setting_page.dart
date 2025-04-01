@@ -198,70 +198,70 @@ class _SettingPageState extends State<SettingPage> {
     }
   }
 
-  FutureOr<Null> showErrorMessage(dynamic error, dynamic stackTrace) {
-    if (error is Fault && mounted) {
-      showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: Text("认证错误"),
-              content: SingleChildScrollView(
+  void showErrorMessage(dynamic error, dynamic stackTrace) {
+    if (!mounted) return;
+    
+    Widget content;
+    String title;
+    
+    if (error is Fault) {
+      title = "认证错误";
+      content = SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("错误信息: ${error.message}"),
+            Divider(),
+            if (error.errors != null && error.errors!.isNotEmpty) ...[
+              Text("详细信息:", style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              ...error.errors!.map((e) => Padding(
+                padding: EdgeInsets.only(bottom: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text("错误信息: ${error.message}"),
-                    Divider(),
-                    if (error.errors != null && error.errors!.isNotEmpty) ...[
-                      Text("详细信息:", style: TextStyle(fontWeight: FontWeight.bold)),
-                      SizedBox(height: 8),
-                      ...error.errors!.map((e) => Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("代码: ${e.code ?? '未知'}"),
-                            Text("资源: ${e.resource ?? '未知'}"),
-                            Text("字段: ${e.field ?? '未知'}"),
-                          ],
-                        ),
-                      )).toList(),
-                    ] else
-                      Text("无详细错误信息"),
+                    Text("代码: ${e.code ?? '未知'}"),
+                    Text("资源: ${e.resource ?? '未知'}"),
+                    Text("字段: ${e.field ?? '未知'}"),
                   ],
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text("关闭"),
-                ),
-              ],
-            );
-          });
-    } else if (mounted) {
-      // 处理非 Fault 类型的错误
-      showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: Text("发生错误"),
-              content: SingleChildScrollView(
-                child: Text(error.toString()),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text("关闭"),
-                ),
-              ],
-            );
-          });
+              )).toList(),
+            ] else
+              Text("无详细错误信息"),
+          ],
+        ),
+      );
+    } else {
+      title = "发生错误";
+      content = SingleChildScrollView(
+        child: Text(error.toString()),
+      );
     }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: content,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text("关闭"),
+          ),
+        ],
+      )
+    );
   }
 
-  Future<void> _loadAthleteInfo() async {
+  Future<void> _loadAthleteInfo({bool isSync = false}) async {
     try {
+      if (isSync) {
+        setState(() {
+          _syncStatus = '正在获取运动员信息...';
+        });
+      }
+
       final athlete = await StravaClientManager()
           .stravaClient
           .athletes
@@ -280,6 +280,12 @@ class _SettingPageState extends State<SettingPage> {
 
         // 通知主应用认证状态和用户信息已更新
         widget.onAuthenticationChanged?.call(true, athlete);
+
+        if (isSync) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('运动员信息同步完成')),
+          );
+        }
       }
     } catch (e, stackTrace) {
       Logger.e('获取运动员信息失败', error: e, stackTrace: stackTrace);
@@ -290,6 +296,12 @@ class _SettingPageState extends State<SettingPage> {
         );
       }
     }
+  }
+
+  // 同步运动员信息
+  Future<void> _syncAthleteInfo() async {
+    if (!mounted) return;
+    await _loadAthleteInfo(isSync: true);
   }
 
   Future<void> testAuthentication() async {
@@ -443,279 +455,45 @@ class _SettingPageState extends State<SettingPage> {
     }
   }
 
-  Future<void> syncActivities() async {
-    if (!mounted) return;
-
-    if (_isSyncing) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步正在进行中，请等待完成')),
-        );
-      }
-      return;
-    }
-
-    if (_athlete == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('请先登录并获取运动员信息')),
-        );
-      }
-      return;
-    }
-
-    try {
-      setState(() {
-        _isSyncing = true;
-        _syncProgress = 0.0;
-        _syncStatus = '准备同步...';
-      });
-
-      final now = DateTime.now().toUtc();
-      final oneYearAgo = now.subtract(Duration(days: 365));
-
-      final saveDir = Directory('/storage/emulated/0/Download/strava_pro/svg');
-      if (!await saveDir.exists()) {
-        await saveDir.create(recursive: true);
-      }
-      if (!mounted) return;
-
-      // 按开始时间排序活动，确保每天处理最早的活动
-      final activities = await StravaClientManager()
-          .stravaClient
-          .activities
-          .listLoggedInAthleteActivities(
-            now,
-            oneYearAgo,
-            1,
-            100,
-          );
-      if (!mounted) return;
-
-      activities.sort((a, b) {
-        final dateA = DateTime.parse(a.startDate ?? '');
-        final dateB = DateTime.parse(b.startDate ?? '');
-        return dateA.compareTo(dateB);
-      });
-
-      int totalActivities = activities.length;
-      int processedCount = 0;
-      int successCount = 0;
-
-      if (mounted) {
-        setState(() {
-          _syncStatus = '获取到 $totalActivities 个活动，开始生成SVG...';
-        });
-      }
-
-      for (var activity in activities) {
-        if (!mounted) break;
-
-        try {
-          if (activity.map?.summaryPolyline != null) {
-            final date = DateTime.parse(activity.startDate ?? '');
-            final dateStr = DateFormat('yyyy-MM-dd').format(date);
-            final fileName = '$dateStr.svg';
-            final filePath = '${saveDir.path}/$fileName';
-
-            // 检查是否已处理过该日期
-            if (!_processedDates.containsKey(dateStr)) {
-              _processedDates[dateStr] = true;
-
-              if (mounted) {
-                setState(() {
-                  _syncStatus = '正在处理: ${activity.name ?? fileName} ($dateStr)';
-                });
-              }
-
-              // 生成SVG文件
-              final svgContent = await PolylineToSVG.generateAndSaveSVG(
-                activity.map!.summaryPolyline!,
-                filePath,
-                strokeColor: 'green',
-                strokeWidth: 10,
-              );
-              if (!mounted) break;
-
-              if (svgContent != null) {
-                successCount++;
-              }
-            }
-          }
-
-          processedCount++;
-          if (mounted) {
-            setState(() {
-              _syncProgress = processedCount / totalActivities;
-              _syncStatus = '已处理: $processedCount/$totalActivities';
-            });
-          }
-        } catch (e) {
-          Logger.e('处理活动 ${activity.name} 时出错', error: e);
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _isSyncing = false;
-          _syncStatus = '同步完成';
-        });
-
-        try {
-          // 更新最后同步时间
-          await _athleteModel.updateLastSyncTime();
-          Logger.d('最后同步时间更新成功', tag: 'SyncTime');
-          
-          // 强制等待一下，确保两次更新之间有时间差
-          await Future.delayed(Duration(milliseconds: 100));
-          
-          // 直接更新数据库中的last_activity_sync_time字段
-          final db = await _athleteModel.database;
-          final now = DateTime.now().toUtc().toIso8601String();
-          final athleteData = await _athleteModel.getAthlete();
-          
-          if (athleteData != null) {
-            int recordId = athleteData['id'] as int;
-            
-            // 直接使用SQL语句更新
-            int result = await db.rawUpdate(
-              'UPDATE athlete SET last_activity_sync_time = ? WHERE id = ?',
-              [now, recordId]
-            );
-            
-            Logger.d('直接SQL更新last_activity_sync_time字段: $now, 结果: $result行受影响', tag: 'SyncTime');
-            
-            // 验证更新
-            final verification = await db.query(
-              'athlete',
-              columns: ['last_activity_sync_time'],
-              where: 'id = ?',
-              whereArgs: [recordId]
-            );
-            
-            if (verification.isNotEmpty) {
-              final updatedValue = verification.first['last_activity_sync_time'];
-              Logger.d('验证更新结果: $updatedValue', tag: 'SyncTime');
-              
-              if (mounted) {
-                setState(() {
-                  _lastActivitySyncTime = updatedValue as String?;
-                });
-                
-                Logger.d('状态已更新 - 最后活动同步时间: $_lastActivitySyncTime', tag: 'SyncTime');
-              }
-            } else {
-              Logger.w('无法验证更新结果', tag: 'SyncTime');
-            }
-          } else {
-            Logger.w('找不到运动员记录，无法更新最后活动同步时间', tag: 'SyncTime');
-          }
-          
-          // 重新加载最后同步时间以确保UI显示正确
-          await _loadLastSyncTime();
-          await _loadLastActivitySyncTime();
-        } catch (timeError) {
-          Logger.e('更新同步时间失败', error: timeError, tag: 'SyncTime');
-          // 即使更新时间失败，也不影响主要功能，继续完成
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步完成，成功生成 $successCount 个 SVG 文件')),
-        );
-      }
-    } catch (e) {
-      Logger.e('同步活动数据失败', error: e, tag: 'SyncActivities');
-
-      if (mounted) {
-        setState(() {
-          _isSyncing = false;
-          _syncStatus = '同步失败: $e';
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步活动数据失败: $e')),
-        );
-      }
-    }
-  }
-
-  // 同步运动员信息
-  Future<void> _syncAthleteInfo() async {
-    if (!mounted) return;
-
-    try {
-      setState(() {
-        _syncStatus = '正在获取运动员信息...';
-      });
-
-      // 获取最新的运动员信息
-      final athlete = await StravaClientManager()
-          .stravaClient
-          .athletes
-          .getAuthenticatedAthlete();
-
-      if (mounted) {
-        setState(() {
-          _athlete = athlete;
-        });
-
-        try {
-          // 将运动员信息保存到数据库
-          await _athleteModel.saveAthlete(athlete);
-
-          try {
-            // 更新最后同步时间
-            await _loadLastSyncTime();
-          } catch (timeError) {
-            Logger.e('加载同步时间失败', error: timeError, tag: 'AthleteSync');
-            // 即使获取时间失败，也不影响主要功能
-          }
-
-          // 通知主应用认证状态和用户信息已更新
-          widget.onAuthenticationChanged?.call(true, athlete);
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('运动员信息同步完成')),
-          );
-        } catch (dbError) {
-          Logger.e('保存运动员信息到数据库失败', error: dbError, tag: 'AthleteSync');
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('同步成功但保存到数据库失败: $dbError')),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      Logger.e('从Strava获取运动员信息失败', error: e, tag: 'AthleteSync');
-
-      if (mounted) {
-        setState(() {
-          _syncStatus = '同步失败: $e';
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('从Strava获取运动员信息失败: $e')),
-        );
-      }
-    }
-  }
-
   Future<void> _syncActivities() async {
     if (!_isAuthenticated) {
       Fluttertoast.showToast(msg: '请先登录 Strava');
       return;
     }
 
+    if (_isSyncing) {
+      Fluttertoast.showToast(msg: '同步正在进行中，请等待完成');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
+      _isSyncing = true;
+      _syncProgress = 0.0;
+      _syncStatus = '准备同步...';
     });
 
     try {
-      await _activityService.syncActivities();
+      // 使用 ActivityService 同步活动数据
+      await _activityService.syncActivities(
+        onProgress: (current, total, status) {
+          if (mounted) {
+            setState(() {
+              _syncProgress = current / total;
+              _syncStatus = status;
+            });
+          }
+        }
+      );
+      
+      // 更新活动计数和同步状态
       await _loadActivityCount();
       await _loadSyncStatus();
+      
+      // 更新最后同步时间
+      await _loadLastSyncTime();
+      await _loadLastActivitySyncTime();
+      
       Fluttertoast.showToast(msg: '同步成功');
     } catch (e) {
       Logger.e('同步活动数据失败: $e', tag: 'SettingPage');
@@ -723,6 +501,8 @@ class _SettingPageState extends State<SettingPage> {
     } finally {
       setState(() {
         _isLoading = false;
+        _isSyncing = false;
+        _syncStatus = '同步完成';
       });
     }
   }
@@ -1046,7 +826,7 @@ class _SettingPageState extends State<SettingPage> {
             // 显示最后同步时间
             if (_lastSyncTime != null)
               Text(
-                '上次同步: ${_formatLastSyncTime(_lastSyncTime!)}',
+                '上次同步: ${_formatDateTime(_lastSyncTime)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             const SizedBox(height: 8),
@@ -1142,14 +922,14 @@ class _SettingPageState extends State<SettingPage> {
                 _buildDetailItem('关注中', '${_athlete!.friendCount!}'),
               if (_athlete?.createdAt != null)
                 _buildDetailItem(
-                    '创建时间', _formatAthleteTime(_athlete!.createdAt)),
+                    '创建时间', _formatDateTime(_athlete!.createdAt)),
               if (_athlete?.updatedAt != null)
                 _buildDetailItem(
-                    '更新时间', _formatAthleteTime(_athlete!.updatedAt)),
+                    '更新时间', _formatDateTime(_athlete!.updatedAt)),
               if (_lastSyncTime != null)
-                _buildDetailItem('最后同步时间', _formatLastSyncTime(_lastSyncTime!)),
+                _buildDetailItem('最后同步时间', _formatDateTime(_lastSyncTime)),
               if (_lastActivitySyncTime != null)
-                _buildDetailItem('最后活动同步时间', _formatLastSyncTime(_lastActivitySyncTime!)),
+                _buildDetailItem('最后活动同步时间', _formatDateTime(_lastActivitySyncTime)),
             ],
           ),
         ),
@@ -1192,42 +972,24 @@ class _SettingPageState extends State<SettingPage> {
     return preference == 'meters' ? '公制 (米)' : '英制 (英尺)';
   }
 
-  // 格式化日期时间
-  String _formatDateTime(String? dateTime) {
-    if (dateTime == null || dateTime == 'null' || dateTime.isEmpty) {
-      return '未设置';
+  // 通用的日期时间格式化方法
+  String _formatDateTime(dynamic dateTime, {String format = 'yyyy-MM-dd HH:mm', String defaultText = '未设置'}) {
+    if (dateTime == null || (dateTime is String && (dateTime == 'null' || dateTime.isEmpty))) {
+      return defaultText;
     }
+    
     try {
-      final dt = DateTime.parse(dateTime);
-      return DateFormat('yyyy-MM-dd HH:mm').format(dt);
-    } catch (e) {
-      return dateTime;
-    }
-  }
-
-  // 格式化最后同步时间
-  String _formatLastSyncTime(String isoTimeString) {
-    try {
-      final dateTime = DateTime.parse(isoTimeString);
-      return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
-    } catch (e) {
-      return isoTimeString;
-    }
-  }
-
-  // 安全格式化运动员对象中的时间字段（可能是字符串或DateTime）
-  String _formatAthleteTime(dynamic timeValue) {
-    if (timeValue == null) return '';
-
-    try {
-      if (timeValue is String) {
-        return DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(timeValue));
-      } else if (timeValue is DateTime) {
-        return DateFormat('yyyy-MM-dd HH:mm').format(timeValue);
+      DateTime dt;
+      if (dateTime is String) {
+        dt = DateTime.parse(dateTime);
+      } else if (dateTime is DateTime) {
+        dt = dateTime;
+      } else {
+        return dateTime.toString();
       }
-      return timeValue.toString();
+      return DateFormat(format).format(dt);
     } catch (e) {
-      return timeValue.toString();
+      return dateTime.toString();
     }
   }
 
@@ -1250,13 +1012,13 @@ class _SettingPageState extends State<SettingPage> {
             ],
             if (_lastActivitySyncTime != null) ...[
               Text(
-                '最后活动同步: ${_formatLastSyncTime(_lastActivitySyncTime!)}',
+                '最后活动同步: ${_formatDateTime(_lastActivitySyncTime)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               SizedBox(height: 8),
             ],
             ElevatedButton.icon(
-              onPressed: _isLoading || !needsSync ? null : syncActivities,
+              onPressed: _isLoading || !needsSync ? null : _syncActivities,
               icon: Icon(Icons.sync),
               label: Text(_isLoading ? '同步中...' : '同步活动数据'),
               style: ElevatedButton.styleFrom(
