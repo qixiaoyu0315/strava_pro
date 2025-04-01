@@ -2,6 +2,7 @@ import 'package:strava_client/strava_client.dart';
 import '../service/strava_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../utils/logger.dart';
 
@@ -20,9 +21,19 @@ class StravaClientManager {
   StravaClientManager._internal();
 
   Future<void> initialize(String clientId, String secret) async {
-    _clientId = clientId;
-    _secret = secret;
-    stravaClient = StravaClient(clientId: clientId, secret: secret);
+    try {
+      Logger.d('初始化 StravaClientManager: ID=${clientId}, Secret=${secret.substring(0, min(5, secret.length))}...', 
+        tag: 'StravaClient');
+      
+      _clientId = clientId;
+      _secret = secret;
+      stravaClient = StravaClient(clientId: clientId, secret: secret);
+      
+      Logger.d('StravaClient 初始化成功', tag: 'StravaClient');
+    } catch (e, stackTrace) {
+      Logger.e('初始化 StravaClientManager 失败', error: e, stackTrace: stackTrace, tag: 'StravaClient');
+      rethrow;
+    }
   }
 
   /// 验证用户是否已认证
@@ -132,19 +143,43 @@ class StravaClientManager {
   }
 
   Future<TokenResponse> authenticate() async {
-    final token = await ExampleAuthentication(stravaClient).testAuthentication(
-      [
-        AuthenticationScope.profile_read_all,
-        AuthenticationScope.read_all,
-        AuthenticationScope.activity_read_all
-      ],
-      "stravaflutter://redirect",
-    );
+    try {
+      Logger.d('开始 Strava 认证流程', tag: 'StravaAuth');
+      
+      final token = await ExampleAuthentication(stravaClient).testAuthentication(
+        [
+          AuthenticationScope.profile_read_all,
+          AuthenticationScope.read_all,
+          AuthenticationScope.activity_read_all
+        ],
+        "stravaflutter://redirect",
+      );
 
-    _token = token;
-    _isAuthenticated = true;
-    await _saveToken(token);
-    return token;
+      Logger.d('认证成功，获取到令牌: ${token.accessToken.substring(0, 5)}...', tag: 'StravaAuth');
+      
+      _token = token;
+      _isAuthenticated = true;
+      await _saveToken(token);
+      return token;
+    } catch (e, stackTrace) {
+      Logger.e('Strava 认证失败', error: e, stackTrace: stackTrace, tag: 'StravaAuth');
+      
+      if (e is Fault) {
+        Logger.e('Strava API 错误: ${e.message}', 
+          error: e, 
+          stackTrace: stackTrace,
+          tag: 'StravaAuth');
+        
+        if (e.errors != null && e.errors!.isNotEmpty) {
+          for (var error in e.errors!) {
+            Logger.e('错误详情: 代码=${error.code}, 资源=${error.resource}, 字段=${error.field}',
+              tag: 'StravaAuth');
+          }
+        }
+      }
+      
+      rethrow;
+    }
   }
 
   /// 取消认证

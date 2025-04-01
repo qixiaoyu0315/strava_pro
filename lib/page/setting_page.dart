@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -204,8 +205,56 @@ class _SettingPageState extends State<SettingPage> {
           builder: (context) {
             return AlertDialog(
               title: Text("认证错误"),
-              content: Text(
-                  "错误信息: ${error.message}\n-----------------\n详细信息:\n${(error.errors ?? []).map((e) => "代码: ${e.code}\n资源: ${e.resource}\n字段: ${e.field}\n").toList().join("\n----------\n")}"),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text("错误信息: ${error.message}"),
+                    Divider(),
+                    if (error.errors != null && error.errors!.isNotEmpty) ...[
+                      Text("详细信息:", style: TextStyle(fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
+                      ...error.errors!.map((e) => Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("代码: ${e.code ?? '未知'}"),
+                            Text("资源: ${e.resource ?? '未知'}"),
+                            Text("字段: ${e.field ?? '未知'}"),
+                          ],
+                        ),
+                      )).toList(),
+                    ] else
+                      Text("无详细错误信息"),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text("关闭"),
+                ),
+              ],
+            );
+          });
+    } else if (mounted) {
+      // 处理非 Fault 类型的错误
+      showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: Text("发生错误"),
+              content: SingleChildScrollView(
+                child: Text(error.toString()),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text("关闭"),
+                ),
+              ],
             );
           });
     }
@@ -232,8 +281,14 @@ class _SettingPageState extends State<SettingPage> {
         // 通知主应用认证状态和用户信息已更新
         widget.onAuthenticationChanged?.call(true, athlete);
       }
-    } catch (e) {
-      Logger.e('获取运动员信息失败', error: e);
+    } catch (e, stackTrace) {
+      Logger.e('获取运动员信息失败', error: e, stackTrace: stackTrace);
+      if (mounted) {
+        showErrorMessage(e, stackTrace);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('获取运动员信息失败，请重新授权')),
+        );
+      }
     }
   }
 
@@ -241,9 +296,26 @@ class _SettingPageState extends State<SettingPage> {
     if (!mounted) return;
 
     try {
-    String id = _idController.text;
-    String key = _keyController.text;
+      setState(() {
+        _isLoading = true;
+      });
+      
+      String id = _idController.text;
+      String key = _keyController.text;
+      
+      if (id.isEmpty || key.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('请输入有效的 API ID 和 Key')),
+        );
+        return;
+      }
 
+      Logger.d('开始认证，使用 API ID: $id, Key: ${key.substring(0, min(5, key.length))}...', tag: 'SettingPage');
+      Logger.d('API 配置详情: ' 
+          '回调URL="stravaflutter://redirect", '
+          '回调方案="stravaflutter"', 
+          tag: 'SettingPage');
+      
       // 保存 API 密钥
       await _apiKeyModel.insertApiKey(id, key);
       if (!mounted) return;
@@ -251,6 +323,8 @@ class _SettingPageState extends State<SettingPage> {
       // 初始化 StravaClientManager
       await StravaClientManager().initialize(id, key);
       if (!mounted) return;
+      
+      Logger.d('StravaClientManager 初始化完成，开始进行认证', tag: 'SettingPage');
 
       // 进行认证
       final tokenResponse = await StravaClientManager().authenticate();
@@ -260,6 +334,8 @@ class _SettingPageState extends State<SettingPage> {
         token = tokenResponse;
         _textEditingController.text = tokenResponse.accessToken;
       });
+      
+      Logger.d('认证成功，获取到令牌，过期时间: ${DateTime.fromMillisecondsSinceEpoch(tokenResponse.expiresAt.toInt() * 1000)}', tag: 'SettingPage');
 
       // 认证成功后加载运动员信息
       await _loadAthleteInfo();
@@ -268,9 +344,36 @@ class _SettingPageState extends State<SettingPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('认证成功')),
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.e('认证过程中出错', error: e, stackTrace: stackTrace, tag: 'SettingPage');
+      
       if (mounted) {
-        showErrorMessage(e, null);
+        showErrorMessage(e, stackTrace);
+        
+        // 显示友好的错误提示
+        String errorMsg = '认证失败';
+        if (e is Fault) {
+          errorMsg += ': ${e.message}';
+          if (e.errors != null && e.errors!.isNotEmpty) {
+            final firstError = e.errors!.first;
+            errorMsg += ' (${firstError.code})';
+          }
+        } else {
+          errorMsg += ': ${e.toString()}';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -1214,6 +1317,7 @@ class _SettingPageState extends State<SettingPage> {
               decoration: const InputDecoration(
                 labelText: '请输入 API ID',
                 border: OutlineInputBorder(),
+                helperText: '在 Strava 开发者网站获取的客户端 ID',
               ),
             ),
             const SizedBox(height: 8),
@@ -1222,6 +1326,7 @@ class _SettingPageState extends State<SettingPage> {
               decoration: const InputDecoration(
                 labelText: '请输入 API Key',
                 border: OutlineInputBorder(),
+                helperText: '在 Strava 开发者网站获取的客户端密钥',
               ),
               obscureText: true,
             ),
@@ -1249,6 +1354,31 @@ class _SettingPageState extends State<SettingPage> {
                 ),
               ),
               readOnly: true,
+            ),
+            const SizedBox(height: 8),
+            // Strava API 配置提示
+            const Card(
+              color: Color(0xFFF5F5F5),
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Strava API 配置说明',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 4),
+                    Text('1. 在 Strava 开发者网站创建应用'),
+                    Text('2. 授权回调域：localhost'),
+                    Text('3. 确保添加了回调 URL：stravaflutter://redirect'),
+                    SizedBox(height: 4),
+                    Text('如果认证失败，请检查您的 API 配置是否正确。', 
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Row(
