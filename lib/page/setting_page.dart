@@ -11,6 +11,8 @@ import '../model/athlete_model.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
 import '../utils/logger.dart';
+import '../service/activity_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -45,7 +47,14 @@ class _SettingPageState extends State<SettingPage> {
   final TextEditingController _keyController = TextEditingController();
   final ApiKeyModel _apiKeyModel = ApiKeyModel();
   final AthleteModel _athleteModel = AthleteModel();
+  final ActivityService _activityService = ActivityService();
   bool _isHorizontalLayout = true;
+
+  bool _isAuthenticated = false;
+  bool _isLoading = false;
+  String? _athleteName;
+  String? _athleteAvatar;
+  int _activityCount = 0;
 
   @override
   void initState() {
@@ -69,6 +78,9 @@ class _SettingPageState extends State<SettingPage> {
         _textEditingController.text = token?.accessToken ?? '';
       });
     }
+
+    _checkAuthStatus();
+    _loadActivityCount();
   }
 
   @override
@@ -371,7 +383,7 @@ class _SettingPageState extends State<SettingPage> {
             now,
             oneYearAgo,
             1,
-            200,
+            100,
           );
       if (!mounted) return;
 
@@ -585,6 +597,40 @@ class _SettingPageState extends State<SettingPage> {
     }
   }
 
+  Future<void> _syncActivities() async {
+    if (!widget.isAuthenticated) {
+      _showToast('请先登录Strava');
+      return;
+    }
+
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      await _activityService.syncActivities();
+      _showToast('活动数据同步成功');
+    } catch (e) {
+      _showToast('同步失败: $e');
+    } finally {
+      setState(() {
+        _isSyncing = false;
+      });
+    }
+  }
+
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.CENTER,
+      timeInSecForIosWeb: 1,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 检测是否为横屏模式
@@ -612,14 +658,14 @@ class _SettingPageState extends State<SettingPage> {
       );
     } else {
       // 竖屏布局 - 保持原样
-      return Scaffold(
-        appBar: AppBar(
+    return Scaffold(
+      appBar: AppBar(
           title: const Text('设置'),
         ),
         body: RefreshIndicator(
           onRefresh: () async {
             if (widget.isAuthenticated) {
-              await _loadAthleteInfo();
+              await _syncActivities();
             }
           },
           child: SingleChildScrollView(
@@ -639,13 +685,13 @@ class _SettingPageState extends State<SettingPage> {
         // 用户信息卡片
         if (_athlete != null) ...[
           _buildUserInfoCard(context),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           _buildSyncCard(),
 
         ],
         // 布局切换开关
         _buildLayoutSwitchCard(),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
         // API设置卡片
         _buildApiSettingsCard(context),
         // 同步按钮和进度
@@ -665,7 +711,7 @@ class _SettingPageState extends State<SettingPage> {
             child: Column(
               children: [
                 _buildUserInfoCard(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
                 _buildSyncCard(),
               ],
             ),
@@ -680,9 +726,9 @@ class _SettingPageState extends State<SettingPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildLayoutSwitchCard(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
                 _buildApiSettingsCard(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -712,7 +758,7 @@ class _SettingPageState extends State<SettingPage> {
                   ? Icon(Icons.person, size: 50)
                   : null,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             // 用户名
             Text(
               '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
@@ -732,27 +778,23 @@ class _SettingPageState extends State<SettingPage> {
                 '上次同步: ${_formatLastSyncTime(_lastSyncTime!)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             // 运动统计
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildStatItem(
                   context,
-                  '关注者',
-                  '${_athlete?.followerCount ?? 0}',
+                  '活动数',
+                  _activityCount.toString(),
+                  Icons.directions_run,
                 ),
                 _buildStatItem(
                   context,
-                  '关注中',
-                  '${_athlete?.friendCount ?? 0}',
+                  '同步状态',
+                  _isSyncing ? '同步中...' : '已同步',
+                  Icons.sync,
                 ),
-                if (_athlete?.weight != null)
-                  _buildStatItem(
-                    context,
-                    '体重',
-                    '${_athlete?.weight?.toStringAsFixed(1) ?? 0} kg',
-                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -906,7 +948,7 @@ class _SettingPageState extends State<SettingPage> {
               LinearProgressIndicator(value: _syncProgress),
               SizedBox(height: 8),
               Text(_syncStatus),
-              SizedBox(height: 16),
+              SizedBox(height: 8),
             ],
             if (_lastActivitySyncTime != null) ...[
               Text(
@@ -971,7 +1013,7 @@ class _SettingPageState extends State<SettingPage> {
               'API 设置',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             TextField(
               controller: _idController,
               decoration: const InputDecoration(
@@ -979,7 +1021,7 @@ class _SettingPageState extends State<SettingPage> {
                 border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             TextField(
               controller: _keyController,
               decoration: const InputDecoration(
@@ -988,7 +1030,7 @@ class _SettingPageState extends State<SettingPage> {
               ),
               obscureText: true,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             TextField(
               minLines: 1,
               maxLines: 3,
@@ -1013,7 +1055,7 @@ class _SettingPageState extends State<SettingPage> {
               ),
               readOnly: true,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -1044,14 +1086,19 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   // 构建统计项小部件
-  Widget _buildStatItem(BuildContext context, String label, String value) {
+  Widget _buildStatItem(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     return Column(
       children: [
+        Icon(icon, size: 24),
+        const SizedBox(height: 4),
         Text(
           value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         Text(
           label,
@@ -1105,6 +1152,44 @@ class _SettingPageState extends State<SettingPage> {
       Logger.d('数据库调试和修复完成', tag: 'DatabaseInit');
     } catch (e) {
       Logger.e('数据库调试和修复失败', error: e, tag: 'DatabaseInit');
+    }
+  }
+
+  /// 检查认证状态
+  Future<void> _checkAuthStatus() async {
+    try {
+      final apiKey = await _apiKeyModel.getApiKey();
+      if (apiKey != null) {
+        // 暂时注释掉获取用户信息的逻辑
+        // final athlete = await StravaClientManager()
+        //     .stravaClient
+        //     .athletes
+        //     .getAthlete(0); // 0 表示获取当前登录用户
+        // setState(() {
+        //   _isAuthenticated = true;
+        //   _athleteName = athlete.firstname;
+        //   _athleteAvatar = athlete.profile;
+        // });
+        setState(() {
+          _isAuthenticated = true;
+          _athleteName = '用户'; // 暂时设置为默认值
+          _athleteAvatar = null; // 暂时设置为 null
+        });
+      }
+    } catch (e) {
+      print('检查认证状态失败: $e');
+    }
+  }
+
+  /// 加载活动数量
+  Future<void> _loadActivityCount() async {
+    try {
+      final activities = await ActivityService().getAllActivities();
+      setState(() {
+        _activityCount = activities.length;
+      });
+    } catch (e) {
+      print('加载活动数量失败: $e');
     }
   }
 }
