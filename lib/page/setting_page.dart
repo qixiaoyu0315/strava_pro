@@ -52,9 +52,14 @@ class _SettingPageState extends State<SettingPage> {
     super.initState();
     _loadApiKey();
     _loadSettings();
-    _loadLastSyncTime();
-    _loadLastActivitySyncTime();
-    _loadAthleteFromDatabase();
+    
+    // 调试和修复数据库问题
+    _debugAndFixDatabase().then((_) {
+      // 完成调试和修复后再加载数据
+      _loadLastSyncTime();
+      _loadLastActivitySyncTime();
+      _loadAthleteFromDatabase();
+    });
 
     // 使用外部传入的认证状态和运动员信息
     if (widget.isAuthenticated && widget.athlete != null) {
@@ -302,8 +307,18 @@ class _SettingPageState extends State<SettingPage> {
     }
     
     try {
-      final updatedAt = DateTime.parse(_athlete!.updatedAt!.toString());
+      // 安全地处理updatedAt字段
+      String updatedAtStr = '';
+      if (_athlete!.updatedAt is String) {
+        updatedAtStr = _athlete!.updatedAt as String;
+      } else {
+        updatedAtStr = _athlete!.updatedAt.toString();
+      }
+      
+      final updatedAt = DateTime.parse(updatedAtStr);
       final lastSync = DateTime.parse(_lastActivitySyncTime!);
+      
+      Logger.d('更新时间: $updatedAt, 最后同步: $lastSync', tag: 'ActivitySync');
       return updatedAt.isAfter(lastSync);
     } catch (e) {
       Logger.e('解析时间失败', error: e, tag: 'ActivitySync');
@@ -432,7 +447,54 @@ class _SettingPageState extends State<SettingPage> {
         try {
           // 更新最后同步时间
           await _athleteModel.updateLastSyncTime();
-          await _athleteModel.updateLastActivitySyncTime();
+          Logger.d('最后同步时间更新成功', tag: 'SyncTime');
+          
+          // 强制等待一下，确保两次更新之间有时间差
+          await Future.delayed(Duration(milliseconds: 100));
+          
+          // 直接更新数据库中的last_activity_sync_time字段
+          final db = await _athleteModel.database;
+          final now = DateTime.now().toUtc().toIso8601String();
+          final athleteData = await _athleteModel.getAthlete();
+          
+          if (athleteData != null) {
+            int recordId = athleteData['id'] as int;
+            
+            // 直接使用SQL语句更新
+            int result = await db.rawUpdate(
+              'UPDATE athlete SET last_activity_sync_time = ? WHERE id = ?',
+              [now, recordId]
+            );
+            
+            Logger.d('直接SQL更新last_activity_sync_time字段: $now, 结果: $result行受影响', tag: 'SyncTime');
+            
+            // 验证更新
+            final verification = await db.query(
+              'athlete',
+              columns: ['last_activity_sync_time'],
+              where: 'id = ?',
+              whereArgs: [recordId]
+            );
+            
+            if (verification.isNotEmpty) {
+              final updatedValue = verification.first['last_activity_sync_time'];
+              Logger.d('验证更新结果: $updatedValue', tag: 'SyncTime');
+              
+              if (mounted) {
+                setState(() {
+                  _lastActivitySyncTime = updatedValue as String?;
+                });
+                
+                Logger.d('状态已更新 - 最后活动同步时间: $_lastActivitySyncTime', tag: 'SyncTime');
+              }
+            } else {
+              Logger.w('无法验证更新结果', tag: 'SyncTime');
+            }
+          } else {
+            Logger.w('找不到运动员记录，无法更新最后活动同步时间', tag: 'SyncTime');
+          }
+          
+          // 重新加载最后同步时间以确保UI显示正确
           await _loadLastSyncTime();
           await _loadLastActivitySyncTime();
         } catch (timeError) {
@@ -975,5 +1037,52 @@ class _SettingPageState extends State<SettingPage> {
         ),
       ],
     );
+  }
+
+  // 调试并修复数据库
+  Future<void> _debugAndFixDatabase() async {
+    try {
+      Logger.d('开始调试和修复数据库...', tag: 'DatabaseInit');
+      
+      // 检查数据库表结构
+      await _athleteModel.debugDatabaseTable();
+      
+      // 尝试常规修复
+      await _athleteModel.fixLastActivitySyncTime();
+      
+      // 再次检查数据库状态
+      await _athleteModel.debugDatabaseTable();
+      
+      // 如果还是有问题，完全重置数据库
+      final lastActivitySyncTime = await _athleteModel.getLastActivitySyncTime();
+      final lastSyncTime = await _athleteModel.getLastSyncTime();
+      
+      Logger.d('修复检查: 最后同步时间=$lastSyncTime, 最后活动同步时间=$lastActivitySyncTime', tag: 'DatabaseInit');
+      
+      // 如果最后活动同步时间依然为null但最后同步时间不为null，重置数据库
+      if (lastSyncTime != null && lastActivitySyncTime == null) {
+        Logger.w('检测到数据库异常，准备重置数据库', tag: 'DatabaseInit');
+        
+        // 备份运动员信息
+        final athleteData = await _athleteModel.getAthlete();
+        
+        // 重置数据库
+        await _athleteModel.resetDatabase();
+        
+        // 如果有运动员数据，重新保存
+        if (athleteData != null && _athlete != null) {
+          // 重新保存运动员信息
+          await _athleteModel.saveAthlete(_athlete!);
+          Logger.d('重置数据库后重新保存了运动员信息', tag: 'DatabaseInit');
+        }
+      }
+      
+      // 最终检查
+      await _athleteModel.debugDatabaseTable();
+      
+      Logger.d('数据库调试和修复完成', tag: 'DatabaseInit');
+    } catch (e) {
+      Logger.e('数据库调试和修复失败', error: e, tag: 'DatabaseInit');
+    }
   }
 }
