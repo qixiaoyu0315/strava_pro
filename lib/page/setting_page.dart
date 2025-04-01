@@ -55,6 +55,7 @@ class _SettingPageState extends State<SettingPage> {
   String? _athleteName;
   String? _athleteAvatar;
   int _activityCount = 0;
+  Map<String, dynamic>? _syncStatusMap;
 
   @override
   void initState() {
@@ -81,6 +82,7 @@ class _SettingPageState extends State<SettingPage> {
 
     _checkAuthStatus();
     _loadActivityCount();
+    _loadSyncStatus();
   }
 
   @override
@@ -598,36 +600,162 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Future<void> _syncActivities() async {
-    if (!widget.isAuthenticated) {
-      _showToast('请先登录Strava');
+    if (!_isAuthenticated) {
+      Fluttertoast.showToast(msg: '请先登录 Strava');
       return;
     }
 
     setState(() {
-      _isSyncing = true;
+      _isLoading = true;
     });
 
     try {
       await _activityService.syncActivities();
-      _showToast('活动数据同步成功');
+      await _loadActivityCount();
+      await _loadSyncStatus();
+      Fluttertoast.showToast(msg: '同步成功');
     } catch (e) {
-      _showToast('同步失败: $e');
+      Logger.e('同步活动数据失败: $e', tag: 'SettingPage');
+      Fluttertoast.showToast(msg: '同步失败: $e');
     } finally {
       setState(() {
-        _isSyncing = false;
+        _isLoading = false;
       });
     }
   }
 
-  void _showToast(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.CENTER,
-      timeInSecForIosWeb: 1,
-      backgroundColor: Colors.black87,
-      textColor: Colors.white,
-      fontSize: 16.0,
+  /// 检查认证状态
+  Future<void> _checkAuthStatus() async {
+    try {
+      final apiKey = await _apiKeyModel.getApiKey();
+      if (apiKey != null) {
+        // 暂时注释掉获取用户信息的逻辑
+        // final athlete = await StravaClientManager()
+        //     .stravaClient
+        //     .athletes
+        //     .getAthlete(0); // 0 表示获取当前登录用户
+        // setState(() {
+        //   _isAuthenticated = true;
+        //   _athleteName = athlete.firstname;
+        //   _athleteAvatar = athlete.profile;
+        // });
+        setState(() {
+          _isAuthenticated = true;
+          _athleteName = '用户'; // 暂时设置为默认值
+          _athleteAvatar = null; // 暂时设置为 null
+        });
+        
+        // 尝试获取运动员信息并更新创建时间
+        _updateAthleteCreatedTime();
+      }
+    } catch (e) {
+      Logger.e('检查认证状态失败: $e', tag: 'SettingPage');
+    }
+  }
+
+  /// 更新运动员创建时间
+  Future<void> _updateAthleteCreatedTime() async {
+    try {
+      // 仅作为示例，实际上需要从Strava API获取
+      final createdAt = DateTime.now().subtract(const Duration(days: 365)).toIso8601String();
+      await _activityService.updateAthleteCreatedAt(createdAt);
+      Logger.d('已更新运动员创建时间: $createdAt', tag: 'SettingPage');
+    } catch (e) {
+      Logger.e('更新运动员创建时间失败: $e', tag: 'SettingPage');
+    }
+  }
+
+  /// 加载活动数量
+  Future<void> _loadActivityCount() async {
+    try {
+      final activities = await _activityService.getAllActivities();
+      setState(() {
+        _activityCount = activities.length;
+      });
+    } catch (e) {
+      Logger.e('加载活动数量失败: $e', tag: 'SettingPage');
+    }
+  }
+
+  /// 加载同步状态
+  Future<void> _loadSyncStatus() async {
+    try {
+      final status = await _activityService.getSyncStatus();
+      setState(() {
+        _syncStatusMap = status;
+      });
+      Logger.d('加载同步状态: $status', tag: 'SettingPage');
+    } catch (e) {
+      Logger.e('加载同步状态失败: $e', tag: 'SettingPage');
+    }
+  }
+
+  /// 重置同步状态
+  Future<void> _resetSyncStatus() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _activityService.resetSyncStatus();
+      await _loadSyncStatus();
+      Fluttertoast.showToast(msg: '重置成功，下次将从第一页开始同步');
+    } catch (e) {
+      Logger.e('重置同步状态失败: $e', tag: 'SettingPage');
+      Fluttertoast.showToast(msg: '重置失败: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// 重置数据库
+  Future<void> _resetDatabase() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _activityService.resetDatabase();
+      await _loadActivityCount();
+      await _loadSyncStatus();
+      Fluttertoast.showToast(msg: '数据库已重置，请重新同步数据');
+    } catch (e) {
+      Logger.e('重置数据库失败: $e', tag: 'SettingPage');
+      Fluttertoast.showToast(msg: '重置数据库失败: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 显示确认对话框
+  void _showResetDatabaseConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('重置数据库'),
+          content: Text('这将删除所有已同步的数据，并重新创建数据库。确定要继续吗？'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确定'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetDatabase();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -694,6 +822,26 @@ class _SettingPageState extends State<SettingPage> {
         const SizedBox(height: 8),
         // API设置卡片
         _buildApiSettingsCard(context),
+        // 重置同步按钮
+        OutlinedButton.icon(
+          onPressed: _isLoading ? null : _resetSyncStatus,
+          icon: const Icon(Icons.restart_alt),
+          label: const Text('重置同步状态'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 重置数据库按钮
+        OutlinedButton.icon(
+          onPressed: _isLoading ? null : () => _showResetDatabaseConfirmation(context),
+          icon: const Icon(Icons.delete_forever),
+          label: const Text('重置数据库'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            foregroundColor: Colors.red,
+          ),
+        ),
         // 同步按钮和进度
       ],
     );
@@ -729,6 +877,26 @@ class _SettingPageState extends State<SettingPage> {
                 const SizedBox(height: 8),
                 _buildApiSettingsCard(context),
                 const SizedBox(height: 8),
+                // 重置同步按钮
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _resetSyncStatus,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('重置同步状态'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 重置数据库按钮
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : () => _showResetDatabaseConfirmation(context),
+                  icon: const Icon(Icons.delete_forever),
+                  label: const Text('重置数据库'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    foregroundColor: Colors.red,
+                  ),
+                ),
               ],
             ),
           ),
@@ -792,11 +960,35 @@ class _SettingPageState extends State<SettingPage> {
                 _buildStatItem(
                   context,
                   '同步状态',
-                  _isSyncing ? '同步中...' : '已同步',
+                  _isLoading ? '同步中...' : '已同步',
                   Icons.sync,
                 ),
               ],
             ),
+            // 显示同步状态信息
+            if (_syncStatusMap != null) ...[
+              const Divider(height: 32),
+              Text(
+                '同步信息',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              _buildSyncInfo(
+                '当前页数',
+                '${_syncStatusMap!['last_page'] ?? 0}',
+                Icons.bookmark,
+              ),
+              _buildSyncInfo(
+                '最后同步',
+                _formatDateTime(_syncStatusMap!['last_sync_time']?.toString()),
+                Icons.access_time,
+              ),
+              _buildSyncInfo(
+                '起始时间',
+                _formatDateTime(_syncStatusMap!['athlete_created_at']?.toString()),
+                Icons.calendar_today,
+              ),
+            ],
             const SizedBox(height: 8),
             // 详细信息按钮
             TextButton(
@@ -898,7 +1090,10 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   // 格式化日期时间
-  String _formatDateTime(String dateTime) {
+  String _formatDateTime(String? dateTime) {
+    if (dateTime == null || dateTime == 'null' || dateTime.isEmpty) {
+      return '未设置';
+    }
     try {
       final dt = DateTime.parse(dateTime);
       return DateFormat('yyyy-MM-dd HH:mm').format(dt);
@@ -944,7 +1139,7 @@ class _SettingPageState extends State<SettingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_isSyncing) ...[
+            if (_isLoading) ...[
               LinearProgressIndicator(value: _syncProgress),
               SizedBox(height: 8),
               Text(_syncStatus),
@@ -958,16 +1153,16 @@ class _SettingPageState extends State<SettingPage> {
               SizedBox(height: 8),
             ],
             ElevatedButton.icon(
-              onPressed: _isSyncing || !needsSync ? null : syncActivities,
+              onPressed: _isLoading || !needsSync ? null : syncActivities,
               icon: Icon(Icons.sync),
-              label: Text(_isSyncing ? '同步中...' : '同步活动数据'),
+              label: Text(_isLoading ? '同步中...' : '同步活动数据'),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 backgroundColor: needsSync ? Colors.green : Colors.grey,
                 foregroundColor: Colors.white,
               ),
             ),
-            if (!needsSync && !_isSyncing) ...[
+            if (!needsSync && !_isLoading) ...[
               SizedBox(height: 8),
               Text(
                 '所有活动已同步',
@@ -1108,6 +1303,21 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
+  // 构建同步状态信息项
+  Widget _buildSyncInfo(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 8),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+
   // 调试并修复数据库
   Future<void> _debugAndFixDatabase() async {
     try {
@@ -1152,44 +1362,6 @@ class _SettingPageState extends State<SettingPage> {
       Logger.d('数据库调试和修复完成', tag: 'DatabaseInit');
     } catch (e) {
       Logger.e('数据库调试和修复失败', error: e, tag: 'DatabaseInit');
-    }
-  }
-
-  /// 检查认证状态
-  Future<void> _checkAuthStatus() async {
-    try {
-      final apiKey = await _apiKeyModel.getApiKey();
-      if (apiKey != null) {
-        // 暂时注释掉获取用户信息的逻辑
-        // final athlete = await StravaClientManager()
-        //     .stravaClient
-        //     .athletes
-        //     .getAthlete(0); // 0 表示获取当前登录用户
-        // setState(() {
-        //   _isAuthenticated = true;
-        //   _athleteName = athlete.firstname;
-        //   _athleteAvatar = athlete.profile;
-        // });
-        setState(() {
-          _isAuthenticated = true;
-          _athleteName = '用户'; // 暂时设置为默认值
-          _athleteAvatar = null; // 暂时设置为 null
-        });
-      }
-    } catch (e) {
-      print('检查认证状态失败: $e');
-    }
-  }
-
-  /// 加载活动数量
-  Future<void> _loadActivityCount() async {
-    try {
-      final activities = await ActivityService().getAllActivities();
-      setState(() {
-        _activityCount = activities.length;
-      });
-    } catch (e) {
-      print('加载活动数量失败: $e');
     }
   }
 }
