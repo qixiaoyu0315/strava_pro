@@ -39,6 +39,7 @@ class _SettingPageState extends State<SettingPage> {
   String _syncStatus = '';
   final Map<String, bool> _processedDates = {};
   String? _lastSyncTime;
+  String? _lastActivitySyncTime;
 
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _keyController = TextEditingController();
@@ -52,6 +53,7 @@ class _SettingPageState extends State<SettingPage> {
     _loadApiKey();
     _loadSettings();
     _loadLastSyncTime();
+    _loadLastActivitySyncTime();
     _loadAthleteFromDatabase();
 
     // 使用外部传入的认证状态和运动员信息
@@ -101,8 +103,8 @@ class _SettingPageState extends State<SettingPage> {
     final apiKey = await _apiKeyModel.getApiKey();
     if (apiKey != null) {
       setState(() {
-        _idController.text = apiKey['api_id']!;
-        _keyController.text = apiKey['api_key']!;
+      _idController.text = apiKey['api_id']!;
+      _keyController.text = apiKey['api_key']!;
       });
     }
   }
@@ -112,6 +114,15 @@ class _SettingPageState extends State<SettingPage> {
     if (lastSyncTime != null && mounted) {
       setState(() {
         _lastSyncTime = lastSyncTime;
+      });
+    }
+  }
+
+  Future<void> _loadLastActivitySyncTime() async {
+    final lastActivitySyncTime = await _athleteModel.getLastActivitySyncTime();
+    if (lastActivitySyncTime != null && mounted) {
+      setState(() {
+        _lastActivitySyncTime = lastActivitySyncTime;
       });
     }
   }
@@ -211,8 +222,8 @@ class _SettingPageState extends State<SettingPage> {
     if (!mounted) return;
 
     try {
-      String id = _idController.text;
-      String key = _keyController.text;
+    String id = _idController.text;
+    String key = _keyController.text;
 
       // 保存 API 密钥
       await _apiKeyModel.insertApiKey(id, key);
@@ -259,6 +270,7 @@ class _SettingPageState extends State<SettingPage> {
         _idController.clear();
         _keyController.clear();
         _lastSyncTime = null;
+        _lastActivitySyncTime = null;
       });
 
       // 清除存储的 API 密钥
@@ -281,6 +293,21 @@ class _SettingPageState extends State<SettingPage> {
       if (mounted) {
         showErrorMessage(e, null);
       }
+    }
+  }
+
+  bool _needsActivitySync() {
+    if (_athlete?.updatedAt == null || _lastActivitySyncTime == null) {
+      return true;
+    }
+    
+    try {
+      final updatedAt = DateTime.parse(_athlete!.updatedAt!.toString());
+      final lastSync = DateTime.parse(_lastActivitySyncTime!);
+      return updatedAt.isAfter(lastSync);
+    } catch (e) {
+      Logger.e('解析时间失败', error: e, tag: 'ActivitySync');
+      return true;
     }
   }
 
@@ -405,7 +432,9 @@ class _SettingPageState extends State<SettingPage> {
         try {
           // 更新最后同步时间
           await _athleteModel.updateLastSyncTime();
+          await _athleteModel.updateLastActivitySyncTime();
           await _loadLastSyncTime();
+          await _loadLastActivitySyncTime();
         } catch (timeError) {
           Logger.e('更新同步时间失败', error: timeError, tag: 'SyncTime');
           // 即使更新时间失败，也不影响主要功能，继续完成
@@ -497,20 +526,26 @@ class _SettingPageState extends State<SettingPage> {
   @override
   Widget build(BuildContext context) {
     // 检测是否为横屏模式
-    final isLandscape =
-        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-
+    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: isLandscape
+      body: RefreshIndicator(
+        onRefresh: () async {
+          if (widget.isAuthenticated) {
+            await _loadAthleteInfo();
+          }
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: isLandscape 
             // 横屏布局
             ? _buildLandscapeLayout(context)
             // 竖屏布局
             : _buildPortraitLayout(context),
+        ),
       ),
     );
   }
@@ -524,14 +559,17 @@ class _SettingPageState extends State<SettingPage> {
         if (_athlete != null) ...[
           _buildUserInfoCard(context),
           const SizedBox(height: 24),
-          _buildSyncCard(),
         ],
-        const SizedBox(height: 24),
         // 布局切换开关
         _buildLayoutSwitchCard(),
         const SizedBox(height: 24),
         // API设置卡片
         _buildApiSettingsCard(context),
+        const SizedBox(height: 24),
+        // 同步按钮和进度
+        if (token != null) ...[
+          _buildSyncCard(),
+        ],
       ],
     );
   }
@@ -542,21 +580,15 @@ class _SettingPageState extends State<SettingPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 左侧用户信息
-        if (_athlete != null)
+        if (_athlete != null) 
           Expanded(
             flex: 1,
-            child: Column(
-              children: [
-                _buildUserInfoCard(context),
-                const SizedBox(height: 24),
-                _buildSyncCard(),
-              ],
-            ),
+            child: _buildUserInfoCard(context),
           ),
-
+        
         // 右侧设置项
         Expanded(
-          flex: 1,
+          flex: 2,
           child: Padding(
             padding: EdgeInsets.only(left: _athlete != null ? 16.0 : 0.0),
             child: Column(
@@ -565,6 +597,8 @@ class _SettingPageState extends State<SettingPage> {
                 _buildLayoutSwitchCard(),
                 const SizedBox(height: 24),
                 _buildApiSettingsCard(context),
+                const SizedBox(height: 24),
+                if (token != null) _buildSyncCard(),
               ],
             ),
           ),
@@ -693,6 +727,8 @@ class _SettingPageState extends State<SettingPage> {
                     '更新时间', _formatAthleteTime(_athlete!.updatedAt)),
               if (_lastSyncTime != null)
                 _buildDetailItem('最后同步时间', _formatLastSyncTime(_lastSyncTime!)),
+              if (_lastActivitySyncTime != null)
+                _buildDetailItem('最后活动同步时间', _formatLastSyncTime(_lastActivitySyncTime!)),
             ],
           ),
         ),
@@ -771,6 +807,55 @@ class _SettingPageState extends State<SettingPage> {
     }
   }
 
+  // 同步卡片
+  Widget _buildSyncCard() {
+    final needsSync = _needsActivitySync();
+    
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isSyncing) ...[
+              LinearProgressIndicator(value: _syncProgress),
+              SizedBox(height: 8),
+              Text(_syncStatus),
+              SizedBox(height: 16),
+            ],
+            if (_lastActivitySyncTime != null) ...[
+              Text(
+                '最后活动同步: ${_formatLastSyncTime(_lastActivitySyncTime!)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              SizedBox(height: 8),
+            ],
+            ElevatedButton.icon(
+              onPressed: _isSyncing || !needsSync ? null : syncActivities,
+              icon: Icon(Icons.sync),
+              label: Text(_isSyncing ? '同步中...' : '同步活动数据'),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                backgroundColor: needsSync ? Colors.green : Colors.grey,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            if (!needsSync && !_isSyncing) ...[
+              SizedBox(height: 8),
+              Text(
+                '所有活动已同步',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   // 布局切换卡片
   Widget _buildLayoutSwitchCard() {
     return Card(
@@ -825,12 +910,12 @@ class _SettingPageState extends State<SettingPage> {
               maxLines: 3,
               controller: _textEditingController,
               decoration: InputDecoration(
-                border: OutlineInputBorder(),
+                  border: OutlineInputBorder(),
                 labelText: "Access Token",
                 suffixIcon: IconButton(
                   icon: Icon(Icons.copy),
-                  onPressed: () {
-                    Clipboard.setData(
+                    onPressed: () {
+                      Clipboard.setData(
                       ClipboardData(text: _textEditingController.text),
                     ).then((_) {
                       if (mounted) {
@@ -864,58 +949,6 @@ class _SettingPageState extends State<SettingPage> {
                     padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 同步卡片
-  Widget _buildSyncCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_isSyncing) ...[
-              LinearProgressIndicator(value: _syncProgress),
-              SizedBox(height: 8),
-              Text(_syncStatus),
-              SizedBox(height: 16),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isSyncing ? null : syncActivities,
-                    icon: Icon(Icons.sync),
-                    label: Text(_isSyncing ? '同步中...' : '同步活动数据'),
-                    style: ElevatedButton.styleFrom(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isSyncing ? null : _syncAthleteInfo,
-                    icon: Icon(Icons.person_outline),
-                    label: Text('同步个人信息'),
-                    style: ElevatedButton.styleFrom(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
                   ),
                 ),
               ],

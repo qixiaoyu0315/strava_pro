@@ -174,9 +174,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
 
             if (!status.isGranted) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('需要存储权限才能导出文件')),
-                );
+              );
               }
               return;
             }
@@ -192,9 +192,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
 
             if (!status.isGranted) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('需要存储权限才能导出文件')),
-                );
+              );
               }
               return;
             }
@@ -244,15 +244,15 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('GPX文件已保存并解析完成')),
-        );
+      );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e')),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导出失败: $e')),
+      );
       }
     }
   }
@@ -695,15 +695,15 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       body: _isDataLoaded
           ? _buildMainContent()
           : FutureBuilder<strava.Route>(
-              future: getRoute(widget.idStr),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('获取路线失败: ${snapshot.error}'));
-                } else if (!snapshot.hasData) {
-                  return Center(child: Text('没有找到路线'));
-                }
+        future: getRoute(widget.idStr),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('获取路线失败: ${snapshot.error}'));
+          } else if (!snapshot.hasData) {
+            return Center(child: Text('没有找到路线'));
+          }
 
                 _routeData = snapshot.data!;
                 _isDataLoaded = true;
@@ -734,23 +734,23 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   }
 
   Widget _buildMainContent() {
-    List<LatLng> points = [];
+          List<LatLng> points = [];
     if (_routeData.map?.summaryPolyline != null) {
-      PolylinePoints polylinePoints = PolylinePoints();
-      List<PointLatLng> result =
+            PolylinePoints polylinePoints = PolylinePoints();
+            List<PointLatLng> result =
           polylinePoints.decodePolyline(_routeData.map!.summaryPolyline!);
-      points = result
-          .map((point) => LatLng(point.latitude, point.longitude))
-          .toList();
-    }
+            points = result
+                .map((point) => LatLng(point.latitude, point.longitude))
+                .toList();
+          }
 
-    LatLng center = points.isNotEmpty
-        ? LatLng(
-            points.map((p) => p.latitude).reduce((a, b) => a + b) /
-                points.length,
-            points.map((p) => p.longitude).reduce((a, b) => a + b) /
-                points.length,
-          )
+          LatLng center = points.isNotEmpty
+              ? LatLng(
+                  points.map((p) => p.latitude).reduce((a, b) => a + b) /
+                      points.length,
+                  points.map((p) => p.longitude).reduce((a, b) => a + b) /
+                      points.length,
+                )
         : LatLng(39.9042, 116.4074);
 
     initialCenter ??= center;
@@ -787,9 +787,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                             screenHeight - paddingTop - paddingBottom - 32;
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+              children: [
                             // 左侧地图
-                            Expanded(
+                Expanded(
                               flex: 3, // 增加地图区域比例
                               child: Container(
                                 height: availableHeight,
@@ -803,25 +803,25 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                               child: SizedBox(
                                 height: availableHeight,
                                 child: Column(
-                                  children: [
+                    children: [
                                     // 海拔和坡度信息（2/5）
-                                    Container(
+                      Container(
                                       height: availableHeight * 0.4,
                                       margin: EdgeInsets.only(bottom: 8),
                                       padding: EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
+                        decoration: BoxDecoration(
                                         color: Theme.of(context).cardColor,
                                         borderRadius: BorderRadius.circular(15),
-                                        boxShadow: [
-                                          BoxShadow(
+                          boxShadow: [
+                            BoxShadow(
                                             color: Theme.of(context)
                                                 .shadowColor
                                                 .withValues(alpha: 0.1),
                                             blurRadius: 10,
                                             spreadRadius: 1,
-                                          ),
-                                        ],
-                                      ),
+                            ),
+                          ],
+                        ),
                                       child: ValueListenableBuilder<Position?>(
                                         valueListenable: currentPosition,
                                         builder: (context, position, child) {
@@ -830,7 +830,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                           return Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceEvenly,
-                                            children: [
+                                children: [
                                               // 海拔信息
                                               Column(
                                                 mainAxisAlignment:
@@ -854,9 +854,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                               .colorScheme
                                                               .onSurfaceVariant,
                                                         ),
-                                                      ),
-                                                    ],
-                                                  ),
+                                      ),
+                                    ],
+                                  ),
                                                   SizedBox(height: 2),
                                                   Text(
                                                     '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
@@ -899,9 +899,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                                   context)
                                                               .colorScheme
                                                               .onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                    ],
+                                          ),
+                                        ),
+                                      ],
                                                   ),
                                                   SizedBox(height: 2),
                                                   Text(
@@ -920,9 +920,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                               .onSurface,
                                                     ),
                                                   ),
-                                                ],
-                                              ),
-                                            ],
+                                    ],
+                                  ),
+                                ],
                                           );
                                         },
                                       ),
@@ -1165,9 +1165,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                         },
                                       )
                                     : SizedBox(),
-                              ),
-                            ),
-                          ],
+                        ),
+                      ),
+                    ],
                         );
                       }
                     },
@@ -1177,8 +1177,8 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.45, // 增加地图高度
                     child: _buildMap(points, center),
-                  ),
-                  SizedBox(height: 16),
+                ),
+                SizedBox(height: 16),
                   // 海拔图
                   if (elevationData != null)
                     Container(
@@ -1208,7 +1208,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                         ),
                       ),
                     ),
-                  // 路线信息部分
+                // 路线信息部分
                   Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
@@ -1233,11 +1233,11 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                 ),
                               ),
                               if (gpxFilePath == null)
-                                IconButton(
+                              IconButton(
                                   onPressed: () => _exportGPX(_routeData),
-                                  icon: Icon(Icons.download),
-                                  tooltip: '导出GPX文件',
-                                ),
+                                icon: Icon(Icons.download),
+                                tooltip: '导出GPX文件',
+                              ),
                             ],
                           ),
                           SizedBox(height: 16),
@@ -1247,26 +1247,26 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                               // 左侧列
                               Expanded(
                                 child: Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.directions_bike),
-                                        SizedBox(width: 8),
-                                        Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.directions_bike),
+                                  SizedBox(width: 8),
+                                  Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
+                                    children: [
+                                      Text(
                                               '${((_routeData.distance ?? 0) / 1000).toStringAsFixed(2)} km',
-                                              style: TextStyle(fontSize: 16),
-                                            ),
+                                        style: TextStyle(fontSize: 16),
+                                      ),
                                             Text('距离',
                                                 style: TextStyle(
                                                     color: Colors.grey)),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                                   ],
                                 ),
                               ),
@@ -1274,58 +1274,58 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                               Expanded(
                                 child: Column(
                                   children: [
-                                    Row(
-                                      children: [
+                              Row(
+                                children: [
                                         Icon(Icons.access_time),
-                                        SizedBox(width: 8),
-                                        Column(
+                                  SizedBox(width: 8),
+                                  Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
+                                    children: [
+                                      Text(
                                               '${((_routeData.estimatedMovingTime ?? 0) / 3600).toStringAsFixed(2)} h',
-                                              style: TextStyle(fontSize: 16),
-                                            ),
+                                        style: TextStyle(fontSize: 16),
+                                      ),
                                             Text('预计时间',
                                                 style: TextStyle(
                                                     color: Colors.grey)),
-                                          ],
+                                    ],
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 12),
-                          // 累计爬升单独一行
-                          Row(
-                            children: [
-                              Icon(Icons.landscape_outlined),
-                              SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${_routeData.elevationGain?.toStringAsFixed(2) ?? 0} m',
-                                    style: TextStyle(fontSize: 16),
                                   ),
+                                ],
+                              ),
+                              SizedBox(height: 12),
+                          // 累计爬升单独一行
+                              Row(
+                                children: [
+                              Icon(Icons.landscape_outlined),
+                                  SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                    '${_routeData.elevationGain?.toStringAsFixed(2) ?? 0} m',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
                                   Text('累计爬升',
                                       style: TextStyle(color: Colors.grey)),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ],
                           ),
-                        ],
                       ),
                     ),
-                  ),
                 ],
               ]),
-            ),
-          ),
-        ],
+                  ),
+                ),
+              ],
       ),
     );
   }

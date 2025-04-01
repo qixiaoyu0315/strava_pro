@@ -43,7 +43,8 @@ class AthleteModel {
             measurement_preference TEXT,
             ftp INTEGER,
             weight REAL,
-            last_sync_time TEXT
+            last_sync_time TEXT,
+            last_activity_sync_time TEXT
           )
         ''');
       },
@@ -52,6 +53,7 @@ class AthleteModel {
 
   Future<void> saveAthlete(DetailedAthlete athlete) async {
     final db = await database;
+    final now = DateTime.now().toUtc().toIso8601String();
     final athleteMap = {
       'id': athlete.id,
       'resource_state': athlete.resourceState,
@@ -71,7 +73,8 @@ class AthleteModel {
       'measurement_preference': athlete.measurementPreference ?? '',
       'ftp': athlete.ftp ?? 0,
       'weight': athlete.weight ?? 0.0,
-      'last_sync_time': DateTime.now(),
+      'last_sync_time': now,
+      'last_activity_sync_time': now,
     };
 
     // 使用DbUtils安全地执行插入操作
@@ -130,6 +133,33 @@ class AthleteModel {
       print('更新最后同步时间失败: $e');
       rethrow;
     }
+  }
+
+  Future<String?> getLastActivitySyncTime() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'athlete',
+      columns: ['last_activity_sync_time'],
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+
+    if (maps.isNotEmpty) {
+      return maps.first['last_activity_sync_time'] as String?;
+    }
+    return null;
+  }
+
+  Future<void> updateLastActivitySyncTime() async {
+    final db = await database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    
+    await db.update(
+      'athlete',
+      {'last_activity_sync_time': now},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
   }
 
   Future<void> deleteAthlete() async {
