@@ -365,17 +365,14 @@ class _SettingPageState extends State<SettingPage> {
         if (_athlete != null) ...[
           _buildUserInfoCard(context),
           const SizedBox(height: 24),
+          _buildSyncCard(),
         ],
+        const SizedBox(height: 24),
         // 布局切换开关
         _buildLayoutSwitchCard(),
         const SizedBox(height: 24),
         // API设置卡片
         _buildApiSettingsCard(context),
-        const SizedBox(height: 24),
-        // 同步按钮和进度
-        if (token != null) ...[
-          _buildSyncCard(),
-        ],
       ],
     );
   }
@@ -389,12 +386,18 @@ class _SettingPageState extends State<SettingPage> {
         if (_athlete != null)
           Expanded(
             flex: 1,
-            child: _buildUserInfoCard(context),
+            child: Column(
+              children: [
+                _buildUserInfoCard(context),
+                const SizedBox(height: 24),
+                _buildSyncCard(),
+              ],
+            ),
           ),
 
         // 右侧设置项
         Expanded(
-          flex: 2,
+          flex: 1,
           child: Padding(
             padding: EdgeInsets.only(left: _athlete != null ? 16.0 : 0.0),
             child: Column(
@@ -403,8 +406,6 @@ class _SettingPageState extends State<SettingPage> {
                 _buildLayoutSwitchCard(),
                 const SizedBox(height: 24),
                 _buildApiSettingsCard(context),
-                const SizedBox(height: 24),
-                if (token != null) _buildSyncCard(),
               ],
             ),
           ),
