@@ -22,7 +22,7 @@ class MonthPicker extends StatefulWidget {
   }) async {
     return showDialog<DateTime>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return Dialog(
           child: SizedBox(
             width: 300,
@@ -32,7 +32,7 @@ class MonthPicker extends StatefulWidget {
               firstDate: firstDate,
               lastDate: lastDate,
               onMonthSelected: (date) {
-                Navigator.of(context).pop(date);
+                Navigator.of(dialogContext).pop(date);
               },
             ),
           ),
@@ -138,12 +138,13 @@ class _MonthPickerState extends State<MonthPicker> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('取消'),
             ),
             ElevatedButton(
               onPressed: () {
-                widget.onMonthSelected(DateTime(_selectedYear, _selectedMonth));
+                final selectedDate = DateTime(_selectedYear, _selectedMonth);
+                widget.onMonthSelected(selectedDate);
               },
               child: const Text('确定'),
             ),

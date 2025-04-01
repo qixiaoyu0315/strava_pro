@@ -67,7 +67,11 @@ class _MonthCalendarState extends State<MonthCalendar> {
 
   Widget _buildMonthHeader(BuildContext context, Color textColor) {
     return GestureDetector(
-      onTap: () => widget.onDateSelected!(widget.month!),
+      onTap: () {
+        if (widget.onDateSelected != null && widget.month != null) {
+          widget.onDateSelected!(widget.month!);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(
           vertical: 8,
@@ -75,9 +79,9 @@ class _MonthCalendarState extends State<MonthCalendar> {
         ),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: widget.displayedMonth!.year == widget.month!.year &&
-                  widget.displayedMonth!.month == widget.month!.month
-              ? Colors.blue.withValues(alpha: 0.1)
+          color: widget.displayedMonth?.year == widget.month?.year &&
+                  widget.displayedMonth?.month == widget.month?.month
+              ? Colors.blue.withOpacity(0.1)
               : null,
         ),
         child: Row(
