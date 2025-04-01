@@ -590,26 +590,45 @@ class _SettingPageState extends State<SettingPage> {
     // 检测是否为横屏模式
     final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('设置'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          if (widget.isAuthenticated) {
-            await _loadAthleteInfo();
-          }
-        },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: isLandscape 
-            // 横屏布局
-            ? _buildLandscapeLayout(context)
-            // 竖屏布局
-            : _buildPortraitLayout(context),
+    if (isLandscape) {
+      // 横屏布局 - 使用CustomScrollView来实现滚动隐藏AppBar
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: const Text('设置'),
+              floating: true,
+              snap: true,
+              pinned: false,
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.all(16.0),
+              sliver: SliverToBoxAdapter(
+                child: _buildLandscapeLayout(context),
+              ),
+            ),
+          ],
         ),
-      ),
-    );
+      );
+    } else {
+      // 竖屏布局 - 保持原样
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('设置'),
+        ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            if (widget.isAuthenticated) {
+              await _loadAthleteInfo();
+            }
+          },
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildPortraitLayout(context),
+          ),
+        ),
+      );
+    }
   }
 
   // 竖屏布局
@@ -654,7 +673,7 @@ class _SettingPageState extends State<SettingPage> {
         
         // 右侧设置项
         Expanded(
-          flex: 2,
+          flex: 1,
           child: Padding(
             padding: EdgeInsets.only(left: _athlete != null ? 16.0 : 0.0),
             child: Column(

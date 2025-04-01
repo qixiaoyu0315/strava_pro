@@ -201,18 +201,23 @@ class _MainAppState extends State<MainApp> {
                             NavigationRailDestination(
                               icon: Icon(Icons.calendar_month),
                               label: Text('日历'),
+                              padding: EdgeInsets.symmetric(vertical: 24),
                             ),
                             NavigationRailDestination(
                               icon: Icon(Icons.route),
                               label: Text('路线'),
+                              padding: EdgeInsets.symmetric(vertical: 24),
                             ),
                             NavigationRailDestination(
                               icon: Icon(Icons.settings),
                               label: Text('设置'),
+                              padding: EdgeInsets.symmetric(vertical: 24),
                             ),
                           ],
                           minWidth: 60,
                           useIndicator: true,
+                          // 设置均等间距
+                          groupAlignment: -0.5,
                         ),
 
                       // 内容区域
@@ -224,7 +229,7 @@ class _MainAppState extends State<MainApp> {
                       ),
                     ],
                   ),
-                  // 竖屏时显示底部导航栏
+                  // 竖屏时显示底部导航栏，样式与横屏一致
                   bottomNavigationBar: isLandscape
                       ? null
                       : BottomNavigationBar(
@@ -244,6 +249,13 @@ class _MainAppState extends State<MainApp> {
                           ],
                           currentIndex: _selectedIndex,
                           onTap: _onItemTapped,
+                          // 确保每个项目占三分之一
+                          type: BottomNavigationBarType.fixed,
+                          // 显示未选中的标签
+                          showUnselectedLabels: true,
+                          // 使用与NavigationRail一致的样式
+                          selectedItemColor: Theme.of(context).colorScheme.primary,
+                          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                         ),
                 );
               },
