@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:strava_client/strava_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../model/api_key_model.dart';
+import '../model/athlete_model.dart';
 import '../service/strava_client_manager.dart';
 import '../utils/poly2svg.dart';
 import '../utils/logger.dart';
@@ -37,10 +38,12 @@ class _SettingPageState extends State<SettingPage> {
   double _syncProgress = 0.0;
   String _syncStatus = '';
   final Map<String, bool> _processedDates = {};
+  String? _lastSyncTime;
 
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _keyController = TextEditingController();
   final ApiKeyModel _apiKeyModel = ApiKeyModel();
+  final AthleteModel _athleteModel = AthleteModel();
   bool _isHorizontalLayout = true;
 
   @override
@@ -48,6 +51,8 @@ class _SettingPageState extends State<SettingPage> {
     super.initState();
     _loadApiKey();
     _loadSettings();
+    _loadLastSyncTime();
+    _loadAthleteFromDatabase();
 
     // 使用外部传入的认证状态和运动员信息
     if (widget.isAuthenticated && widget.athlete != null) {
@@ -102,6 +107,66 @@ class _SettingPageState extends State<SettingPage> {
     }
   }
 
+  Future<void> _loadLastSyncTime() async {
+    final lastSyncTime = await _athleteModel.getLastSyncTime();
+    if (lastSyncTime != null && mounted) {
+      setState(() {
+        _lastSyncTime = lastSyncTime;
+      });
+    }
+  }
+
+  Future<void> _loadAthleteFromDatabase() async {
+    if (_athlete != null) return;
+
+    final athleteData = await _athleteModel.getAthlete();
+    if (athleteData != null && mounted) {
+      try {
+        // 使用现有的DetailedAthlete对象，然后添加数据库中的信息
+        final athlete = DetailedAthlete.fromJson({
+          'id': athleteData['id'],
+          'resource_state': athleteData['resource_state'],
+          'firstname': athleteData['firstname'],
+          'lastname': athleteData['lastname'],
+          'profile_medium': athleteData['profile_medium'],
+          'profile': athleteData['profile'],
+          'city': athleteData['city'],
+          'state': athleteData['state'],
+          'country': athleteData['country'],
+          'sex': athleteData['sex'],
+          'premium': athleteData['summit'] == 1,
+          'follower_count': athleteData['follower_count'],
+          'friend_count': athleteData['friend_count'],
+          'measurement_preference': athleteData['measurement_preference'],
+          'ftp': athleteData['ftp'],
+          'weight': athleteData['weight'],
+          // 确保时间字段是字符串类型
+          'created_at': athleteData['created_at'] ?? '',
+          'updated_at': athleteData['updated_at'] ?? '',
+          // 添加必需的其他字段，使用默认值
+          'username': '',
+          'badge_type_id': 0,
+          'friend': false,
+          'follower': false,
+          'mutual_friend_count': 0,
+          'athlete_type': 0,
+          'date_preference': '',
+          'clubs': [],
+        });
+
+        setState(() {
+          _athlete = athlete;
+        });
+
+        Logger.d('从数据库成功加载运动员信息', tag: 'AthleteDb');
+      } catch (e) {
+        Logger.e('从数据库加载运动员信息失败', error: e, tag: 'AthleteDb');
+      }
+    } else {
+      Logger.d('数据库中没有运动员信息', tag: 'AthleteDb');
+    }
+  }
+
   FutureOr<Null> showErrorMessage(dynamic error, dynamic stackTrace) {
     if (error is Fault && mounted) {
       showDialog(
@@ -127,6 +192,12 @@ class _SettingPageState extends State<SettingPage> {
         setState(() {
           _athlete = athlete;
         });
+
+        // 将运动员信息保存到数据库
+        await _athleteModel.saveAthlete(athlete);
+
+        // 更新最后同步时间
+        await _loadLastSyncTime();
 
         // 通知主应用认证状态和用户信息已更新
         widget.onAuthenticationChanged?.call(true, athlete);
@@ -187,10 +258,15 @@ class _SettingPageState extends State<SettingPage> {
         _textEditingController.clear();
         _idController.clear();
         _keyController.clear();
+        _lastSyncTime = null;
       });
 
       // 清除存储的 API 密钥
       await _apiKeyModel.deleteApiKey();
+
+      // 清除存储的运动员信息
+      await _athleteModel.deleteAthlete();
+
       if (!mounted) return;
 
       // 通知主应用认证状态已更新
@@ -215,6 +291,15 @@ class _SettingPageState extends State<SettingPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('同步正在进行中，请等待完成')),
+        );
+      }
+      return;
+    }
+
+    if (_athlete == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('请先登录并获取运动员信息')),
         );
       }
       return;
@@ -317,11 +402,22 @@ class _SettingPageState extends State<SettingPage> {
           _syncStatus = '同步完成';
         });
 
+        try {
+          // 更新最后同步时间
+          await _athleteModel.updateLastSyncTime();
+          await _loadLastSyncTime();
+        } catch (timeError) {
+          Logger.e('更新同步时间失败', error: timeError, tag: 'SyncTime');
+          // 即使更新时间失败，也不影响主要功能，继续完成
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('同步完成，成功生成 $successCount 个 SVG 文件')),
         );
       }
     } catch (e) {
+      Logger.e('同步活动数据失败', error: e, tag: 'SyncActivities');
+
       if (mounted) {
         setState(() {
           _isSyncing = false;
@@ -329,7 +425,70 @@ class _SettingPageState extends State<SettingPage> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步失败: $e')),
+          SnackBar(content: Text('同步活动数据失败: $e')),
+        );
+      }
+    }
+  }
+
+  // 同步运动员信息
+  Future<void> _syncAthleteInfo() async {
+    if (!mounted) return;
+
+    try {
+      setState(() {
+        _syncStatus = '正在获取运动员信息...';
+      });
+
+      // 获取最新的运动员信息
+      final athlete = await StravaClientManager()
+          .stravaClient
+          .athletes
+          .getAuthenticatedAthlete();
+
+      if (mounted) {
+        setState(() {
+          _athlete = athlete;
+        });
+
+        try {
+          // 将运动员信息保存到数据库
+          await _athleteModel.saveAthlete(athlete);
+
+          try {
+            // 更新最后同步时间
+            await _loadLastSyncTime();
+          } catch (timeError) {
+            Logger.e('加载同步时间失败', error: timeError, tag: 'AthleteSync');
+            // 即使获取时间失败，也不影响主要功能
+          }
+
+          // 通知主应用认证状态和用户信息已更新
+          widget.onAuthenticationChanged?.call(true, athlete);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('运动员信息同步完成')),
+          );
+        } catch (dbError) {
+          Logger.e('保存运动员信息到数据库失败', error: dbError, tag: 'AthleteSync');
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('同步成功但保存到数据库失败: $dbError')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      Logger.e('从Strava获取运动员信息失败', error: e, tag: 'AthleteSync');
+
+      if (mounted) {
+        setState(() {
+          _syncStatus = '同步失败: $e';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('从Strava获取运动员信息失败: $e')),
         );
       }
     }
@@ -448,6 +607,13 @@ class _SettingPageState extends State<SettingPage> {
                 '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+            const SizedBox(height: 8),
+            // 显示最后同步时间
+            if (_lastSyncTime != null)
+              Text(
+                '上次同步: ${_formatLastSyncTime(_lastSyncTime!)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             const SizedBox(height: 16),
             // 运动统计
             Row(
@@ -463,17 +629,146 @@ class _SettingPageState extends State<SettingPage> {
                   '关注中',
                   '${_athlete?.friendCount ?? 0}',
                 ),
-                _buildStatItem(
-                  context,
-                  '活动',
-                  '${_athlete?.resourceState ?? 0}',
-                ),
+                if (_athlete?.weight != null)
+                  _buildStatItem(
+                    context,
+                    '体重',
+                    '${_athlete?.weight?.toStringAsFixed(1) ?? 0} kg',
+                  ),
               ],
+            ),
+            const SizedBox(height: 8),
+            // 详细信息按钮
+            TextButton(
+              onPressed: () => _showAthleteDetails(context),
+              child: Text('查看详细信息'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // 显示运动员详细信息
+  void _showAthleteDetails(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('运动员详细信息'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_athlete?.id != null)
+                _buildDetailItem('ID', '${_athlete!.id}'),
+              if (_athlete?.username != null)
+                _buildDetailItem('用户名', _athlete!.username!),
+              if (_athlete?.sex != null) _buildDetailItem('性别', _athlete!.sex!),
+              if (_athlete?.premium != null)
+                _buildDetailItem('高级会员', _athlete!.premium! ? '是' : '否'),
+              if (_athlete?.country != null)
+                _buildDetailItem('国家', _athlete!.country!),
+              if (_athlete?.state != null)
+                _buildDetailItem('州/省', _athlete!.state!),
+              if (_athlete?.city != null)
+                _buildDetailItem('城市', _athlete!.city!),
+              if (_athlete?.measurementPreference != null)
+                _buildDetailItem('测量单位',
+                    _getMeasurePreference(_athlete!.measurementPreference!)),
+              if (_athlete?.weight != null)
+                _buildDetailItem(
+                    '体重', '${_athlete!.weight!.toStringAsFixed(1)} kg'),
+              if (_athlete?.ftp != null && _athlete!.ftp! > 0)
+                _buildDetailItem('FTP', '${_athlete!.ftp!} W'),
+              if (_athlete?.followerCount != null)
+                _buildDetailItem('关注者', '${_athlete!.followerCount!}'),
+              if (_athlete?.friendCount != null)
+                _buildDetailItem('关注中', '${_athlete!.friendCount!}'),
+              if (_athlete?.createdAt != null)
+                _buildDetailItem(
+                    '创建时间', _formatAthleteTime(_athlete!.createdAt)),
+              if (_athlete?.updatedAt != null)
+                _buildDetailItem(
+                    '更新时间', _formatAthleteTime(_athlete!.updatedAt)),
+              if (_lastSyncTime != null)
+                _buildDetailItem('最后同步时间', _formatLastSyncTime(_lastSyncTime!)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建详细信息项
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 获取测量单位偏好的中文表示
+  String _getMeasurePreference(String preference) {
+    return preference == 'meters' ? '公制 (米)' : '英制 (英尺)';
+  }
+
+  // 格式化日期时间
+  String _formatDateTime(String dateTime) {
+    try {
+      final dt = DateTime.parse(dateTime);
+      return DateFormat('yyyy-MM-dd HH:mm').format(dt);
+    } catch (e) {
+      return dateTime;
+    }
+  }
+
+  // 格式化最后同步时间
+  String _formatLastSyncTime(String isoTimeString) {
+    try {
+      final dateTime = DateTime.parse(isoTimeString);
+      return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
+    } catch (e) {
+      return isoTimeString;
+    }
+  }
+
+  // 安全格式化运动员对象中的时间字段（可能是字符串或DateTime）
+  String _formatAthleteTime(dynamic timeValue) {
+    if (timeValue == null) return '';
+
+    try {
+      if (timeValue is String) {
+        return DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(timeValue));
+      } else if (timeValue is DateTime) {
+        return DateFormat('yyyy-MM-dd HH:mm').format(timeValue);
+      }
+      return timeValue.toString();
+    } catch (e) {
+      return timeValue.toString();
+    }
   }
 
   // 布局切换卡片
@@ -594,15 +889,36 @@ class _SettingPageState extends State<SettingPage> {
               Text(_syncStatus),
               SizedBox(height: 16),
             ],
-            ElevatedButton.icon(
-              onPressed: _isSyncing ? null : syncActivities,
-              icon: Icon(Icons.sync),
-              label: Text(_isSyncing ? '同步中...' : '同步数据'),
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isSyncing ? null : syncActivities,
+                    icon: Icon(Icons.sync),
+                    label: Text(_isSyncing ? '同步中...' : '同步活动数据'),
+                    style: ElevatedButton.styleFrom(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isSyncing ? null : _syncAthleteInfo,
+                    icon: Icon(Icons.person_outline),
+                    label: Text('同步个人信息'),
+                    style: ElevatedButton.styleFrom(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
