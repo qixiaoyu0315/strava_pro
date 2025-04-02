@@ -406,10 +406,10 @@ class _RouteDetailPageState extends State<RouteDetailPage>
             
             // 只有当已设置了可视范围时才检查
             if (_visibleRangeStart != null && _visibleRangeEnd != null) {
-              // 添加一个小边距作为缓冲，防止频繁切换
-              double buffer = 0.05; // 50米的缓冲区
-              isOutOfRange = currentDistance < _visibleRangeStart! + buffer || 
-                             currentDistance > _visibleRangeEnd! - buffer;
+              // 只需要检查当前位置是否小于起点或大于终点
+              // 我们关心的是当前位置是否在范围内，或者已经超出了右侧终点
+              isOutOfRange = currentDistance < _visibleRangeStart! || 
+                             currentDistance > _visibleRangeEnd!;
             } else {
               // 如果尚未设置可视范围，则需要设置初始范围
               isOutOfRange = true;
@@ -420,24 +420,24 @@ class _RouteDetailPageState extends State<RouteDetailPage>
               setState(() {
                 switch (_selectedRangeOption) {
                   case '500米':
-                    _visibleRangeStart = math.max(0, currentDistance - 0.25);
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.25);
-                    break;
-                  case '1000米':
-                    _visibleRangeStart = math.max(0, currentDistance - 0.5);
+                    _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
                     break;
-                  case '2000米':
-                    _visibleRangeStart = math.max(0, currentDistance - 1.0);
+                  case '1000米':
+                    _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
                     break;
+                  case '2000米':
+                    _visibleRangeStart = currentDistance;
+                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.0);
+                    break;
                   case '5000米':
-                    _visibleRangeStart = math.max(0, currentDistance - 2.5);
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.5);
+                    _visibleRangeStart = currentDistance;
+                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
                     break;
                   case '10000米':
-                    _visibleRangeStart = math.max(0, currentDistance - 5.0);
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
+                    _visibleRangeStart = currentDistance;
+                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 10.0);
                     break;
                 }
               });
@@ -1475,30 +1475,30 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       // 获取当前位置索引
       int? currentIndex = currentSegmentIndex.value;
       if (currentIndex == null || currentIndex >= elevationData!.elevationPoints.length) {
-        // 如果没有当前位置，使用总距离的中点
-        double midPoint = elevationData!.totalDistance / 2;
+        // 如果没有当前位置，使用总距离的起点
+        double startPoint = 0;
         
         // 根据选项设置可视范围
         switch (option) {
           case '500米':
-            _visibleRangeStart = math.max(0, midPoint - 0.25);
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, midPoint + 0.25);
+            _visibleRangeStart = startPoint;
+            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 0.5);
             break;
           case '1000米':
-            _visibleRangeStart = math.max(0, midPoint - 0.5);
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, midPoint + 0.5);
+            _visibleRangeStart = startPoint;
+            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 1.0);
             break;
           case '2000米':
-            _visibleRangeStart = math.max(0, midPoint - 1.0);
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, midPoint + 1.0);
+            _visibleRangeStart = startPoint;
+            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 2.0);
             break;
           case '5000米':
-            _visibleRangeStart = math.max(0, midPoint - 2.5);
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, midPoint + 2.5);
+            _visibleRangeStart = startPoint;
+            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 5.0);
             break;
           case '10000米':
-            _visibleRangeStart = math.max(0, midPoint - 5.0);
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, midPoint + 5.0);
+            _visibleRangeStart = startPoint;
+            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 10.0);
             break;
         }
         return;
@@ -1507,27 +1507,27 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       // 获取当前位置的距离
       double currentDistance = elevationData!.elevationPoints[currentIndex].distance;
       
-      // 根据选项设置可视范围
+      // 根据选项设置可视范围，从当前位置向右延伸
       switch (option) {
         case '500米':
-          _visibleRangeStart = math.max(0, currentDistance - 0.25);
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.25);
-          break;
-        case '1000米':
-          _visibleRangeStart = math.max(0, currentDistance - 0.5);
+          _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
           break;
-        case '2000米':
-          _visibleRangeStart = math.max(0, currentDistance - 1.0);
+        case '1000米':
+          _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
           break;
+        case '2000米':
+          _visibleRangeStart = currentDistance;
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.0);
+          break;
         case '5000米':
-          _visibleRangeStart = math.max(0, currentDistance - 2.5);
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.5);
+          _visibleRangeStart = currentDistance;
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
           break;
         case '10000米':
-          _visibleRangeStart = math.max(0, currentDistance - 5.0);
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
+          _visibleRangeStart = currentDistance;
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 10.0);
           break;
       }
     });

@@ -326,7 +326,9 @@ class _ElevationChartState extends State<ElevationChart> {
                                color: Colors.orange, size: 14),
                           SizedBox(width: 4),
                           Text(
-                            '位置不在范围内',
+                            widget.data.points[widget.currentSegmentIndex!].x > maxX
+                                ? '位置超出右侧范围'
+                                : '位置在视图左侧',
                             style: TextStyle(
                               color: Colors.orange,
                               fontSize: 10,
@@ -534,7 +536,7 @@ class _ElevationChartState extends State<ElevationChart> {
                     ),
                   ),
                 ),
-                // 如果当前点在可视范围外，在图表左边或右边添加指示箭头
+                // 如果当前点在可视范围外，在图表右边添加指示箭头
                 if (widget.currentSegmentIndex != null && 
                     widget.currentSegmentIndex! < widget.data.elevationPoints.length && 
                     !isCurrentPointInRange)
@@ -579,19 +581,17 @@ class _ElevationChartState extends State<ElevationChart> {
   
   // 计算箭头位置
   double _getArrowPosition(double pointX, double minX, double maxX, double chartWidth) {
-    if (pointX < minX) {
-      return 0; // 左侧
-    } else {
+    // 由于我们只关心设备位置是否超出右侧边界，所以只在右侧显示箭头
+    if (pointX > maxX) {
       return chartWidth; // 右侧
+    } else {
+      return -1000; // 不显示
     }
   }
   
   // 获取箭头图标
   IconData _getArrowIcon(double pointX, double minX, double maxX) {
-    if (pointX < minX) {
-      return Icons.arrow_back; // 左侧箭头
-    } else {
-      return Icons.arrow_forward; // 右侧箭头
-    }
+    // 只返回向右的箭头
+    return Icons.arrow_forward; // 右侧箭头
   }
 }
