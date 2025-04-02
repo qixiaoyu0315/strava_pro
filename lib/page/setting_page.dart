@@ -15,6 +15,9 @@ import '../utils/logger.dart';
 import '../service/activity_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../utils/poly2png.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -1096,6 +1099,21 @@ class _SettingPageState extends State<SettingPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 8.0),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _generateAllPNG,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.purple,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('生成PNG路线'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1445,5 +1463,164 @@ class _SettingPageState extends State<SettingPage> {
     });
     
     Fluttertoast.showToast(msg: '路线图生成已在后台开始');
+  }
+
+  // 生成PNG路线图
+  Future<void> _generateAllPNG() async {
+    if (_isLoading) {
+      Fluttertoast.showToast(msg: '请等待当前操作完成');
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _syncProgress = 0.0;
+      _syncStatus = '准备生成PNG...';
+      _syncMessage = '正在准备生成PNG...';
+    });
+    
+    // 将生成PNG的过程放在后台执行
+    Future.delayed(Duration.zero, () async {
+      try {
+        // 检查 Android 版本并请求相应权限
+        if (Platform.isAndroid) {
+          final deviceInfoPlugin = DeviceInfoPlugin();
+          final androidInfo = await deviceInfoPlugin.androidInfo;
+          if (androidInfo.version.sdkInt >= 33) {
+            // Android 13 及以上版本
+            var status = await Permission.photos.status;
+            if (!status.isGranted) {
+              status = await Permission.photos.request();
+              if (!status.isGranted) {
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                    _syncMessage = '需要存储权限才能导出PNG文件';
+                  });
+                  Fluttertoast.showToast(msg: '需要存储权限才能导出PNG文件');
+                }
+                return;
+              }
+            }
+          } else {
+            // Android 13 以下版本
+            var status = await Permission.storage.status;
+            if (!status.isGranted) {
+              status = await Permission.storage.request();
+              if (!status.isGranted) {
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                    _syncMessage = '需要存储权限才能导出PNG文件';
+                  });
+                  Fluttertoast.showToast(msg: '需要存储权限才能导出PNG文件');
+                }
+                return;
+              }
+            }
+          }
+        }
+        
+        // 获取所有活动数据
+        final activities = await _activityService.getAllActivities();
+        int total = activities.length;
+        int current = 0;
+        int success = 0;
+        int skipped = 0;
+        int error = 0;
+        
+        for (var activity in activities) {
+          current++;
+          
+          // 更新进度
+          if (mounted) {
+            setState(() {
+              _syncProgress = current / total;
+              _syncStatus = '处理: ${activity['name'] ?? activity['id']} ($current/$total)';
+            });
+          }
+          
+          // 检查是否有map_polyline
+          final polyline = activity['map_polyline'] as String?;
+          final id = activity['id']?.toString() ?? '';
+          
+          if (polyline == null || polyline.isEmpty) {
+            skipped++;
+            continue;
+          }
+          
+          try {
+            // 提取日期，格式为"yyyy-MM-dd"
+            final startDate = DateTime.parse(activity['start_date'].toString());
+            final dateStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+            
+            // 设置PNG输出路径
+            String pngPath;
+            if (Platform.isAndroid) {
+              pngPath = '/storage/emulated/0/Download/strava_pro/png/$dateStr.png';
+            } else {
+              final dir = await getApplicationDocumentsDirectory();
+              pngPath = '${dir.path}/strava_pro/png/$dateStr.png';
+            }
+            
+            // 确保目录存在
+            final file = File(pngPath);
+            final directory = file.parent;
+            if (!await directory.exists()) {
+              await directory.create(recursive: true);
+            }
+            
+            // 生成PNG文件
+            await PolylineToPNG.generateAndSavePNG(
+              polyline,
+              pngPath,
+              strokeWidth: 8.0,
+              strokeColor: Colors.green,
+            );
+            
+            success++;
+          } catch (e) {
+            Logger.e('为活动 $id 生成PNG失败: $e', error: e, tag: 'PNG');
+            error++;
+          }
+          
+          // 每处理10个活动，暂停一下，避免阻塞UI
+          if (current % 10 == 0) {
+            await Future.delayed(const Duration(milliseconds: 50));
+          }
+        }
+        
+        // 更新最终状态
+        if (mounted) {
+          setState(() {
+            _syncMessage = 'PNG路线图生成完成: 成功=$success, 跳过=$skipped, 失败=$error';
+          });
+          Fluttertoast.showToast(msg: 'PNG路线图生成完成');
+        }
+      } catch (e) {
+        Logger.e('生成PNG失败: $e', error: e, tag: 'PNG');
+        if (mounted) {
+          setState(() {
+            _syncMessage = '生成PNG失败: $e';
+          });
+          Fluttertoast.showToast(msg: '生成PNG失败: $e');
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _syncStatus = '操作完成';
+          });
+        }
+      }
+    });
+    
+    // 立即释放UI，让用户可以做其他操作
+    setState(() {
+      _isLoading = false;
+      _syncMessage = 'PNG路线图生成在后台进行中...';
+    });
+    
+    Fluttertoast.showToast(msg: 'PNG路线图生成已在后台开始');
   }
 }
