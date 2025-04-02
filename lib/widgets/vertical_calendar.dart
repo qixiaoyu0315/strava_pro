@@ -252,15 +252,17 @@ class _VerticalCalendarState extends State<VerticalCalendar>
         ),
         // 月份列表
         Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            itemCount: _loadedMonths.length,
-            itemBuilder: (context, index) {
-              final month = _loadedMonths[index];
-              final monthKey = '${month.year}-${month.month}';
-              return _monthWidgets[monthKey] ?? Container();
-            },
-          ),
+          child: _loadedMonths.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _loadedMonths.length,
+                  itemBuilder: (context, index) {
+                    final month = _loadedMonths[index];
+                    final monthKey = '${month.year}-${month.month}';
+                    return _monthWidgets[monthKey] ?? Container();
+                  },
+                ),
         ),
       ],
     );

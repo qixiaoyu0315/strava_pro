@@ -831,6 +831,92 @@ class ActivityService {
     }
   }
   
+  /// 获取指定月份的活动统计数据
+  /// 返回：包含不同类型活动的距离、爬升、卡路里等统计信息
+  Future<Map<String, dynamic>> getMonthlyStats(int year, int month) async {
+    try {
+      final db = await database;
+      
+      // 构建月份查询条件（格式：'YYYY-MM-%'）
+      final monthStr = month.toString().padLeft(2, '0');
+      final datePrefix = '$year-$monthStr';
+      
+      // 查询该月所有活动
+      final activities = await db.query(
+        tableName,
+        where: "start_date LIKE ?",
+        whereArgs: ['$datePrefix%'],
+      );
+      
+      // 初始化统计结果
+      final stats = {
+        'totalActivities': activities.length,
+        'totalDistance': 0.0, // 总距离 (米)
+        'totalElevationGain': 0.0, // 总爬升 (米)
+        'totalKilojoules': 0.0, // 总卡路里消耗 (千焦)
+        'totalMovingTime': 0, // 总运动时间 (秒)
+        
+        // 按活动类型分类的统计
+        'byActivityType': <String, Map<String, dynamic>>{},
+        
+        // 记录每天是否有活动
+        'activeDays': <int>{},
+      };
+      
+      // 遍历活动并累加数据
+      for (final activity in activities) {
+        // 累加总计数据
+        stats['totalDistance'] = (stats['totalDistance'] as double) + (activity['distance'] as double? ?? 0.0);
+        stats['totalElevationGain'] = (stats['totalElevationGain'] as double) + (activity['total_elevation_gain'] as double? ?? 0.0);
+        stats['totalKilojoules'] = (stats['totalKilojoules'] as double) + (activity['kilojoules'] as double? ?? 0.0);
+        stats['totalMovingTime'] = (stats['totalMovingTime'] as int) + (activity['moving_time'] as int? ?? 0);
+        
+        // 提取活动日期并记录活跃日
+        final startDate = DateTime.parse(activity['start_date'] as String);
+        (stats['activeDays'] as Set<int>).add(startDate.day);
+        
+        // 按活动类型分类统计
+        final activityType = activity['type'] as String? ?? '未知';
+        final typeStats = (stats['byActivityType'] as Map<String, Map<String, dynamic>>)[activityType] ?? {
+          'count': 0,
+          'distance': 0.0,
+          'elevationGain': 0.0,
+          'kilojoules': 0.0,
+          'movingTime': 0,
+        };
+        
+        typeStats['count'] = (typeStats['count'] as int) + 1;
+        typeStats['distance'] = (typeStats['distance'] as double) + (activity['distance'] as double? ?? 0.0);
+        typeStats['elevationGain'] = (typeStats['elevationGain'] as double) + (activity['total_elevation_gain'] as double? ?? 0.0);
+        typeStats['kilojoules'] = (typeStats['kilojoules'] as double) + (activity['kilojoules'] as double? ?? 0.0);
+        typeStats['movingTime'] = (typeStats['movingTime'] as int) + (activity['moving_time'] as int? ?? 0);
+        
+        (stats['byActivityType'] as Map<String, Map<String, dynamic>>)[activityType] = typeStats;
+      }
+      
+      // 计算活跃天数
+      stats['activeDaysCount'] = (stats['activeDays'] as Set<int>).length;
+      
+      // 转换Set为List以便JSON序列化
+      stats['activeDays'] = (stats['activeDays'] as Set<int>).toList()..sort();
+      
+      return stats;
+    } catch (e) {
+      Logger.e('获取月度统计数据失败: $e', tag: 'ActivityService');
+      return {
+        'totalActivities': 0,
+        'totalDistance': 0.0,
+        'totalElevationGain': 0.0,
+        'totalKilojoules': 0.0,
+        'totalMovingTime': 0,
+        'byActivityType': {},
+        'activeDays': [],
+        'activeDaysCount': 0,
+        'error': e.toString(),
+      };
+    }
+  }
+  
   /// 获取单个活动数据
   Future<Map<String, dynamic>?> getActivity(String activityId) async {
     try {

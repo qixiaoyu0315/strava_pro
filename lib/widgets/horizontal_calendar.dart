@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'month_view.dart';
 import 'month_picker.dart';
 import '../widgets/calendar_utils.dart';
+import '../service/activity_service.dart';
+import 'monthly_stats_widget.dart';
 
 class HorizontalCalendar extends StatefulWidget {
   final DateTime? initialMonth;
@@ -30,6 +32,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   late PageController _pageController;
   late AnimationController _animationController;
   late int _totalMonths; // 显示的总月数
+  final ActivityService _activityService = ActivityService();
 
   // 用于存储当前可见月份的缓存
   final Map<int, Map<String, bool>> _monthSvgCaches = {};
@@ -102,15 +105,15 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
         MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     if (isLandscape) {
-      // 横屏模式：并排显示两个月份
+      // 横屏模式：左侧日历，右侧统计
       return _buildLandscapeLayout();
     } else {
-      // 竖屏模式：单月份翻页视图
+      // 竖屏模式：上方日历，下方统计
       return _buildPortraitLayout();
     }
   }
 
-  // 横屏布局：并排显示两个月
+  // 横屏布局：左侧日历，右侧统计
   Widget _buildLandscapeLayout() {
     final now = DateTime.now();
     final startDate = DateTime(now.year - 2, now.month);
@@ -119,7 +122,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
       builder: (context, constraints) {
         return Column(
           children: [
-            // 并排显示两个月
+            // 日历和统计并排显示
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -145,18 +148,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                     startDate.month + index,
                   );
 
-                  // 如果是当前索引，显示当月和下个月
-                  final nextMonth = DateTime(month.year, month.month + 1);
-
                   // 获取月份缓存
                   final monthCache = _monthSvgCaches[index] ?? widget.svgCache;
-                  final nextMonthCache =
-                      _monthSvgCaches[index + 1] ?? widget.svgCache;
 
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 当前月
+                      // 左侧当前月日历
                       Expanded(
                         child: MonthView(
                           month: month,
@@ -173,21 +171,15 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                       // 分隔线
                       Container(
                         width: 1,
-                        color: Colors.grey.withValues(alpha: 0.3),
+                        color: Colors.grey.withOpacity(0.3),
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                       ),
 
-                      // 下个月
+                      // 右侧月度统计
                       Expanded(
-                        child: MonthView(
-                          month: nextMonth,
-                          selectedDate: _selectedDate,
-                          onDateSelected: _selectDate,
-                          svgCache: nextMonthCache,
-                          isCurrentMonth: nextMonth.year == now.year &&
-                              nextMonth.month == now.month,
-                          displayedMonth: _displayedMonth,
-                          onMonthTap: _selectMonth,
+                        child: MonthlyStatsWidget(
+                          month: month,
+                          activityService: _activityService,
                         ),
                       ),
                     ],
@@ -201,15 +193,16 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     );
   }
 
-  // 竖屏布局：单月份翻页视图
+  // 竖屏布局：上方日历，下方统计
   Widget _buildPortraitLayout() {
     final now = DateTime.now();
     final startDate = DateTime(now.year - 2, now.month);
 
     return Column(
       children: [
-        // 月份视图
+        // 月份视图（占2/3高度）
         Expanded(
+          flex: 2,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) {
@@ -246,6 +239,26 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                     month.year == now.year && month.month == now.month,
                 displayedMonth: _displayedMonth,
                 onMonthTap: _selectMonth,
+              );
+            },
+          ),
+        ),
+        
+        // 下方月度统计（占1/3高度）
+        Expanded(
+          flex: 1,
+          child: PageView.builder(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(), // 禁止滑动，由上方日历控制
+            itemCount: _totalMonths,
+            itemBuilder: (context, index) {
+              final month = DateTime(
+                startDate.year,
+                startDate.month + index,
+              );
+              return MonthlyStatsWidget(
+                month: month,
+                activityService: _activityService,
               );
             },
           ),
