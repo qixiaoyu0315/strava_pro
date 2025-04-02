@@ -5,11 +5,17 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.view.View
 import android.widget.RemoteViews
 import java.util.Calendar
 import java.io.File
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import android.os.Build
+import android.util.Log
+import android.widget.Toast
 
 class CalendarWidget : AppWidgetProvider() {
     
@@ -20,6 +26,7 @@ class CalendarWidget : AppWidgetProvider() {
         private const val PREF_MONTH_KEY = "calendar_widget_month"
         private const val PREF_YEAR_KEY = "calendar_widget_year"
         private const val PREF_SELECTED_DAY_KEY = "calendar_widget_selected_day"
+        private const val TAG = "CalendarWidget"
     }
 
     override fun onUpdate(
@@ -208,45 +215,64 @@ class CalendarWidget : AppWidgetProvider() {
                              day == selectedDay &&
                              selectedDay > 0
             
-            // 判断是否有SVG图片（活动数据）
+            // 判断是否有SVG图片或PNG图片（活动数据）
             val dateStr = "${displayYear}-${(displayMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
             val svgPath = "/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg"
+            val pngPath = "/storage/emulated/0/Download/strava_pro/png/$dateStr.png"
             val svgExists = File(svgPath).exists()
+            val pngExists = File(pngPath).exists()
             
-            // 设置日期文本
-            var dayText = day.toString()
-            // 添加笑脸表情符号，如果存在活动
-            if (svgExists) {
-                dayText = "$day\n😊"
-            }
-            views.setTextViewText(dayId, dayText)
-            
-            // 设置日期颜色和背景
+            // 设置日期颜色和背景样式 - 先应用基本样式
             when {
                 isSelected -> {
                     // 选中日期用蓝色背景，白色文字
                     views.setTextColor(dayId, Color.WHITE)
                     views.setInt(dayId, "setBackgroundResource", R.drawable.selected_background)
+                    views.setTextViewText(dayId, day.toString())
                 }
                 isToday -> {
-                    // 当天日期用蓝色背景，白色文字
+                    // 当天日期用绿色背景，白色文字
                     views.setTextColor(dayId, Color.WHITE)
                     views.setInt(dayId, "setBackgroundResource", R.drawable.today_background)
+                    views.setTextViewText(dayId, day.toString())
+                }
+                pngExists -> {
+                    // 如果存在PNG，使用特殊的背景颜色标记
+                    views.setTextColor(dayId, Color.WHITE)
+                    // 使用紫色底色代表有PNG
+                    views.setInt(dayId, "setBackgroundColor", Color.rgb(128, 0, 128))  // 紫色
+                    views.setTextViewText(dayId, day.toString())
+                    Log.d(TAG, "Setting purple background for day $day with PNG: $pngPath")
+                }
+                svgExists -> {
+                    // 如果存在SVG，使用笑脸符号
+                    views.setTextViewText(dayId, "$day\n😊")
+                    if (dayOfWeek == Calendar.SATURDAY) {
+                        views.setTextColor(dayId, Color.rgb(64, 149, 255))
+                    } else if (dayOfWeek == Calendar.SUNDAY) {
+                        views.setTextColor(dayId, Color.rgb(255, 64, 64))
+                    } else {
+                        views.setTextColor(dayId, Color.WHITE)
+                    }
+                    views.setInt(dayId, "setBackgroundResource", 0)
                 }
                 dayOfWeek == Calendar.SATURDAY -> {
                     // 周六显示蓝色
                     views.setTextColor(dayId, Color.rgb(64, 149, 255))
                     views.setInt(dayId, "setBackgroundResource", 0)
+                    views.setTextViewText(dayId, day.toString())
                 }
                 dayOfWeek == Calendar.SUNDAY -> {
                     // 周日显示红色
                     views.setTextColor(dayId, Color.rgb(255, 64, 64))
                     views.setInt(dayId, "setBackgroundResource", 0)
+                    views.setTextViewText(dayId, day.toString())
                 }
                 else -> {
                     // 普通日期白色
                     views.setTextColor(dayId, Color.WHITE)
                     views.setInt(dayId, "setBackgroundResource", 0)
+                    views.setTextViewText(dayId, day.toString())
                 }
             }
             
@@ -270,5 +296,20 @@ class CalendarWidget : AppWidgetProvider() {
         
         // 更新小组件
         appWidgetManager.updateAppWidget(appWidgetId, views)
+    }
+
+    // 创建一个带有突出显示背景色的Bitmap
+    private fun createHighlightedBitmap(original: Bitmap, backgroundColor: Int): Bitmap {
+        // 创建一个新的Bitmap，与原始图像相同大小
+        val resultBitmap = Bitmap.createBitmap(original.width, original.height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(resultBitmap)
+        
+        // 先绘制背景色
+        canvas.drawColor(backgroundColor)
+        
+        // 在背景上绘制原始图像
+        canvas.drawBitmap(original, 0f, 0f, null)
+        
+        return resultBitmap
     }
 } 
