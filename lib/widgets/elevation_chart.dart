@@ -275,6 +275,14 @@ class _ElevationChartState extends State<ElevationChart> {
       maxX = widget.data.totalDistance;
     }
     
+    // 检查当前位置是否在可视范围内
+    bool isCurrentPointInRange = true;
+    if (widget.currentSegmentIndex != null && 
+        widget.currentSegmentIndex! < widget.data.elevationPoints.length) {
+      double currentX = widget.data.points[widget.currentSegmentIndex!].x;
+      isCurrentPointInRange = currentX >= minX && currentX <= maxX;
+    }
+    
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
@@ -299,12 +307,43 @@ class _ElevationChartState extends State<ElevationChart> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
-                '总距离: ${widget.data.totalDistance.toStringAsFixed(2)}km',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 12,
-                ),
+              Row(
+                children: [
+                  // 当当前位置不在可视范围内时显示指示器
+                  if (widget.currentSegmentIndex != null && !isCurrentPointInRange)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      margin: EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, 
+                               color: Colors.orange, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            '位置不在范围内',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Text(
+                    '总距离: ${widget.data.totalDistance.toStringAsFixed(2)}km',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -495,10 +534,31 @@ class _ElevationChartState extends State<ElevationChart> {
                     ),
                   ),
                 ),
+                // 如果当前点在可视范围外，在图表左边或右边添加指示箭头
+                if (widget.currentSegmentIndex != null && 
+                    widget.currentSegmentIndex! < widget.data.elevationPoints.length && 
+                    !isCurrentPointInRange)
+                  Positioned(
+                    left: _getArrowPosition(
+                      widget.data.points[widget.currentSegmentIndex!].x, 
+                      minX, maxX, 
+                      MediaQuery.of(context).size.width - 32 - 32
+                    ),
+                    bottom: 10,
+                    child: Icon(
+                      _getArrowIcon(
+                        widget.data.points[widget.currentSegmentIndex!].x, 
+                        minX, maxX
+                      ),
+                      color: Colors.orange,
+                      size: 24,
+                    ),
+                  ),
+                // 只有当当前点在可视范围内时才显示提示框
                 if (widget.currentSegmentIndex != null &&
-                    widget.currentSegmentIndex! <
-                        widget.data.elevationPoints.length &&
-                    _showTooltip)
+                    widget.currentSegmentIndex! < widget.data.elevationPoints.length &&
+                    _showTooltip &&
+                    isCurrentPointInRange)
                   Positioned(
                     left: ((widget.data.points[widget.currentSegmentIndex!].x - minX) /
                             (maxX - minX)) *
@@ -515,5 +575,23 @@ class _ElevationChartState extends State<ElevationChart> {
         ],
       ),
     );
+  }
+  
+  // 计算箭头位置
+  double _getArrowPosition(double pointX, double minX, double maxX, double chartWidth) {
+    if (pointX < minX) {
+      return 0; // 左侧
+    } else {
+      return chartWidth; // 右侧
+    }
+  }
+  
+  // 获取箭头图标
+  IconData _getArrowIcon(double pointX, double minX, double maxX) {
+    if (pointX < minX) {
+      return Icons.arrow_back; // 左侧箭头
+    } else {
+      return Icons.arrow_forward; // 右侧箭头
+    }
   }
 }
