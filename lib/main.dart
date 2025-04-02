@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'page/route_page.dart';
 import 'page/setting_page.dart';
 import 'page/calendar_name.dart';
@@ -24,6 +25,16 @@ void main() async {
     } catch (e) {
       Logger.e('无法加载现有认证', error: e);
     }
+  }
+
+  // 加载并应用全屏设置
+  final prefs = await SharedPreferences.getInstance();
+  final isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
+  
+  if (isFullscreenMode) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+  } else {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
   runApp(const MainApp());

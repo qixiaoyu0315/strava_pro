@@ -52,6 +52,9 @@ class _SettingPageState extends State<SettingPage> {
   final AthleteModel _athleteModel = AthleteModel();
   final ActivityService _activityService = ActivityService();
   bool _isHorizontalLayout = true;
+  
+  // 新增显示模式相关变量
+  bool _isFullscreenMode = false; // 是否使用全屏模式
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -112,13 +115,38 @@ class _SettingPageState extends State<SettingPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
+      _isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
     });
+    
+    // 根据设置应用全屏模式
+    _applyFullscreenMode();
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isHorizontalLayout', _isHorizontalLayout);
+    await prefs.setBool('isFullscreenMode', _isFullscreenMode);
     widget.onLayoutChanged?.call(_isHorizontalLayout);
+  }
+  
+  // 新增：应用全屏模式方法
+  void _applyFullscreenMode() {
+    if (_isFullscreenMode) {
+      // 启用全屏模式，隐藏状态栏和导航栏
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    } else {
+      // 恢复正常模式
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+  
+  // 新增：切换全屏模式
+  void _toggleFullscreenMode(bool value) {
+    setState(() {
+      _isFullscreenMode = value;
+    });
+    _saveSettings();
+    _applyFullscreenMode();
   }
 
   Future<void> _loadApiKey() async {
@@ -1078,16 +1106,27 @@ class _SettingPageState extends State<SettingPage> {
   Widget _buildLayoutSwitchCard() {
     return Card(
       elevation: 2,
-      child: SwitchListTile(
-        title: const Text('使用水平布局'),
-        subtitle: const Text('切换日历的显示方式'),
-        value: _isHorizontalLayout,
-        onChanged: (bool value) {
-          setState(() {
-            _isHorizontalLayout = value;
-          });
-          _saveSettings();
-        },
+      child: Column(
+        children: [
+          SwitchListTile(
+            title: const Text('使用水平布局'),
+            subtitle: const Text('切换日历的显示方式'),
+            value: _isHorizontalLayout,
+            onChanged: (bool value) {
+              setState(() {
+                _isHorizontalLayout = value;
+              });
+              _saveSettings();
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            title: const Text('全屏模式'),
+            subtitle: const Text('隐藏状态栏和导航栏，获得更多显示空间'),
+            value: _isFullscreenMode,
+            onChanged: _toggleFullscreenMode,
+          ),
+        ],
       ),
     );
   }
