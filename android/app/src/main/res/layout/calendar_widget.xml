@@ -2,7 +2,7 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="8dp"
+    android:padding="12dp"
     android:background="@android:color/black">
 
     <TextView
@@ -12,7 +12,8 @@
         android:layout_centerHorizontal="true"
         android:textColor="@android:color/white"
         android:textSize="20sp"
-        android:text="4月" />
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
 
     <GridLayout
         android:id="@+id/calendar_grid"
@@ -21,9 +22,71 @@
         android:layout_below="@id/month_text"
         android:columnCount="7"
         android:rowCount="7"
-        android:layout_marginTop="8dp">
+        android:layout_marginTop="4dp">
 
-        <!-- 日历网格将在代码中动态填充 -->
+        <!-- 星期标题 -->
+        <TextView android:id="@+id/week_sun" style="@style/CalendarDayStyle" android:text="日" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_mon" style="@style/CalendarDayStyle" android:text="一" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_tue" style="@style/CalendarDayStyle" android:text="二" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_wed" style="@style/CalendarDayStyle" android:text="三" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_thu" style="@style/CalendarDayStyle" android:text="四" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_fri" style="@style/CalendarDayStyle" android:text="五" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_sat" style="@style/CalendarDayStyle" android:text="六" android:textColor="#AAAAAA"/>
+
+        <!-- 日期网格 - 第1行 -->
+        <TextView android:id="@+id/day_1" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_2" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_3" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_4" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_5" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_6" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_7" style="@style/CalendarDayStyle"/>
+
+        <!-- 日期网格 - 第2行 -->
+        <TextView android:id="@+id/day_8" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_9" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_10" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_11" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_12" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_13" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_14" style="@style/CalendarDayStyle"/>
+
+        <!-- 日期网格 - 第3行 -->
+        <TextView android:id="@+id/day_15" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_16" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_17" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_18" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_19" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_20" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_21" style="@style/CalendarDayStyle"/>
+
+        <!-- 日期网格 - 第4行 -->
+        <TextView android:id="@+id/day_22" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_23" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_24" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_25" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_26" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_27" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_28" style="@style/CalendarDayStyle"/>
+
+        <!-- 日期网格 - 第5行 -->
+        <TextView android:id="@+id/day_29" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_30" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_31" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_32" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_33" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_34" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_35" style="@style/CalendarDayStyle"/>
+
+        <!-- 日期网格 - 第6行 -->
+        <TextView android:id="@+id/day_36" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_37" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_38" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_39" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_40" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_41" style="@style/CalendarDayStyle"/>
+        <TextView android:id="@+id/day_42" style="@style/CalendarDayStyle"/>
+
     </GridLayout>
 
 </RelativeLayout> 
