@@ -677,20 +677,29 @@ class _SettingPageState extends State<SettingPage> {
         ),
       );
     } else {
-      // 竖屏布局 - 保持原样
-    return Scaffold(
-      appBar: AppBar(
-          title: const Text('设置'),
-        ),
+      // 竖屏布局 - 使用CustomScrollView实现滚动隐藏AppBar
+      return Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
             if (widget.isAuthenticated) {
               await _syncActivities();
             }
           },
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: _buildPortraitLayout(context),
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                title: const Text('设置'),
+                floating: true,
+                snap: true,
+                pinned: false,
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(16.0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildPortraitLayout(context),
+                ),
+              ),
+            ],
           ),
         ),
       );
