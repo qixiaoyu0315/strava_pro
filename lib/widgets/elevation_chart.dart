@@ -6,6 +6,7 @@ import 'package:great_circle_distance_calculator/great_circle_distance_calculato
 import 'dart:io';
 import 'dart:async';
 import '../utils/logger.dart';
+import 'dart:math' as math;
 
 class ElevationPoint {
   final double distance; // 距离（公里）
@@ -283,6 +284,33 @@ class _ElevationChartState extends State<ElevationChart> {
       isCurrentPointInRange = currentX >= minX && currentX <= maxX;
     }
     
+    // 计算可见范围内的最大和最小海拔高度
+    double minY = double.infinity;
+    double maxY = 0;
+    
+    // 如果在选定范围内寻找最大最小海拔
+    for (var point in widget.data.points) {
+      if (point.x >= minX && point.x <= maxX) {
+        if (point.y < minY) {
+          minY = point.y;
+        }
+        if (point.y > maxY) {
+          maxY = point.y;
+        }
+      }
+    }
+    
+    // 如果没有找到点（极少情况），使用全部数据
+    if (minY == double.infinity || maxY == 0) {
+      minY = 0;
+      maxY = widget.data.maxElevation;
+    } else {
+      // 为海拔范围增加一点余量
+      double elevationPadding = (maxY - minY) * 0.1; // 10%的边距
+      minY = math.max(0, minY - elevationPadding);
+      maxY = maxY + elevationPadding;
+    }
+    
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
@@ -358,8 +386,8 @@ class _ElevationChartState extends State<ElevationChart> {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: true,
-                      horizontalInterval: (widget.data.maxElevation + 10) / 5,
-                      verticalInterval: (maxX - minX) / 5,
+                      horizontalInterval: (maxY - minY) / 4, // 根据当前范围动态计算
+                      verticalInterval: (maxX - minX) / 4, // 根据当前范围动态计算
                     ),
                     titlesData: FlTitlesData(
                       show: true,
@@ -372,11 +400,13 @@ class _ElevationChartState extends State<ElevationChart> {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: (maxX - minX) / 5,
+                          interval: (maxX - minX) / 4,
                           getTitlesWidget: (value, meta) {
-                            if (value == minX || value >= maxX - 0.1) {
+                            // 对于起点和终点，显示精确值
+                            if ((value - minX).abs() < 0.01 || (value - maxX).abs() < 0.01) {
                               return Text(value.toStringAsFixed(1));
                             }
+                            // 其他标记点显示整数
                             return Text('${value.toInt()}');
                           },
                         ),
@@ -384,7 +414,7 @@ class _ElevationChartState extends State<ElevationChart> {
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: (widget.data.maxElevation + 10) / 5,
+                          interval: (maxY - minY) / 4,
                           reservedSize: 40,
                           getTitlesWidget: (value, meta) {
                             return Text('${value.toInt()}');
@@ -401,8 +431,8 @@ class _ElevationChartState extends State<ElevationChart> {
                     ),
                     minX: minX,
                     maxX: maxX,
-                    minY: 0,
-                    maxY: widget.data.maxElevation + 10,
+                    minY: minY,
+                    maxY: maxY,
                     lineBarsData: [
                       LineChartBarData(
                         spots: widget.data.points,
