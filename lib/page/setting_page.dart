@@ -14,6 +14,7 @@ import '../utils/poly2svg.dart';
 import '../utils/logger.dart';
 import '../service/activity_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:path_provider/path_provider.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -40,6 +41,7 @@ class _SettingPageState extends State<SettingPage> {
   bool _isSyncing = false;
   double _syncProgress = 0.0;
   String _syncStatus = '';
+  String _syncMessage = ''; // 同步消息显示
   final Map<String, bool> _processedDates = {};
   String? _lastSyncTime;
   String? _lastActivitySyncTime;
@@ -494,9 +496,16 @@ class _SettingPageState extends State<SettingPage> {
       await _loadLastSyncTime();
       await _loadLastActivitySyncTime();
       
+      setState(() {
+        _syncMessage = '同步成功，时间: ${_formatDateTime(DateTime.now().toString())}';
+      });
+      
       Fluttertoast.showToast(msg: '同步成功');
     } catch (e) {
       Logger.e('同步活动数据失败: $e', tag: 'SettingPage');
+      setState(() {
+        _syncMessage = '同步失败: $e';
+      });
       Fluttertoast.showToast(msg: '同步失败: $e');
     } finally {
       setState(() {
@@ -995,47 +1004,62 @@ class _SettingPageState extends State<SettingPage> {
 
   // 同步卡片
   Widget _buildSyncCard() {
-    final needsSync = _needsActivitySync();
-    
     return Card(
-      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_isLoading) ...[
-              LinearProgressIndicator(value: _syncProgress),
-              SizedBox(height: 8),
-              Text(_syncStatus),
-              SizedBox(height: 8),
-            ],
-            if (_lastActivitySyncTime != null) ...[
-              Text(
-                '最后活动同步: ${_formatDateTime(_lastActivitySyncTime)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              SizedBox(height: 8),
-            ],
-            ElevatedButton.icon(
-              onPressed: _isLoading || !needsSync ? null : _syncActivities,
-              icon: Icon(Icons.sync),
-              label: Text(_isLoading ? '同步中...' : '同步活动数据'),
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                backgroundColor: needsSync ? Colors.green : Colors.grey,
-                foregroundColor: Colors.white,
-              ),
+            const Text(
+              '数据同步',
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
             ),
-            if (!needsSync && !_isLoading) ...[
-              SizedBox(height: 8),
-              Text(
-                '所有活动已同步',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey,
-                ),
+            const SizedBox(height: 16.0),
+            if (_isLoading)
+              Column(
+                children: [
+                  LinearProgressIndicator(value: _syncProgress),
+                  const SizedBox(height: 8.0),
+                  Text(_syncStatus),
+                ],
               ),
-            ],
+            const SizedBox(height: 8.0),
+            // 添加一个文本显示最后同步时间
+            Text('最后同步: ${_lastSyncTime ?? "未同步"}'),
+            Text('最后获取活动时间: ${_lastActivitySyncTime ?? "未同步"}'),
+            if (_syncMessage.isNotEmpty)
+              Text(
+                _syncMessage,
+                style: const TextStyle(fontStyle: FontStyle.italic),
+              ),
+            const SizedBox(height: 16.0),
+            // 按钮行：添加同步按钮和生成SVG按钮
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _syncActivities,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('同步活动数据'),
+                  ),
+                ),
+                const SizedBox(width: 8.0),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _generateAllSVG,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('生成SVG路线'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1255,5 +1279,124 @@ class _SettingPageState extends State<SettingPage> {
     } catch (e) {
       Logger.e('数据库调试和修复失败', error: e, tag: 'DatabaseInit');
     }
+  }
+
+  // 生成SVG路线图
+  Future<void> _generateAllSVG() async {
+    if (_isLoading) {
+      Fluttertoast.showToast(msg: '请等待当前操作完成');
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _syncProgress = 0.0;
+      _syncStatus = '准备生成SVG...';
+      _syncMessage = '正在准备生成SVG...';
+    });
+    
+    // 将生成SVG的过程放在后台执行
+    Future.delayed(Duration.zero, () async {
+      try {
+        // 获取所有活动数据
+        final activities = await _activityService.getAllActivities();
+        int total = activities.length;
+        int current = 0;
+        int success = 0;
+        int skipped = 0;
+        int error = 0;
+        
+        for (var activity in activities) {
+          current++;
+          
+          // 更新进度
+          if (mounted) {
+            setState(() {
+              _syncProgress = current / total;
+              _syncStatus = '处理: ${activity['name'] ?? activity['id']} ($current/$total)';
+            });
+          }
+          
+          // 检查是否有map_polyline
+          final polyline = activity['map_polyline'] as String?;
+          final id = activity['id']?.toString() ?? '';
+          
+          if (polyline == null || polyline.isEmpty) {
+            skipped++;
+            continue;
+          }
+          
+          try {
+            // 提取日期，格式为"yyyy-MM-dd"
+            final startDate = DateTime.parse(activity['start_date'].toString());
+            final dateStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+            
+            // 设置SVG输出路径
+            String svgPath;
+            if (Platform.isAndroid) {
+              svgPath = '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
+            } else {
+              final dir = await getApplicationDocumentsDirectory();
+              svgPath = '${dir.path}/strava_pro/svg/$dateStr.svg';
+            }
+            
+            // 确保目录存在
+            final file = File(svgPath);
+            final directory = file.parent;
+            if (!await directory.exists()) {
+              await directory.create(recursive: true);
+            }
+            
+            // 生成SVG文件
+            await PolylineToSVG.generateAndSaveSVG(
+              polyline,
+              svgPath,
+              strokeWidth: 6.0,
+            );
+            
+            success++;
+          } catch (e) {
+            Logger.e('为活动 $id 生成SVG失败: $e', error: e, tag: 'SVG');
+            error++;
+          }
+          
+          // 每处理10个活动，暂停一下，避免阻塞UI
+          if (current % 10 == 0) {
+            await Future.delayed(const Duration(milliseconds: 50));
+          }
+        }
+        
+        // 更新最终状态
+        if (mounted) {
+          setState(() {
+            _syncMessage = '路线图生成完成: 成功=$success, 跳过=$skipped, 失败=$error';
+          });
+          Fluttertoast.showToast(msg: '路线图生成完成');
+        }
+      } catch (e) {
+        Logger.e('生成SVG失败: $e', error: e, tag: 'SVG');
+        if (mounted) {
+          setState(() {
+            _syncMessage = '生成SVG失败: $e';
+          });
+          Fluttertoast.showToast(msg: '生成SVG失败: $e');
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _syncStatus = '操作完成';
+          });
+        }
+      }
+    });
+    
+    // 立即释放UI，让用户可以做其他操作
+    setState(() {
+      _isLoading = false;
+      _syncMessage = '路线图生成在后台进行中...';
+    });
+    
+    Fluttertoast.showToast(msg: '路线图生成已在后台开始');
   }
 }

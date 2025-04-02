@@ -806,15 +806,28 @@ class ActivityService {
   /// 获取所有活动数据
   Future<List<Map<String, dynamic>>> getAllActivities() async {
     try {
-      Logger.d('开始获取所有活动数据', tag: 'ActivityService');
       final db = await database;
-      final activities = await db.query(tableName, orderBy: 'start_date DESC');
-      Logger.d('从数据库获取到 ${activities.length} 个活动', tag: 'ActivityService');
-      return activities;
-    } catch (e, stackTrace) {
-      Logger.e('获取所有活动数据失败: ${e.toString()}', 
-          error: e, stackTrace: stackTrace, tag: 'ActivityService');
-      rethrow;
+      final result = await db.query(tableName, orderBy: 'start_date DESC');
+      return result;
+    } catch (e) {
+      Logger.e('获取活动数据失败: $e', tag: 'ActivityService');
+      return [];
+    }
+  }
+  
+  /// 按日期获取活动数据
+  Future<List<Map<String, dynamic>>> getActivitiesByDate(String date) async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        tableName,
+        where: "start_date LIKE ?",
+        whereArgs: ['$date%'],
+      );
+      return result;
+    } catch (e) {
+      Logger.e('按日期获取活动数据失败: $e', tag: 'ActivityService');
+      return [];
     }
   }
   

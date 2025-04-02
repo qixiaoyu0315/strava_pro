@@ -46,7 +46,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   String _selectedRangeOption = '全程';
   
   // 添加距离选项列表
-  final List<String> _rangeOptions = ['500m', '1km', '2km', '5km', '10km', '全程'];
+  final List<String> _rangeOptions = ['500米', '1000米', '2000米', '5000米', '10000米', '全程'];
   
   // 添加可视范围
   double? _visibleRangeStart;
@@ -419,23 +419,23 @@ class _RouteDetailPageState extends State<RouteDetailPage>
             if (isOutOfRange) {
               setState(() {
                 switch (_selectedRangeOption) {
-                  case '500m':
+                  case '500米':
                     _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
                     break;
-                  case '1km':
+                  case '1000米':
                     _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
                     break;
-                  case '2km':
+                  case '2000米':
                     _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.0);
                     break;
-                  case '5km':
+                  case '5000米':
                     _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
                     break;
-                  case '10km':
+                  case '10000米':
                     _visibleRangeStart = currentDistance;
                     _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 10.0);
                     break;
@@ -1480,23 +1480,23 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         
         // 根据选项设置可视范围
         switch (option) {
-          case '500m':
+          case '500米':
             _visibleRangeStart = startPoint;
             _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 0.5);
             break;
-          case '1km':
+          case '1000米':
             _visibleRangeStart = startPoint;
             _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 1.0);
             break;
-          case '2km':
+          case '2000米':
             _visibleRangeStart = startPoint;
             _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 2.0);
             break;
-          case '5km':
+          case '5000米':
             _visibleRangeStart = startPoint;
             _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 5.0);
             break;
-          case '10km':
+          case '10000米':
             _visibleRangeStart = startPoint;
             _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 10.0);
             break;
@@ -1509,23 +1509,23 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       
       // 根据选项设置可视范围，从当前位置向右延伸
       switch (option) {
-        case '500m':
+        case '500米':
           _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
           break;
-        case '1km':
+        case '1000米':
           _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
           break;
-        case '2km':
+        case '2000米':
           _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.0);
           break;
-        case '5km':
+        case '5000米':
           _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
           break;
-        case '10km':
+        case '10000米':
           _visibleRangeStart = currentDistance;
           _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 10.0);
           break;
@@ -1548,16 +1548,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
           return Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: ChoiceChip(
-              label: Text(
-                option,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 13,
-                  color: isSelected 
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+              label: Text(option),
               selected: isSelected,
               onSelected: (selected) {
                 if (selected) {
@@ -1566,11 +1557,11 @@ class _RouteDetailPageState extends State<RouteDetailPage>
               },
               selectedColor: Theme.of(context).colorScheme.primary,
               backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+              labelStyle: TextStyle(
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           );
         },
