@@ -109,12 +109,16 @@ class ElevationChart extends StatefulWidget {
   final ElevationData data;
   final Function(ElevationPoint) onPointSelected;
   final int? currentSegmentIndex;
+  final double? visibleRangeStart;
+  final double? visibleRangeEnd;
 
   const ElevationChart({
     super.key,
     required this.data,
     required this.onPointSelected,
     this.currentSegmentIndex,
+    this.visibleRangeStart,
+    this.visibleRangeEnd,
   });
 
   @override
@@ -251,6 +255,26 @@ class _ElevationChartState extends State<ElevationChart> {
 
   @override
   Widget build(BuildContext context) {
+    // 计算可见范围
+    double minX = 0;
+    double maxX = widget.data.totalDistance;
+    
+    // 如果设置了可见范围，则使用设置的范围
+    if (widget.visibleRangeStart != null && widget.visibleRangeEnd != null) {
+      minX = widget.visibleRangeStart!;
+      maxX = widget.visibleRangeEnd!;
+    }
+    
+    // 确保范围不超出总距离
+    minX = minX.clamp(0, widget.data.totalDistance);
+    maxX = maxX.clamp(0, widget.data.totalDistance);
+    
+    // 确保minX < maxX
+    if (minX >= maxX) {
+      minX = 0;
+      maxX = widget.data.totalDistance;
+    }
+    
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
@@ -294,7 +318,7 @@ class _ElevationChartState extends State<ElevationChart> {
                       show: true,
                       drawVerticalLine: true,
                       horizontalInterval: (widget.data.maxElevation + 10) / 5,
-                      verticalInterval: widget.data.totalDistance / 5,
+                      verticalInterval: (maxX - minX) / 5,
                     ),
                     titlesData: FlTitlesData(
                       show: true,
@@ -307,10 +331,9 @@ class _ElevationChartState extends State<ElevationChart> {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: widget.data.totalDistance / 5,
+                          interval: (maxX - minX) / 5,
                           getTitlesWidget: (value, meta) {
-                            if (value == 0 ||
-                                value >= widget.data.totalDistance - 0.1) {
+                            if (value == minX || value >= maxX - 0.1) {
                               return Text(value.toStringAsFixed(1));
                             }
                             return Text('${value.toInt()}');
@@ -335,8 +358,8 @@ class _ElevationChartState extends State<ElevationChart> {
                         width: 1,
                       ),
                     ),
-                    minX: 0,
-                    maxX: widget.data.totalDistance,
+                    minX: minX,
+                    maxX: maxX,
                     minY: 0,
                     maxY: widget.data.maxElevation + 10,
                     lineBarsData: [
@@ -351,6 +374,16 @@ class _ElevationChartState extends State<ElevationChart> {
                           getDotPainter: (spot, percent, barData, index) {
                             Color color = Colors.transparent;
                             double radius = 0;
+
+                            // 如果点在可显示范围外，不显示
+                            if (spot.x < minX || spot.x > maxX) {
+                              return FlDotCirclePainter(
+                                radius: 0,
+                                color: Colors.transparent,
+                                strokeWidth: 0,
+                                strokeColor: Colors.transparent,
+                              );
+                            }
 
                             if (widget.currentSegmentIndex != null &&
                                 index == widget.currentSegmentIndex) {
@@ -467,8 +500,8 @@ class _ElevationChartState extends State<ElevationChart> {
                         widget.data.elevationPoints.length &&
                     _showTooltip)
                   Positioned(
-                    left: (widget.data.points[widget.currentSegmentIndex!].x /
-                            widget.data.totalDistance) *
+                    left: ((widget.data.points[widget.currentSegmentIndex!].x - minX) /
+                            (maxX - minX)) *
                         (MediaQuery.of(context).size.width - 32 - 32),
                     top: 0,
                     child: _buildTooltip(

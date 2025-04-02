@@ -41,6 +41,16 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       ValueNotifier<Position?>(null);
   late strava.Route _routeData; // 缓存路线数据，避免旋转重载
   bool _isDataLoaded = false;
+  
+  // 添加选中的距离范围选项
+  String _selectedRangeOption = '全程';
+  
+  // 添加距离选项列表
+  final List<String> _rangeOptions = ['500米', '1000米', '2000米', '5000米', '10000米', '全程'];
+  
+  // 添加可视范围
+  double? _visibleRangeStart;
+  double? _visibleRangeEnd;
 
   @override
   void initState() {
@@ -383,6 +393,41 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       if (result != null) {
         currentSegmentIndex.value = result.$1;
         currentMinDistance.value = result.$2;
+        
+        // 当位置更新且已选择某个距离范围选项（非全程）时，更新可视范围
+        if (_selectedRangeOption != '全程' && elevationData != null) {
+          // 获取当前位置的距离
+          int index = result.$1;
+          if (index < elevationData!.elevationPoints.length) {
+            double currentDistance = elevationData!.elevationPoints[index].distance;
+            
+            // 根据选项设置可视范围
+            setState(() {
+              switch (_selectedRangeOption) {
+                case '500米':
+                  _visibleRangeStart = math.max(0, currentDistance - 0.25);
+                  _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.25);
+                  break;
+                case '1000米':
+                  _visibleRangeStart = math.max(0, currentDistance - 0.5);
+                  _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
+                  break;
+                case '2000米':
+                  _visibleRangeStart = math.max(0, currentDistance - 1.0);
+                  _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
+                  break;
+                case '5000米':
+                  _visibleRangeStart = math.max(0, currentDistance - 2.5);
+                  _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.5);
+                  break;
+                case '10000米':
+                  _visibleRangeStart = math.max(0, currentDistance - 5.0);
+                  _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
+                  break;
+              }
+            });
+          }
+        }
       }
     }
   }
@@ -944,42 +989,52 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                             ),
                                           ],
                                         ),
-                                        child: ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(15),
-                                          child: elevationData != null
-                                              ? ValueListenableBuilder<int?>(
-                                                  valueListenable:
-                                                      currentSegmentIndex,
-                                                  builder: (context,
-                                                      segmentIndex, child) {
-                                                    return ValueListenableBuilder<
-                                                        double?>(
-                                                      valueListenable:
-                                                          currentMinDistance,
-                                                      builder: (context,
-                                                          minDistance, child) {
-                                                        return ElevationChart(
-                                                          data: elevationData!,
-                                                          onPointSelected:
-                                                              (point) {
-                                                            selectedPoint
-                                                                    .value =
-                                                                point.position;
-                                                          },
-                                                          currentSegmentIndex:
-                                                              minDistance !=
-                                                                          null &&
-                                                                      minDistance <=
-                                                                          50
-                                                                  ? segmentIndex
-                                                                  : null,
-                                                        );
-                                                      },
-                                                    );
-                                                  },
-                                                )
-                                              : SizedBox(),
+                                        child: Column(
+                                          children: [
+                                            Expanded(
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                                child: elevationData != null
+                                                    ? ValueListenableBuilder<int?>(
+                                                        valueListenable:
+                                                            currentSegmentIndex,
+                                                        builder: (context,
+                                                            segmentIndex, child) {
+                                                          return ValueListenableBuilder<
+                                                              double?>(
+                                                            valueListenable:
+                                                                currentMinDistance,
+                                                            builder: (context,
+                                                                minDistance, child) {
+                                                              return ElevationChart(
+                                                                data: elevationData!,
+                                                                onPointSelected:
+                                                                    (point) {
+                                                                  selectedPoint
+                                                                          .value =
+                                                                      point.position;
+                                                                },
+                                                                currentSegmentIndex:
+                                                                    minDistance !=
+                                                                                null &&
+                                                                            minDistance <=
+                                                                                50
+                                                                        ? segmentIndex
+                                                                        : null,
+                                                                visibleRangeStart: _visibleRangeStart,
+                                                                visibleRangeEnd: _visibleRangeEnd,
+                                                              );
+                                                            },
+                                                          );
+                                                        },
+                                                      )
+                                                    : SizedBox(),
+                                              ),
+                                            ),
+                                            // 添加距离选择器
+                                            _buildRangeSelector(),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -1136,38 +1191,48 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                   ),
                                 ],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: elevationData != null
-                                    ? ValueListenableBuilder<int?>(
-                                        valueListenable: currentSegmentIndex,
-                                        builder:
-                                            (context, segmentIndex, child) {
-                                          return ValueListenableBuilder<
-                                              double?>(
-                                            valueListenable: currentMinDistance,
-                                            builder:
-                                                (context, minDistance, child) {
-                                              return ElevationChart(
-                                                data: elevationData!,
-                                                onPointSelected: (point) {
-                                                  selectedPoint.value =
-                                                      point.position;
-                                                },
-                                                currentSegmentIndex:
-                                                    minDistance != null &&
-                                                            minDistance <= 50
-                                                        ? segmentIndex
-                                                        : null,
-                                              );
-                                            },
-                                          );
-                                        },
-                                      )
-                                    : SizedBox(),
-                        ),
-                      ),
-                    ],
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(15),
+                                      child: elevationData != null
+                                          ? ValueListenableBuilder<int?>(
+                                              valueListenable: currentSegmentIndex,
+                                              builder:
+                                                  (context, segmentIndex, child) {
+                                                return ValueListenableBuilder<
+                                                    double?>(
+                                                  valueListenable: currentMinDistance,
+                                                  builder:
+                                                      (context, minDistance, child) {
+                                                    return ElevationChart(
+                                                      data: elevationData!,
+                                                      onPointSelected: (point) {
+                                                        selectedPoint.value =
+                                                            point.position;
+                                                      },
+                                                      currentSegmentIndex:
+                                                          minDistance != null &&
+                                                                  minDistance <= 50
+                                                              ? segmentIndex
+                                                              : null,
+                                                      visibleRangeStart: _visibleRangeStart,
+                                                      visibleRangeEnd: _visibleRangeEnd,
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                            )
+                                          : SizedBox(),
+                                    ),
+                                  ),
+                                  // 添加距离选择器
+                                  _buildRangeSelector(),
+                                ],
+                              ),
+                            ),
+                          ],
                         );
                       }
                     },
@@ -1197,15 +1262,25 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                           ),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: ElevationChart(
-                          data: elevationData!,
-                          onPointSelected: (point) {
-                            selectedPoint.value = point.position;
-                          },
-                          currentSegmentIndex: null,
-                        ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(15),
+                              child: ElevationChart(
+                                data: elevationData!,
+                                onPointSelected: (point) {
+                                  selectedPoint.value = point.position;
+                                },
+                                currentSegmentIndex: null,
+                                visibleRangeStart: _visibleRangeStart,
+                                visibleRangeEnd: _visibleRangeEnd,
+                              ),
+                            ),
+                          ),
+                          // 添加距离选择器
+                          _buildRangeSelector(),
+                        ],
                       ),
                     ),
                 // 路线信息部分
@@ -1365,6 +1440,92 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         }
       });
     }
+  }
+
+  // 添加处理距离范围更改的方法
+  void _updateVisibleRange(String option) {
+    if (!mounted || elevationData == null) return;
+    
+    setState(() {
+      _selectedRangeOption = option;
+      
+      // 获取当前位置索引
+      int? currentIndex = currentSegmentIndex.value;
+      if (currentIndex == null || currentIndex >= elevationData!.elevationPoints.length) {
+        // 如果没有当前位置，则显示全程
+        _visibleRangeStart = null;
+        _visibleRangeEnd = null;
+        return;
+      }
+      
+      // 获取当前位置的距离
+      double currentDistance = elevationData!.elevationPoints[currentIndex].distance;
+      
+      // 根据选项设置可视范围
+      switch (option) {
+        case '500米':
+          _visibleRangeStart = math.max(0, currentDistance - 0.25);
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.25);
+          break;
+        case '1000米':
+          _visibleRangeStart = math.max(0, currentDistance - 0.5);
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
+          break;
+        case '2000米':
+          _visibleRangeStart = math.max(0, currentDistance - 1.0);
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
+          break;
+        case '5000米':
+          _visibleRangeStart = math.max(0, currentDistance - 2.5);
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.5);
+          break;
+        case '10000米':
+          _visibleRangeStart = math.max(0, currentDistance - 5.0);
+          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
+          break;
+        case '全程':
+        default:
+          _visibleRangeStart = null;
+          _visibleRangeEnd = null;
+          break;
+      }
+    });
+  }
+
+  // 添加距离选择器UI组件
+  Widget _buildRangeSelector() {
+    return Container(
+      height: 40,
+      margin: EdgeInsets.symmetric(vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _rangeOptions.length,
+        itemBuilder: (context, index) {
+          final option = _rangeOptions[index];
+          final isSelected = _selectedRangeOption == option;
+          
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: Text(option),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  _updateVisibleRange(option);
+                }
+              },
+              selectedColor: Theme.of(context).colorScheme.primary,
+              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+              labelStyle: TextStyle(
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
