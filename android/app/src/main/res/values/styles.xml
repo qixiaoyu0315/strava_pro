@@ -16,6 +16,17 @@
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 
+    <!-- 星期标题样式 -->
+    <style name="CalendarWeekdayStyle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:padding">4dp</item>
+    </style>
+
     <!-- 日历日期样式 -->
     <style name="CalendarDayStyle">
         <item name="android:layout_width">0dp</item>
@@ -25,5 +36,7 @@
         <item name="android:textSize">14sp</item>
         <item name="android:textColor">@android:color/white</item>
         <item name="android:padding">4dp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+        <item name="android:minHeight">36dp</item>
     </style>
 </resources>

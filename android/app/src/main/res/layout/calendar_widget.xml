@@ -51,13 +51,13 @@
         android:layout_marginTop="4dp">
 
         <!-- 星期标题 -->
-        <TextView android:id="@+id/week_sun" style="@style/CalendarDayStyle" android:text="日" android:textColor="#AAAAAA"/>
-        <TextView android:id="@+id/week_mon" style="@style/CalendarDayStyle" android:text="一" android:textColor="#AAAAAA"/>
-        <TextView android:id="@+id/week_tue" style="@style/CalendarDayStyle" android:text="二" android:textColor="#AAAAAA"/>
-        <TextView android:id="@+id/week_wed" style="@style/CalendarDayStyle" android:text="三" android:textColor="#AAAAAA"/>
-        <TextView android:id="@+id/week_thu" style="@style/CalendarDayStyle" android:text="四" android:textColor="#AAAAAA"/>
-        <TextView android:id="@+id/week_fri" style="@style/CalendarDayStyle" android:text="五" android:textColor="#AAAAAA"/>
-        <TextView android:id="@+id/week_sat" style="@style/CalendarDayStyle" android:text="六" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_sun" style="@style/CalendarWeekdayStyle" android:text="日" android:textColor="#FF0000"/>
+        <TextView android:id="@+id/week_mon" style="@style/CalendarWeekdayStyle" android:text="一" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_tue" style="@style/CalendarWeekdayStyle" android:text="二" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_wed" style="@style/CalendarWeekdayStyle" android:text="三" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_thu" style="@style/CalendarWeekdayStyle" android:text="四" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_fri" style="@style/CalendarWeekdayStyle" android:text="五" android:textColor="#AAAAAA"/>
+        <TextView android:id="@+id/week_sat" style="@style/CalendarWeekdayStyle" android:text="六" android:textColor="#4095FF"/>
 
         <!-- 日期网格 - 第1行 -->
         <TextView android:id="@+id/day_1" style="@style/CalendarDayStyle"/>

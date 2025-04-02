@@ -51,8 +51,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
         (now.year - startDate.year) * 12 + now.month - startDate.month + 1;
 
     // 计算当前月份的索引
-    final currentIndex =
-        (now.year - startDate.year) * 12 + (now.month - startDate.month);
+    final currentIndex = _getMonthIndex(_displayedMonth);
 
     // 初始化PageController
     _pageController = PageController(
@@ -70,12 +69,48 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
     _animationController.forward();
   }
+  
+  @override
+  void didUpdateWidget(HorizontalCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // 如果选中的日期变化了，更新状态
+    if (widget.selectedDate != null && 
+        (oldWidget.selectedDate == null || 
+         widget.selectedDate!.year != oldWidget.selectedDate!.year ||
+         widget.selectedDate!.month != oldWidget.selectedDate!.month ||
+         widget.selectedDate!.day != oldWidget.selectedDate!.day)) {
+      setState(() {
+        _selectedDate = widget.selectedDate!;
+      });
+      
+      // 如果选中的月份与显示的月份不同，切换到相应的月份
+      if (_selectedDate.year != _displayedMonth.year || 
+          _selectedDate.month != _displayedMonth.month) {
+        final newIndex = _getMonthIndex(DateTime(_selectedDate.year, _selectedDate.month));
+        if (newIndex >= 0 && newIndex < _totalMonths) {
+          _pageController.animateToPage(
+            newIndex,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    }
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  // 获取指定月份的索引
+  int _getMonthIndex(DateTime month) {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year - 2, now.month);
+    return (month.year - startDate.year) * 12 + (month.month - startDate.month);
   }
 
   // 加载指定索引月份的SVG数据
@@ -97,6 +132,45 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
         });
       }
     });
+  }
+
+  void _selectDate(DateTime date) {
+    if (widget.onDateSelected != null) {
+      widget.onDateSelected!(date);
+    }
+    
+    setState(() {
+      _selectedDate = date;
+    });
+  }
+
+  void _selectMonth(DateTime month) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return MonthPicker(
+          initialMonth: _displayedMonth,
+          onMonthSelected: (DateTime selectedMonth) {
+            Navigator.of(context).pop();
+            final index = _getMonthIndex(selectedMonth);
+            if (index >= 0 && index < _totalMonths) {
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  // 修改这里，创建VoidCallback包装
+  VoidCallback _getMonthTapCallback() {
+    return () {
+      _selectMonth(_displayedMonth);
+    };
   }
 
   @override
@@ -166,7 +240,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                           isCurrentMonth: month.year == now.year &&
                               month.month == now.month,
                           displayedMonth: _displayedMonth,
-                          onMonthTap: _selectMonth,
+                          onMonthTap: _getMonthTapCallback(),
                         ),
                       ),
 
@@ -251,21 +325,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                           selectedDate: _selectedDate,
                           onDateSelected: _selectDate,
                           svgCache: monthCache,
-                          isCurrentMonth: month.year == now.year &&
-                              month.month == now.month,
+                          isCurrentMonth: month.year == now.year && month.month == now.month,
                           displayedMonth: _displayedMonth,
-                          onMonthTap: _selectMonth,
+                          onMonthTap: _getMonthTapCallback(),
                         ),
                       ),
 
-                      // 分隔线
-                      Container(
-                        height: 1,
-                        color: Colors.grey.withOpacity(0.3),
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-
-                      // 下方月度统计（可滚动）
+                      // 下方月度统计
                       Expanded(
                         child: SingleChildScrollView(
                           child: Padding(
@@ -273,7 +339,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                             child: MonthlyStatsWidget(
                               month: month,
                               activityService: _activityService,
-                              showCard: false,
+                              showCard: true,
                             ),
                           ),
                         ),
@@ -288,59 +354,5 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
       },
     );
   }
-
-  void _selectDate(DateTime date) async {
-    setState(() {
-      _selectedDate = date;
-    });
-    
-    // 安全调用回调
-    widget.onDateSelected?.call(date);
-    
-    // 获取所选日期的年-月-日格式
-    final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    
-    // 查询该日期的活动数据
-    final activities = await _activityService.getActivitiesByDate(dateString);
-    
-    if (!mounted) return;
-    
-    // 如果有活动数据，显示弹窗
-    if (activities.isNotEmpty) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return ActivityListDialog(
-            date: date,
-            activities: activities,
-          );
-        },
-      );
-    }
-  }
-
-  void _selectMonth() {
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return MonthPicker(
-          initialDate: _displayedMonth,
-          firstDate: DateTime(DateTime.now().year - 2),
-          lastDate: DateTime(DateTime.now().year + 2),
-          onMonthSelected: (DateTime date) {
-            if (mounted) {
-              setState(() {
-                _displayedMonth = date;
-              });
-              // 选择月份后也更新选中的日期
-              _selectDate(date);
-            }
-            Navigator.of(context).pop();
-          },
-        );
-      },
-    );
-  }
 }
+
