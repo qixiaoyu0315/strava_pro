@@ -30,6 +30,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   late DateTime _selectedDate;
   late DateTime _displayedMonth;
   late PageController _pageController;
+  PageController? _statsPageController; // 为统计视图添加单独的控制器
   late AnimationController _animationController;
   late int _totalMonths; // 显示的总月数
   final ActivityService _activityService = ActivityService();
@@ -73,6 +74,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   @override
   void dispose() {
     _pageController.dispose();
+    _statsPageController?.dispose(); // 安全释放统计视图的控制器
     _animationController.dispose();
     super.dispose();
   }
@@ -104,7 +106,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     final isLandscape =
         MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
+    // 处理屏幕方向变化时PageController的释放与创建
     if (isLandscape) {
+      // 横屏模式：使用主PageController
+      if (_statsPageController != null) {
+        _statsPageController!.dispose();
+        _statsPageController = null;
+      }
       // 横屏模式：左侧日历，右侧统计
       return _buildLandscapeLayout();
     } else {
@@ -175,11 +183,17 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                       ),
 
-                      // 右侧月度统计
+                      // 右侧月度统计（添加SingleChildScrollView使内容可滚动）
                       Expanded(
-                        child: MonthlyStatsWidget(
-                          month: month,
-                          activityService: _activityService,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: MonthlyStatsWidget(
+                              month: month,
+                              activityService: _activityService,
+                              showCard: false,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -197,6 +211,12 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   Widget _buildPortraitLayout() {
     final now = DateTime.now();
     final startDate = DateTime(now.year - 2, now.month);
+
+    // 创建新的PageController用于月度统计
+    _statsPageController = PageController(
+      initialPage: _pageController.initialPage,
+      viewportFraction: 1.0,
+    );
 
     return Column(
       children: [
@@ -219,6 +239,11 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
               setState(() {
                 _displayedMonth = month;
               });
+              
+              // 同步统计页面
+              if (_statsPageController != null && _statsPageController!.hasClients) {
+                _statsPageController!.jumpToPage(index);
+              }
             },
             itemCount: _totalMonths,
             itemBuilder: (context, index) {
@@ -244,21 +269,32 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
           ),
         ),
         
-        // 下方月度统计（占1/3高度）
+        // 下方月度统计（占1/3高度，可滚动）
         Expanded(
           flex: 1,
           child: PageView.builder(
-            controller: _pageController,
-            physics: const NeverScrollableScrollPhysics(), // 禁止滑动，由上方日历控制
+            controller: _statsPageController,
+            onPageChanged: (index) {
+              // 同步日历页面
+              if (_pageController.hasClients) {
+                _pageController.jumpToPage(index);
+              }
+            },
             itemCount: _totalMonths,
             itemBuilder: (context, index) {
               final month = DateTime(
                 startDate.year,
                 startDate.month + index,
               );
-              return MonthlyStatsWidget(
-                month: month,
-                activityService: _activityService,
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: MonthlyStatsWidget(
+                    month: month,
+                    activityService: _activityService,
+                    showCard: false,
+                  ),
+                ),
               );
             },
           ),

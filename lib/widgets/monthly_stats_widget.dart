@@ -6,11 +6,13 @@ import 'package:intl/intl.dart';
 class MonthlyStatsWidget extends StatefulWidget {
   final DateTime month;
   final ActivityService activityService;
+  final bool showCard;
 
   const MonthlyStatsWidget({
     super.key,
     required this.month,
     required this.activityService,
+    this.showCard = true,
   });
 
   @override
@@ -65,18 +67,28 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
     }
     
     if (_stats['totalActivities'] == 0) {
-      return Card(
-        margin: const EdgeInsets.all(8.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Center(
-            child: Text(
-              '本月没有活动记录',
-              style: theme.textTheme.titleMedium,
-            ),
-          ),
-        ),
-      );
+      return widget.showCard 
+          ? Card(
+              margin: const EdgeInsets.all(8.0),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: Text(
+                    '本月没有活动记录',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Text(
+                  '本月没有活动记录',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+            );
     }
     
     // 格式化数字
@@ -94,88 +106,92 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
     Map<String, Map<String, dynamic>> activityTypes = 
         Map<String, Map<String, dynamic>>.from(_stats['byActivityType'] as Map);
     
-    return Card(
-      margin: const EdgeInsets.all(8.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${DateFormat('yyyy年MM月').format(widget.month)}活动统计',
-              style: theme.textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            
-            // 总体统计行
-            Row(
-              children: [
-                _buildStatItem(
-                  context,
-                  '总活动',
-                  '${_stats['totalActivities']}次',
-                  Icons.directions_run,
-                ),
-                _buildStatItem(
-                  context,
-                  '活动天数',
-                  '${_stats['activeDaysCount']}天',
-                  Icons.calendar_today,
-                ),
-                _buildStatItem(
-                  context,
-                  '总时间',
-                  '$hours小时$minutes分钟',
-                  Icons.access_time,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            
-            // 运动数据统计行
-            Row(
-              children: [
-                _buildStatItem(
-                  context,
-                  '总距离',
-                  '${distanceFormat.format(_stats['totalDistance'] / 1000)}公里',
-                  Icons.straighten,
-                ),
-                _buildStatItem(
-                  context,
-                  '总爬升',
-                  '${elevationFormat.format(_stats['totalElevationGain'])}米',
-                  Icons.terrain,
-                ),
-                _buildStatItem(
-                  context,
-                  '总能量',
-                  '${kilojouleFormat.format(_stats['totalKilojoules'])}千焦',
-                  Icons.local_fire_department,
-                ),
-              ],
-            ),
-            
-            // 活动类型细节
-            if (activityTypes.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text(
-                '活动类型明细',
-                style: theme.textTheme.titleMedium,
+    final content = Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${DateFormat('yyyy年MM月').format(widget.month)}活动统计',
+            style: theme.textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          
+          // 总体统计行
+          Row(
+            children: [
+              _buildStatItem(
+                context,
+                '总活动',
+                '${_stats['totalActivities']}次',
+                Icons.directions_run,
               ),
-              const SizedBox(height: 8),
-              
-              // 每个活动类型的明细
-              for (var entry in activityTypes.entries)
-                _buildActivityTypeRow(context, entry.key, entry.value),
+              _buildStatItem(
+                context,
+                '活动天数',
+                '${_stats['activeDaysCount']}天',
+                Icons.calendar_today,
+              ),
+              _buildStatItem(
+                context,
+                '总时间',
+                '$hours小时$minutes分钟',
+                Icons.access_time,
+              ),
             ],
+          ),
+          const SizedBox(height: 12),
+          
+          // 运动数据统计行
+          Row(
+            children: [
+              _buildStatItem(
+                context,
+                '总距离',
+                '${distanceFormat.format(_stats['totalDistance'] / 1000)}公里',
+                Icons.straighten,
+              ),
+              _buildStatItem(
+                context,
+                '总爬升',
+                '${elevationFormat.format(_stats['totalElevationGain'])}米',
+                Icons.terrain,
+              ),
+              _buildStatItem(
+                context,
+                '总能量',
+                '${kilojouleFormat.format(_stats['totalKilojoules'])}千焦',
+                Icons.local_fire_department,
+              ),
+            ],
+          ),
+          
+          // 活动类型细节
+          if (activityTypes.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Text(
+              '活动类型明细',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            
+            // 每个活动类型的明细
+            for (var entry in activityTypes.entries)
+              _buildActivityTypeRow(context, entry.key, entry.value),
           ],
-        ),
+        ],
       ),
     );
+    
+    return widget.showCard 
+        ? Card(
+            margin: const EdgeInsets.all(8.0),
+            child: content,
+          )
+        : content;
   }
   
   Widget _buildStatItem(BuildContext context, String label, String value, IconData icon) {
