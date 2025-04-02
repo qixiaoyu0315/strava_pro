@@ -1014,7 +1014,6 @@ class _SettingPageState extends State<SettingPage> {
   // 同步卡片
   Widget _buildSyncCard() {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
