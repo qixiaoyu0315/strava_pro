@@ -4,6 +4,7 @@ import 'month_picker.dart';
 import '../widgets/calendar_utils.dart';
 import '../service/activity_service.dart';
 import 'monthly_stats_widget.dart';
+import 'activity_list_dialog.dart';
 
 class HorizontalCalendar extends StatefulWidget {
   final DateTime? initialMonth;
@@ -303,12 +304,34 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     );
   }
 
-  void _selectDate(DateTime date) {
+  void _selectDate(DateTime date) async {
     setState(() {
       _selectedDate = date;
     });
+    
     // 安全调用回调
     widget.onDateSelected?.call(date);
+    
+    // 获取所选日期的年-月-日格式
+    final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    
+    // 查询该日期的活动数据
+    final activities = await _activityService.getActivitiesByDate(dateString);
+    
+    if (!mounted) return;
+    
+    // 如果有活动数据，显示弹窗
+    if (activities.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return ActivityListDialog(
+            date: date,
+            activities: activities,
+          );
+        },
+      );
+    }
   }
 
   void _selectMonth() {
