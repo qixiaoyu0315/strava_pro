@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp"
+    android:background="@android:color/black">
+
+    <TextView
+        android:id="@+id/month_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:textColor="@android:color/white"
+        android:textSize="20sp"
+        android:text="4月" />
+
+    <GridLayout
+        android:id="@+id/calendar_grid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/month_text"
+        android:columnCount="7"
+        android:rowCount="7"
+        android:layout_marginTop="8dp">
+
+        <!-- 日历网格将在代码中动态填充 -->
+    </GridLayout>
+
+</RelativeLayout> 
