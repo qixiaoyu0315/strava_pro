@@ -10,8 +10,11 @@ class WidgetManager {
   // 小组件相关常量 - 确保与Kotlin代码中的值一致
   static const String appGroupId = 'com.example.strava_pro';
   static const String calendarWidgetKey = 'calendar_widget';
+  static const String weekWidgetKey = 'week_widget';
   static const String imagePathKey =
       'calendar_image_path'; // 与CalendarWidgetReceiver.IMAGE_PATH_KEY一致
+  static const String weekImagePathKey =
+      'week_image_path'; // 与WeekWidgetReceiver.IMAGE_PATH_KEY一致
 
   /// 初始化小组件服务
   static Future<void> initialize() async {
@@ -58,6 +61,36 @@ class WidgetManager {
     }
   }
 
+  /// 更新周视图小组件
+  static Future<bool> updateWeekWidget({String? imagePath}) async {
+    try {
+      final String weekImagePath = imagePath ??
+          '/storage/emulated/0/Download/strava_pro/week/week_default.png';
+
+      // 检查图片是否存在
+      final imageFile = File(weekImagePath);
+      if (!await imageFile.exists()) {
+        Logger.e('要显示的周图片不存在: $weekImagePath', tag: 'WidgetManager');
+        return false;
+      }
+
+      // 保存图片路径到小组件数据 - 确保键与WeekWidgetReceiver中一致
+      await HomeWidget.saveWidgetData(weekImagePathKey, weekImagePath);
+
+      // 请求更新小组件
+      await HomeWidget.updateWidget(
+        androidName: 'WeekWidgetReceiver',
+        iOSName: 'WeekWidget',
+      );
+
+      Logger.d('周视图小组件更新成功，图片路径: $weekImagePath', tag: 'WidgetManager');
+      return true;
+    } catch (e) {
+      Logger.e('更新周视图小组件失败', error: e, tag: 'WidgetManager');
+      return false;
+    }
+  }
+
   /// 小组件点击回调
   @pragma('vm:entry-point')
   static Future<void> backgroundCallback(Uri? uri) async {
@@ -69,6 +102,9 @@ class WidgetManager {
     switch (uri.host) {
       case 'calendar_widget_clicked':
         // 处理日历小组件点击
+        break;
+      case 'week_widget_clicked':
+        // 处理周视图小组件点击
         break;
       default:
         break;

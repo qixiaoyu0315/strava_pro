@@ -5,6 +5,7 @@ import 'strava_client_manager.dart';
 import '../utils/logger.dart';
 import 'dart:async';
 import 'dart:convert';
+import '../widgets/calendar_utils.dart';
 
 /// 活动服务类，处理活动数据的同步和存储
 class ActivityService {
@@ -12,19 +13,19 @@ class ActivityService {
   static const String tableName = 'activities';
   static const String syncTableName = 'sync_status';
   static const int _databaseVersion = 4; // 数据库版本更新为4
-  
+
   /// 获取数据库实例
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
-  
+
   /// 初始化数据库
   Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), 'strava_activities.db');
     Logger.d('初始化数据库: $path', tag: 'ActivityService');
-    
+
     // 检查数据库是否存在
     bool exists = await databaseExists(path);
     if (!exists) {
@@ -32,7 +33,7 @@ class ActivityService {
     } else {
       Logger.d('数据库已存在，可能需要升级', tag: 'ActivityService');
     }
-    
+
     return await openDatabase(
       path,
       version: _databaseVersion,
@@ -40,11 +41,11 @@ class ActivityService {
       onUpgrade: _onUpgrade,
     );
   }
-  
+
   /// 创建数据库表
   Future<void> _onCreate(Database db, int version) async {
     Logger.d('创建活动数据表 (数据库版本: $version)', tag: 'ActivityService');
-    
+
     // 创建活动表
     await db.execute('''
       CREATE TABLE $tableName(
@@ -115,7 +116,7 @@ class ActivityService {
         total_activities INTEGER DEFAULT 0
       )
     ''');
-    
+
     // 初始化同步状态
     await db.insert(syncTableName, {
       'last_page': 0,
@@ -123,25 +124,24 @@ class ActivityService {
       'athlete_created_at': null,
       'total_activities': 0
     });
-    
+
     Logger.d('活动数据表和同步状态表创建完成', tag: 'ActivityService');
   }
-  
+
   /// 升级数据库
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     Logger.d('升级数据库从 $oldVersion 到 $newVersion', tag: 'ActivityService');
-    
+
     if (oldVersion < 2) {
       // 版本1升级到版本2：添加同步状态表
       try {
         // 检查表是否已存在
         final tables = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='$syncTableName'"
-        );
-        
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='$syncTableName'");
+
         if (tables.isEmpty) {
           Logger.d('创建同步状态表 $syncTableName', tag: 'ActivityService');
-          
+
           // 创建同步状态表
           await db.execute('''
             CREATE TABLE $syncTableName(
@@ -152,7 +152,7 @@ class ActivityService {
               total_activities INTEGER DEFAULT 0
             )
           ''');
-          
+
           // 初始化同步状态
           await db.insert(syncTableName, {
             'last_page': 0,
@@ -160,7 +160,7 @@ class ActivityService {
             'athlete_created_at': null,
             'total_activities': 0
           });
-          
+
           Logger.d('同步状态表创建完成', tag: 'ActivityService');
         } else {
           Logger.d('同步状态表已存在，跳过创建', tag: 'ActivityService');
@@ -170,7 +170,7 @@ class ActivityService {
         // 尝试直接删除旧表并重新创建
         try {
           await db.execute('DROP TABLE IF EXISTS $syncTableName');
-          
+
           await db.execute('''
             CREATE TABLE $syncTableName(
               id INTEGER PRIMARY KEY,
@@ -180,7 +180,7 @@ class ActivityService {
               total_activities INTEGER DEFAULT 0
             )
           ''');
-          
+
           // 初始化同步状态
           await db.insert(syncTableName, {
             'last_page': 0,
@@ -188,26 +188,26 @@ class ActivityService {
             'athlete_created_at': null,
             'total_activities': 0
           });
-          
+
           Logger.d('同步状态表重新创建完成', tag: 'ActivityService');
         } catch (e2) {
           Logger.e('重新创建同步状态表失败: $e2', error: e2, tag: 'ActivityService');
         }
       }
     }
-    
+
     // 版本2升级到版本3：更新活动表结构
     if (oldVersion < 3 && newVersion >= 3) {
       try {
         Logger.d('更新活动表结构到版本3', tag: 'ActivityService');
-        
+
         // 备份旧表数据
         final oldActivities = await db.query(tableName);
         Logger.d('已备份 ${oldActivities.length} 条旧活动数据', tag: 'ActivityService');
-        
+
         // 重命名旧表
         await db.execute('ALTER TABLE $tableName RENAME TO ${tableName}_old');
-        
+
         // 创建新表
         await db.execute('''
           CREATE TABLE $tableName(
@@ -267,17 +267,18 @@ class ActivityService {
             updated_at TEXT
           )
         ''');
-        
+
         // 迁移能够迁移的数据
         if (oldActivities.isNotEmpty) {
           Logger.d('开始迁移活动数据', tag: 'ActivityService');
           int migratedCount = 0;
-          
+
           for (var oldActivity in oldActivities) {
             try {
               // 创建适合新表结构的数据
               var newActivity = {
-                'activity_id': int.tryParse(oldActivity['activity_id'].toString()),
+                'activity_id':
+                    int.tryParse(oldActivity['activity_id'].toString()),
                 'name': oldActivity['name'],
                 'distance': oldActivity['distance'],
                 'moving_time': oldActivity['moving_time'],
@@ -300,25 +301,26 @@ class ActivityService {
                 'created_at': oldActivity['created_at'],
                 'updated_at': DateTime.now().toIso8601String(),
               };
-              
+
               // 移除空值
               newActivity.removeWhere((key, value) => value == null);
-              
+
               // 插入新表
               await db.insert(tableName, newActivity);
               migratedCount++;
             } catch (e) {
-              Logger.e('迁移活动 ID ${oldActivity['activity_id']} 失败: $e', error: e, tag: 'ActivityService');
+              Logger.e('迁移活动 ID ${oldActivity['activity_id']} 失败: $e',
+                  error: e, tag: 'ActivityService');
             }
           }
-          
-          Logger.d('成功迁移 $migratedCount/${oldActivities.length} 条活动数据', tag: 'ActivityService');
+
+          Logger.d('成功迁移 $migratedCount/${oldActivities.length} 条活动数据',
+              tag: 'ActivityService');
         }
-        
+
         // 删除旧表
         await db.execute('DROP TABLE IF EXISTS ${tableName}_old');
         Logger.d('已删除旧活动表', tag: 'ActivityService');
-        
       } catch (e) {
         Logger.e('更新活动表结构失败: $e', error: e, tag: 'ActivityService');
         // 如果更新失败，尝试重置整个数据库
@@ -331,12 +333,12 @@ class ActivityService {
         }
       }
     }
-    
+
     // 版本3升级到版本4：添加复杂类型字段
     if (oldVersion < 4 && newVersion >= 4) {
       try {
         Logger.d('更新活动表结构到版本4 - 添加复杂类型字段', tag: 'ActivityService');
-        
+
         // 添加新列
         final columnUpdateStatements = [
           'ALTER TABLE $tableName ADD COLUMN start_latlng TEXT',
@@ -346,7 +348,7 @@ class ActivityService {
           'ALTER TABLE $tableName ADD COLUMN map_resource_state INTEGER',
           'ALTER TABLE $tableName ADD COLUMN athlete_id INTEGER',
         ];
-        
+
         // 执行列添加操作
         for (var statement in columnUpdateStatements) {
           try {
@@ -357,7 +359,7 @@ class ActivityService {
             Logger.w('执行失败: $statement, 错误: $e', tag: 'ActivityService');
           }
         }
-        
+
         Logger.d('活动表结构更新到版本4完成', tag: 'ActivityService');
       } catch (e) {
         Logger.e('更新活动表结构到版本4失败: $e', error: e, tag: 'ActivityService');
@@ -369,24 +371,25 @@ class ActivityService {
   Future<void> resetDatabase() async {
     try {
       Logger.d('开始重置数据库', tag: 'ActivityService');
-      
+
       String path = join(await getDatabasesPath(), 'strava_activities.db');
-      
+
       // 关闭数据库连接
       if (_database != null) {
         await _database!.close();
         _database = null;
       }
-      
+
       // 删除数据库文件
       await deleteDatabase(path);
       Logger.d('数据库文件已删除', tag: 'ActivityService');
-      
+
       // 重新初始化数据库
       _database = await _initDatabase();
       Logger.d('数据库已重新初始化', tag: 'ActivityService');
     } catch (e, stackTrace) {
-      Logger.e('重置数据库失败: $e', error: e, stackTrace: stackTrace, tag: 'ActivityService');
+      Logger.e('重置数据库失败: $e',
+          error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
   }
@@ -396,7 +399,7 @@ class ActivityService {
     try {
       final db = await database;
       Logger.d('更新运动员创建时间: $createdAt', tag: 'ActivityService');
-      
+
       // 检查同步状态表是否有记录
       final records = await db.query(syncTableName);
       if (records.isEmpty) {
@@ -417,7 +420,7 @@ class ActivityService {
         );
       }
     } catch (e, stackTrace) {
-      Logger.e('更新运动员创建时间失败: ${e.toString()}', 
+      Logger.e('更新运动员创建时间失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
@@ -428,19 +431,19 @@ class ActivityService {
     try {
       Logger.d('获取同步状态', tag: 'ActivityService');
       final db = await database;
-      
+
       // 确保同步状态表存在
       bool syncTableExists = await _ensureSyncTableExists(db);
       if (!syncTableExists) {
         Logger.d('同步状态表不存在，创建表', tag: 'ActivityService');
         await resetSyncStatus();
       }
-      
+
       final List<Map<String, dynamic>> results = await db.query(syncTableName);
-      
+
       if (results.isEmpty) {
         Logger.d('同步状态记录不存在，创建记录', tag: 'ActivityService');
-        
+
         // 创建默认记录
         final defaultStatus = {
           'last_page': 0,
@@ -448,17 +451,17 @@ class ActivityService {
           'athlete_created_at': null,
           'total_activities': 0
         };
-        
+
         final id = await db.insert(syncTableName, defaultStatus);
         defaultStatus['id'] = id;
-        
+
         return defaultStatus;
       }
-      
+
       Logger.d('同步状态: ${results.first}', tag: 'ActivityService');
       return results.first;
     } catch (e, stackTrace) {
-      Logger.e('获取同步状态失败: ${e.toString()}', 
+      Logger.e('获取同步状态失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       // 出错时返回一个默认状态
       return {
@@ -474,12 +477,13 @@ class ActivityService {
   /// 更新同步状态
   Future<void> updateSyncStatus(int currentPage, int totalActivities) async {
     try {
-      Logger.d('更新同步状态: 页数=$currentPage, 总活动数=$totalActivities', tag: 'ActivityService');
+      Logger.d('更新同步状态: 页数=$currentPage, 总活动数=$totalActivities',
+          tag: 'ActivityService');
       final db = await database;
-      
+
       // 获取当前同步状态
       final status = await getSyncStatus();
-      
+
       // 更新同步状态
       await db.update(
         syncTableName,
@@ -491,23 +495,23 @@ class ActivityService {
         where: 'id = ?',
         whereArgs: [status['id']],
       );
-      
+
       Logger.d('同步状态更新完成', tag: 'ActivityService');
     } catch (e, stackTrace) {
-      Logger.e('更新同步状态失败: ${e.toString()}', 
+      Logger.e('更新同步状态失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       // 更新失败不抛出异常，继续同步过程
     }
   }
-  
+
   /// 同步活动数据
-  Future<void> syncActivities({
-    Function(double current, double total, String status)? onProgress
-  }) async {
+  Future<void> syncActivities(
+      {Function(double current, double total, String status)?
+          onProgress}) async {
     try {
       Logger.d('开始同步活动数据 - 使用摘要数据模式', tag: 'ActivityService');
       final db = await database;
-      
+
       // 确保数据库表存在
       bool syncTableExists = await _ensureSyncTableExists(db);
       if (!syncTableExists) {
@@ -521,11 +525,11 @@ class ActivityService {
           throw Exception('无法创建同步状态表');
         }
       }
-      
+
       // 获取同步状态
       final syncStatusList = await db.query(syncTableName);
       Map<String, dynamic> syncStatus;
-      
+
       if (syncStatusList.isEmpty) {
         Logger.d('同步状态不存在，初始化同步状态', tag: 'ActivityService');
         syncStatus = {
@@ -538,50 +542,53 @@ class ActivityService {
       } else {
         syncStatus = syncStatusList.first;
       }
-      
+
       int currentPage = (syncStatus['last_page'] as int?) ?? 0;
       currentPage++; // 从下一页开始
-      
+
       // 获取总活动数
       final activities = await db.query(tableName);
       int totalActivities = activities.length;
       int initialActivityCount = totalActivities;
-      
-      Logger.d('当前同步状态: 页数=$currentPage, 总活动数=$totalActivities', tag: 'ActivityService');
-      
+
+      Logger.d('当前同步状态: 页数=$currentPage, 总活动数=$totalActivities',
+          tag: 'ActivityService');
+
       // 使用当前时间作为结束时间
       final now = DateTime.now().toUtc();
-      
+
       // 获取运动员创建时间作为起始时间
       DateTime startTime;
       if (syncStatus['athlete_created_at'] != null) {
         startTime = DateTime.parse(syncStatus['athlete_created_at'].toString());
-        Logger.d('使用运动员创建时间作为起始时间: ${startTime.toIso8601String()}', tag: 'ActivityService');
+        Logger.d('使用运动员创建时间作为起始时间: ${startTime.toIso8601String()}',
+            tag: 'ActivityService');
       } else {
         // 如果没有运动员创建时间，使用三年前的时间
         startTime = now.subtract(const Duration(days: 365 * 3));
-        Logger.d('未找到运动员创建时间，使用三年前时间: ${startTime.toIso8601String()}', tag: 'ActivityService');
+        Logger.d('未找到运动员创建时间，使用三年前时间: ${startTime.toIso8601String()}',
+            tag: 'ActivityService');
       }
-      
+
       bool hasMoreActivities = true;
       int perPage = 50; // 每页50条数据
       int successCount = 0;
       int errorCount = 0;
       int totalPages = 0;
       Stopwatch stopwatch = Stopwatch()..start();
-      
+
       // 循环获取活动数据，直到没有更多数据
       while (hasMoreActivities) {
         totalPages++;
-        Logger.d('获取第 $currentPage 页活动数据，每页 $perPage 条', tag: 'ActivityService');
-        
+        Logger.d('获取第 $currentPage 页活动数据，每页 $perPage 条',
+            tag: 'ActivityService');
+
         // 更新进度
         if (onProgress != null) {
-          onProgress(successCount.toDouble(), 
-                    (successCount + perPage).toDouble(), 
-                    '获取第 $currentPage 页活动数据...');
+          onProgress(successCount.toDouble(),
+              (successCount + perPage).toDouble(), '获取第 $currentPage 页活动数据...');
         }
-        
+
         try {
           // 获取活动列表
           final pageActivities = await StravaClientManager()
@@ -593,117 +600,132 @@ class ActivityService {
                 currentPage,
                 perPage,
               );
-          
+
           if (pageActivities.isEmpty) {
             Logger.d('第 $currentPage 页没有活动数据，同步完成', tag: 'ActivityService');
             hasMoreActivities = false;
             break;
           }
-          
-          Logger.d('从 Strava API 获取到第 $currentPage 页的 ${pageActivities.length} 个活动', 
+
+          Logger.d(
+              '从 Strava API 获取到第 $currentPage 页的 ${pageActivities.length} 个活动',
               tag: 'ActivityService');
-          
+
           int pageSuccessCount = 0;
           int pageErrorCount = 0;
-              
+
           for (var activity in pageActivities) {
             try {
               // 直接保存 SummaryActivity 数据，不再获取详细信息
               if (successCount % 10 == 0) {
-                Logger.d('处理活动 ${activity.id} - ${activity.name}', tag: 'ActivityService');
+                Logger.d('处理活动 ${activity.id} - ${activity.name}',
+                    tag: 'ActivityService');
               }
-              
+
               // 更新进度
               if (onProgress != null) {
-                onProgress(successCount.toDouble(), 
-                          (successCount + pageActivities.length).toDouble(), 
-                          '处理活动: ${activity.name ?? activity.id}');
+                onProgress(
+                    successCount.toDouble(),
+                    (successCount + pageActivities.length).toDouble(),
+                    '处理活动: ${activity.name ?? activity.id}');
               }
-              
+
               // 直接保存活动数据，不获取详细信息
               await _insertOrUpdateActivity(db, activity);
               successCount++;
               pageSuccessCount++;
-              
+
               // 每处理10个活动，更新一次同步状态
               if (successCount % 10 == 0) {
                 totalActivities = await _getActivityCount(db);
                 await updateSyncStatus(currentPage, totalActivities);
-                
+
                 // 更新进度
                 if (onProgress != null) {
-                  onProgress(successCount.toDouble(), 
-                            (successCount + (pageActivities.length - pageActivities.indexOf(activity) - 1)).toDouble(), 
-                            '已同步 $successCount 个活动...');
+                  onProgress(
+                      successCount.toDouble(),
+                      (successCount +
+                              (pageActivities.length -
+                                  pageActivities.indexOf(activity) -
+                                  1))
+                          .toDouble(),
+                      '已同步 $successCount 个活动...');
                 }
               }
             } catch (e) {
               errorCount++;
               pageErrorCount++;
-              Logger.e('处理活动 ${activity.id} 时出错: ${e.toString()}', error: e, tag: 'ActivityService');
+              Logger.e('处理活动 ${activity.id} 时出错: ${e.toString()}',
+                  error: e, tag: 'ActivityService');
             }
           }
-          
-          Logger.d('第 $currentPage 页处理完成: 成功=$pageSuccessCount, 失败=$pageErrorCount', tag: 'ActivityService');
-          
+
+          Logger.d(
+              '第 $currentPage 页处理完成: 成功=$pageSuccessCount, 失败=$pageErrorCount',
+              tag: 'ActivityService');
+
           // 更新当前页码和同步状态
           totalActivities = await _getActivityCount(db);
           await updateSyncStatus(currentPage, totalActivities);
           currentPage++;
-          
         } catch (e) {
-          Logger.e('获取第 $currentPage 页活动数据失败: ${e.toString()}', error: e, tag: 'ActivityService');
+          Logger.e('获取第 $currentPage 页活动数据失败: ${e.toString()}',
+              error: e, tag: 'ActivityService');
           // 发生错误时，保存当前同步状态，以便下次从这里继续
           await updateSyncStatus(currentPage - 1, totalActivities);
           throw Exception('获取第 $currentPage 页活动数据失败: ${e.toString()}');
         }
       }
-      
+
       // 停止计时
       stopwatch.stop();
       int elapsedSeconds = stopwatch.elapsedMilliseconds ~/ 1000;
-      
+
       // 验证同步结果
       totalActivities = await _getActivityCount(db);
       int newActivities = totalActivities - initialActivityCount;
-      
-      Logger.d('同步完成，耗时：${elapsedSeconds}秒，共处理 $successCount 个活动，新增 $newActivities 个，'
-          '失败 $errorCount 个，共查询 $totalPages 页，数据库中现有 $totalActivities 个活动', 
+
+      Logger.d(
+          '同步完成，耗时：${elapsedSeconds}秒，共处理 $successCount 个活动，新增 $newActivities 个，'
+          '失败 $errorCount 个，共查询 $totalPages 页，数据库中现有 $totalActivities 个活动',
           tag: 'ActivityService');
-      
+
       // 最终更新进度
       if (onProgress != null) {
         onProgress(1.0, 1.0, '同步完成，共同步 $successCount 个活动，新增 $newActivities 个');
       }
-      
+
       // 更新最终的同步状态
       await updateSyncStatus(currentPage - 1, totalActivities);
-          
+
       if (errorCount > 0) {
         throw Exception('同步过程中有 $errorCount 个活动处理失败');
       }
     } catch (e, stackTrace) {
-      Logger.e('同步活动数据失败: ${e.toString()}', error: e, stackTrace: stackTrace, tag: 'ActivityService');
+      Logger.e('同步活动数据失败: ${e.toString()}',
+          error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
   }
-  
+
   /// 获取活动总数
   Future<int> _getActivityCount(Database db) async {
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM $tableName');
+    final result =
+        await db.rawQuery('SELECT COUNT(*) as count FROM $tableName');
     return Sqflite.firstIntValue(result) ?? 0;
   }
-  
+
   /// 插入或更新活动数据
-  Future<void> _insertOrUpdateActivity(Database db, SummaryActivity activity) async {
+  Future<void> _insertOrUpdateActivity(
+      Database db, SummaryActivity activity) async {
     try {
       Logger.d('准备保存活动 ${activity.id} 到数据库', tag: 'ActivityService');
-      
+
       // 确保所有必需字段都有值
       if (activity.id == null) {
         throw Exception('活动ID不能为空');
       }
-      
+
       // 处理 startLatlng 和 endLatlng，将 List<double> 转为 JSON 字符串
       String? startLatlngJson;
       String? endLatlngJson;
@@ -713,7 +735,7 @@ class ActivityService {
       if (activity.endLatlng != null && activity.endLatlng!.isNotEmpty) {
         endLatlngJson = jsonEncode(activity.endLatlng);
       }
-      
+
       // 处理 map 对象，提取有用信息
       String? mapId;
       String? mapPolyline;
@@ -723,13 +745,13 @@ class ActivityService {
         mapPolyline = activity.map!.summaryPolyline;
         mapResourceState = activity.map!.resourceState;
       }
-      
+
       // 处理 athlete 对象，提取 athleteId
       int? athleteId;
       if (activity.athlete != null) {
         athleteId = activity.athlete!.id;
       }
-      
+
       final values = {
         'activity_id': activity.id,
         'resource_state': activity.resourceState,
@@ -785,24 +807,24 @@ class ActivityService {
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
-      
+
       // 移除所有值为null的键
       values.removeWhere((key, value) => value == null);
-      
+
       final result = await db.insert(
         tableName,
         values,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      
+
       Logger.d('活动 ${activity.id} 保存成功，结果: $result', tag: 'ActivityService');
     } catch (e, stackTrace) {
-      Logger.e('保存活动 ${activity.id} 到数据库失败: ${e.toString()}', 
+      Logger.e('保存活动 ${activity.id} 到数据库失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
   }
-  
+
   /// 获取所有活动数据
   Future<List<Map<String, dynamic>>> getAllActivities() async {
     try {
@@ -814,7 +836,7 @@ class ActivityService {
       return [];
     }
   }
-  
+
   /// 按日期获取活动数据
   Future<List<Map<String, dynamic>>> getActivitiesByDate(String date) async {
     try {
@@ -830,24 +852,24 @@ class ActivityService {
       return [];
     }
   }
-  
+
   /// 获取指定月份的活动统计数据
   /// 返回：包含不同类型活动的距离、爬升、卡路里等统计信息
   Future<Map<String, dynamic>> getMonthlyStats(int year, int month) async {
     try {
       final db = await database;
-      
+
       // 构建月份查询条件（格式：'YYYY-MM-%'）
       final monthStr = month.toString().padLeft(2, '0');
       final datePrefix = '$year-$monthStr';
-      
+
       // 查询该月所有活动
       final activities = await db.query(
         tableName,
         where: "start_date LIKE ?",
         whereArgs: ['$datePrefix%'],
       );
-      
+
       // 初始化统计结果
       final stats = {
         'totalActivities': activities.length,
@@ -855,51 +877,62 @@ class ActivityService {
         'totalElevationGain': 0.0, // 总爬升 (米)
         'totalKilojoules': 0.0, // 总卡路里消耗 (千焦)
         'totalMovingTime': 0, // 总运动时间 (秒)
-        
+
         // 按活动类型分类的统计
         'byActivityType': <String, Map<String, dynamic>>{},
-        
+
         // 记录每天是否有活动
         'activeDays': <int>{},
       };
-      
+
       // 遍历活动并累加数据
       for (final activity in activities) {
         // 累加总计数据
-        stats['totalDistance'] = (stats['totalDistance'] as double) + (activity['distance'] as double? ?? 0.0);
-        stats['totalElevationGain'] = (stats['totalElevationGain'] as double) + (activity['total_elevation_gain'] as double? ?? 0.0);
-        stats['totalKilojoules'] = (stats['totalKilojoules'] as double) + (activity['kilojoules'] as double? ?? 0.0);
-        stats['totalMovingTime'] = (stats['totalMovingTime'] as int) + (activity['moving_time'] as int? ?? 0);
-        
+        stats['totalDistance'] = (stats['totalDistance'] as double) +
+            (activity['distance'] as double? ?? 0.0);
+        stats['totalElevationGain'] = (stats['totalElevationGain'] as double) +
+            (activity['total_elevation_gain'] as double? ?? 0.0);
+        stats['totalKilojoules'] = (stats['totalKilojoules'] as double) +
+            (activity['kilojoules'] as double? ?? 0.0);
+        stats['totalMovingTime'] = (stats['totalMovingTime'] as int) +
+            (activity['moving_time'] as int? ?? 0);
+
         // 提取活动日期并记录活跃日
         final startDate = DateTime.parse(activity['start_date'] as String);
         (stats['activeDays'] as Set<int>).add(startDate.day);
-        
+
         // 按活动类型分类统计
         final activityType = activity['type'] as String? ?? '未知';
-        final typeStats = (stats['byActivityType'] as Map<String, Map<String, dynamic>>)[activityType] ?? {
-          'count': 0,
-          'distance': 0.0,
-          'elevationGain': 0.0,
-          'kilojoules': 0.0,
-          'movingTime': 0,
-        };
-        
+        final typeStats = (stats['byActivityType']
+                as Map<String, Map<String, dynamic>>)[activityType] ??
+            {
+              'count': 0,
+              'distance': 0.0,
+              'elevationGain': 0.0,
+              'kilojoules': 0.0,
+              'movingTime': 0,
+            };
+
         typeStats['count'] = (typeStats['count'] as int) + 1;
-        typeStats['distance'] = (typeStats['distance'] as double) + (activity['distance'] as double? ?? 0.0);
-        typeStats['elevationGain'] = (typeStats['elevationGain'] as double) + (activity['total_elevation_gain'] as double? ?? 0.0);
-        typeStats['kilojoules'] = (typeStats['kilojoules'] as double) + (activity['kilojoules'] as double? ?? 0.0);
-        typeStats['movingTime'] = (typeStats['movingTime'] as int) + (activity['moving_time'] as int? ?? 0);
-        
-        (stats['byActivityType'] as Map<String, Map<String, dynamic>>)[activityType] = typeStats;
+        typeStats['distance'] = (typeStats['distance'] as double) +
+            (activity['distance'] as double? ?? 0.0);
+        typeStats['elevationGain'] = (typeStats['elevationGain'] as double) +
+            (activity['total_elevation_gain'] as double? ?? 0.0);
+        typeStats['kilojoules'] = (typeStats['kilojoules'] as double) +
+            (activity['kilojoules'] as double? ?? 0.0);
+        typeStats['movingTime'] = (typeStats['movingTime'] as int) +
+            (activity['moving_time'] as int? ?? 0);
+
+        (stats['byActivityType']
+            as Map<String, Map<String, dynamic>>)[activityType] = typeStats;
       }
-      
+
       // 计算活跃天数
       stats['activeDaysCount'] = (stats['activeDays'] as Set<int>).length;
-      
+
       // 转换Set为List以便JSON序列化
       stats['activeDays'] = (stats['activeDays'] as Set<int>).toList()..sort();
-      
+
       return stats;
     } catch (e) {
       Logger.e('获取月度统计数据失败: $e', tag: 'ActivityService');
@@ -916,7 +949,7 @@ class ActivityService {
       };
     }
   }
-  
+
   /// 获取单个活动数据
   Future<Map<String, dynamic>?> getActivity(String activityId) async {
     try {
@@ -927,15 +960,16 @@ class ActivityService {
         where: 'activity_id = ?',
         whereArgs: [activityId],
       );
-      Logger.d('查询结果: ${results.isNotEmpty ? '找到活动' : '未找到活动'}', tag: 'ActivityService');
+      Logger.d('查询结果: ${results.isNotEmpty ? '找到活动' : '未找到活动'}',
+          tag: 'ActivityService');
       return results.isNotEmpty ? results.first : null;
     } catch (e, stackTrace) {
-      Logger.e('获取活动 $activityId 数据失败: ${e.toString()}', 
+      Logger.e('获取活动 $activityId 数据失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
   }
-  
+
   /// 删除活动数据
   Future<void> deleteActivity(String activityId) async {
     try {
@@ -948,12 +982,12 @@ class ActivityService {
       );
       Logger.d('删除活动 $activityId 完成，结果: $result', tag: 'ActivityService');
     } catch (e, stackTrace) {
-      Logger.e('删除活动 $activityId 失败: ${e.toString()}', 
+      Logger.e('删除活动 $activityId 失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
   }
-  
+
   /// 清空所有活动数据
   Future<void> clearAllActivities() async {
     try {
@@ -962,7 +996,7 @@ class ActivityService {
       final result = await db.delete(tableName);
       Logger.d('清空活动数据完成，结果: $result', tag: 'ActivityService');
     } catch (e, stackTrace) {
-      Logger.e('清空活动数据失败: ${e.toString()}', 
+      Logger.e('清空活动数据失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
@@ -973,12 +1007,11 @@ class ActivityService {
     try {
       Logger.d('重置同步状态', tag: 'ActivityService');
       final db = await database;
-      
+
       // 检查表是否存在
       final tables = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='$syncTableName'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='$syncTableName'");
+
       if (tables.isEmpty) {
         // 表不存在，创建表
         await db.execute('''
@@ -990,7 +1023,7 @@ class ActivityService {
             total_activities INTEGER DEFAULT 0
           )
         ''');
-        
+
         // 初始化记录
         await db.insert(syncTableName, {
           'last_page': 0,
@@ -998,12 +1031,12 @@ class ActivityService {
           'athlete_created_at': null,
           'total_activities': 0
         });
-        
+
         Logger.d('同步状态表创建并初始化', tag: 'ActivityService');
       } else {
         // 表存在，获取记录修改
         final syncStatus = await getSyncStatus();
-        
+
         await db.update(
           syncTableName,
           {
@@ -1013,11 +1046,11 @@ class ActivityService {
           where: 'id = ?',
           whereArgs: [syncStatus['id']],
         );
-        
+
         Logger.d('同步状态已重置', tag: 'ActivityService');
       }
     } catch (e, stackTrace) {
-      Logger.e('重置同步状态失败: ${e.toString()}', 
+      Logger.e('重置同步状态失败: ${e.toString()}',
           error: e, stackTrace: stackTrace, tag: 'ActivityService');
       rethrow;
     }
@@ -1026,8 +1059,51 @@ class ActivityService {
   /// 确保同步状态表存在
   Future<bool> _ensureSyncTableExists(Database db) async {
     final tables = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='$syncTableName'"
-    );
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='$syncTableName'");
     return tables.isNotEmpty;
   }
-} 
+
+  /// 获取所有活动的SVG缓存状态
+  Future<Map<String, bool>> getSvgCache() async {
+    final Map<String, bool> svgCache = {};
+    try {
+      // 获取数据库中所有活动的起始日期
+      final db = await database;
+      final List<Map<String, dynamic>> activities = await db.query(
+        tableName,
+        columns: ['start_date'],
+        where: 'start_date IS NOT NULL',
+      );
+
+      Logger.d('正在为 ${activities.length} 个活动生成SVG缓存', tag: 'ActivityService');
+
+      // 对于每个活动，检查对应日期的SVG文件是否存在
+      for (var activity in activities) {
+        if (activity['start_date'] != null) {
+          try {
+            final startDate = DateTime.parse(activity['start_date']);
+            final dateStr = CalendarUtils.formatDateToString(startDate);
+            svgCache[dateStr] = await CalendarUtils.doesSvgExist(dateStr);
+          } catch (e) {
+            Logger.e('处理活动日期出错: ${activity['start_date']}',
+                error: e, tag: 'ActivityService');
+          }
+        }
+      }
+
+      // 获取当前月和前后各两个月的SVG状态，确保日历显示完整
+      final now = DateTime.now();
+      for (int i = -2; i <= 2; i++) {
+        final month = DateTime(now.year, now.month + i);
+        final monthCache = await CalendarUtils.preloadSvgForMonth(month);
+        svgCache.addAll(monthCache);
+      }
+
+      Logger.d('SVG缓存生成完成，共 ${svgCache.length} 项', tag: 'ActivityService');
+      return svgCache;
+    } catch (e) {
+      Logger.e('生成SVG缓存出错', error: e, tag: 'ActivityService');
+      return {};
+    }
+  }
+}

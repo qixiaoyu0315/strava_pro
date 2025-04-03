@@ -17,6 +17,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
 import '../utils/calendar_exporter.dart';
 import '../utils/widget_manager.dart';
+import '../utils/date_utils.dart' as date_util;
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -64,6 +65,10 @@ class _SettingPageState extends State<SettingPage> {
   String? _athleteAvatar;
   int _activityCount = 0;
   Map<String, dynamic>? _syncStatusMap;
+
+  // 在_SettingPageState类中添加字段
+  DateTime _selectedWeekStart =
+      date_util.DateUtils.getWeekStart(DateTime.now());
 
   @override
   void initState() {
@@ -1132,10 +1137,156 @@ class _SettingPageState extends State<SettingPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 8.0),
+            // 周历选择和导出功能区域
+            _buildWeekExportSection(),
           ],
         ),
       ),
     );
+  }
+
+  // 添加周历选择和导出功能组件
+  Widget _buildWeekExportSection() {
+    final weekTitle = date_util.DateUtils.formatWeekTitle(_selectedWeekStart);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '周历导出',
+          style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 8.0),
+        // 显示当前选中的周
+        InkWell(
+          onTap: _showWeekPicker,
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(4.0),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(weekTitle),
+                Icon(Icons.arrow_drop_down),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 8.0),
+        // 导出周历按钮
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isLoading ? null : _exportWeekCalendar,
+            icon: const Icon(Icons.calendar_view_week),
+            label: const Text('导出周历图片'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 添加周选择器弹窗方法
+  void _showWeekPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('选择周'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: ListView.builder(
+            itemCount: 52, // 显示一年的周数
+            itemBuilder: (context, index) {
+              // 从当前日期开始，向前后各26周
+              final DateTime now = DateTime.now();
+              final DateTime weekStart = date_util.DateUtils.getWeekStart(now);
+              final DateTime targetWeekStart = DateTime(
+                weekStart.year,
+                weekStart.month,
+                weekStart.day - (26 - index) * 7,
+              );
+              final String weekTitle =
+                  date_util.DateUtils.formatWeekTitle(targetWeekStart);
+
+              // 判断是否为当前选中的周
+              final bool isSelected =
+                  targetWeekStart.year == _selectedWeekStart.year &&
+                      targetWeekStart.month == _selectedWeekStart.month &&
+                      targetWeekStart.day == _selectedWeekStart.day;
+
+              return ListTile(
+                title: Text(weekTitle),
+                subtitle: Text('第${index + 1}周'),
+                tileColor: isSelected ? Colors.blue.withOpacity(0.1) : null,
+                selected: isSelected,
+                onTap: () {
+                  setState(() {
+                    _selectedWeekStart = targetWeekStart;
+                  });
+                  Navigator.pop(context);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 添加导出周历的方法
+  Future<void> _exportWeekCalendar() async {
+    try {
+      final now = DateTime.now();
+
+      // 获取当前所有活动数据的SVG缓存
+      final svgCache = await _activityService.getSvgCache();
+
+      setState(() {
+        _isLoading = true;
+        _syncStatus = '正在导出周历...';
+        _syncProgress = 0.5;
+      });
+
+      final result = await CalendarExporter.exportWeek(
+        context: context,
+        weekStart: _selectedWeekStart,
+        selectedDate: now,
+        svgCache: svgCache,
+      );
+
+      setState(() {
+        _isLoading = false;
+        _syncStatus = '';
+        _syncMessage = result != null ? '周历导出成功' : '周历导出失败';
+      });
+
+      // 延迟清除消息
+      _clearMessageAfterDelay();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _syncStatus = '';
+        _syncMessage = '周历导出错误: $e';
+      });
+
+      // 延迟清除消息
+      _clearMessageAfterDelay();
+    }
   }
 
   // 布局切换卡片
@@ -1595,5 +1746,14 @@ class _SettingPageState extends State<SettingPage> {
       Logger.e('获取SVG缓存失败', error: e, tag: 'ExportCalendar');
       return {};
     }
+  }
+
+  // 延迟清除消息
+  void _clearMessageAfterDelay() {
+    Future.delayed(Duration(seconds: 5), () {
+      setState(() {
+        _syncMessage = '';
+      });
+    });
   }
 }
