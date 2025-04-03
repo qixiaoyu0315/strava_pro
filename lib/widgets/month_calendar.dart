@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
+import '../utils/calendar_exporter.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class MonthCalendar extends StatefulWidget {
   final DateTime? month;
@@ -66,46 +68,58 @@ class _MonthCalendarState extends State<MonthCalendar> {
   }
 
   Widget _buildMonthHeader(BuildContext context, Color textColor) {
-    return GestureDetector(
-      onTap: () {
-        if (widget.onDateSelected != null && widget.month != null) {
-          widget.onDateSelected!(widget.month!);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-          horizontal: 16,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: widget.displayedMonth?.year == widget.month?.year &&
-                  widget.displayedMonth?.month == widget.month?.month
-              ? Colors.blue.withOpacity(0.1)
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${widget.month!.year}年${widget.month!.month}月',
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                fontWeight: widget.displayedMonth!.year == widget.month!.year &&
-                        widget.displayedMonth!.month == widget.month!.month
-                    ? FontWeight.bold
-                    : FontWeight.w500,
-              ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        GestureDetector(
+          onTap: () {
+            if (widget.onDateSelected != null && widget.month != null) {
+              widget.onDateSelected!(widget.month!);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 16,
             ),
-            Icon(
-              Icons.arrow_drop_down,
-              color: textColor,
-              size: 20,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: widget.displayedMonth?.year == widget.month?.year &&
+                      widget.displayedMonth?.month == widget.month?.month
+                  ? Colors.blue.withOpacity(0.1)
+                  : null,
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${widget.month!.year}年${widget.month!.month}月',
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 16,
+                    fontWeight: widget.displayedMonth!.year ==
+                                widget.month!.year &&
+                            widget.displayedMonth!.month == widget.month!.month
+                        ? FontWeight.bold
+                        : FontWeight.w500,
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: textColor,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
+        IconButton(
+          onPressed: () => _exportCurrentMonth(context),
+          icon: const Icon(Icons.save_alt),
+          tooltip: '导出本月日历',
+          color: textColor,
+        ),
+      ],
     );
   }
 
@@ -215,5 +229,33 @@ class _MonthCalendarState extends State<MonthCalendar> {
     }
 
     return days;
+  }
+
+  Future<void> _exportCurrentMonth(BuildContext context) async {
+    try {
+      Fluttertoast.showToast(
+        msg: '正在导出${widget.month!.year}年${widget.month!.month}月的日历...',
+        toastLength: Toast.LENGTH_SHORT,
+      );
+
+      final String? exportedPath = await CalendarExporter.exportMonth(
+        context: context,
+        month: widget.month!,
+        selectedDate: widget.selectedDate,
+        svgCache: widget.svgCache,
+      );
+
+      if (exportedPath != null) {
+        Fluttertoast.showToast(
+          msg: '日历已导出',
+          toastLength: Toast.LENGTH_SHORT,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: '导出失败: $e',
+        toastLength: Toast.LENGTH_LONG,
+      );
+    }
   }
 }

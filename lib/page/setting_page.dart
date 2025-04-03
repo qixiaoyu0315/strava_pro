@@ -15,6 +15,7 @@ import '../utils/logger.dart';
 import '../service/activity_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
+import '../utils/calendar_exporter.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -52,7 +53,7 @@ class _SettingPageState extends State<SettingPage> {
   final AthleteModel _athleteModel = AthleteModel();
   final ActivityService _activityService = ActivityService();
   bool _isHorizontalLayout = true;
-  
+
   // 新增显示模式相关变量
   bool _isFullscreenMode = false; // 是否使用全屏模式
 
@@ -68,7 +69,7 @@ class _SettingPageState extends State<SettingPage> {
     super.initState();
     _loadApiKey();
     _loadSettings();
-    
+
     // 调试和修复数据库问题
     _debugAndFixDatabase().then((_) {
       // 完成调试和修复后再加载数据
@@ -117,7 +118,7 @@ class _SettingPageState extends State<SettingPage> {
       _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
       _isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
     });
-    
+
     // 根据设置应用全屏模式
     _applyFullscreenMode();
   }
@@ -128,7 +129,7 @@ class _SettingPageState extends State<SettingPage> {
     await prefs.setBool('isFullscreenMode', _isFullscreenMode);
     widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
-  
+
   // 新增：应用全屏模式方法
   void _applyFullscreenMode() {
     if (_isFullscreenMode) {
@@ -139,7 +140,7 @@ class _SettingPageState extends State<SettingPage> {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
-  
+
   // 新增：切换全屏模式
   void _toggleFullscreenMode(bool value) {
     setState(() {
@@ -153,8 +154,8 @@ class _SettingPageState extends State<SettingPage> {
     final apiKey = await _apiKeyModel.getApiKey();
     if (apiKey != null) {
       setState(() {
-      _idController.text = apiKey['api_id']!;
-      _keyController.text = apiKey['api_key']!;
+        _idController.text = apiKey['api_id']!;
+        _keyController.text = apiKey['api_key']!;
       });
     }
   }
@@ -230,10 +231,10 @@ class _SettingPageState extends State<SettingPage> {
 
   void showErrorMessage(dynamic error, dynamic stackTrace) {
     if (!mounted) return;
-    
+
     Widget content;
     String title;
-    
+
     if (error is Fault) {
       title = "认证错误";
       content = SingleChildScrollView(
@@ -246,17 +247,19 @@ class _SettingPageState extends State<SettingPage> {
             if (error.errors != null && error.errors!.isNotEmpty) ...[
               Text("详细信息:", style: TextStyle(fontWeight: FontWeight.bold)),
               SizedBox(height: 8),
-              ...error.errors!.map((e) => Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("代码: ${e.code ?? '未知'}"),
-                    Text("资源: ${e.resource ?? '未知'}"),
-                    Text("字段: ${e.field ?? '未知'}"),
-                  ],
-                ),
-              )).toList(),
+              ...error.errors!
+                  .map((e) => Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("代码: ${e.code ?? '未知'}"),
+                            Text("资源: ${e.resource ?? '未知'}"),
+                            Text("字段: ${e.field ?? '未知'}"),
+                          ],
+                        ),
+                      ))
+                  .toList(),
             ] else
               Text("无详细错误信息"),
           ],
@@ -268,20 +271,19 @@ class _SettingPageState extends State<SettingPage> {
         child: Text(error.toString()),
       );
     }
-    
+
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: content,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("关闭"),
-          ),
-        ],
-      )
-    );
+        context: context,
+        builder: (context) => AlertDialog(
+              title: Text(title),
+              content: content,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text("关闭"),
+                ),
+              ],
+            ));
   }
 
   Future<void> _loadAthleteInfo({bool isSync = false}) async {
@@ -341,10 +343,10 @@ class _SettingPageState extends State<SettingPage> {
       setState(() {
         _isLoading = true;
       });
-      
+
       String id = _idController.text;
       String key = _keyController.text;
-      
+
       if (id.isEmpty || key.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('请输入有效的 API ID 和 Key')),
@@ -352,12 +354,15 @@ class _SettingPageState extends State<SettingPage> {
         return;
       }
 
-      Logger.d('开始认证，使用 API ID: $id, Key: ${key.substring(0, min(5, key.length))}...', tag: 'SettingPage');
-      Logger.d('API 配置详情: ' 
-          '回调URL="stravaflutter://redirect", '
-          '回调方案="stravaflutter"', 
+      Logger.d(
+          '开始认证，使用 API ID: $id, Key: ${key.substring(0, min(5, key.length))}...',
           tag: 'SettingPage');
-      
+      Logger.d(
+          'API 配置详情: '
+          '回调URL="stravaflutter://redirect", '
+          '回调方案="stravaflutter"',
+          tag: 'SettingPage');
+
       // 保存 API 密钥
       await _apiKeyModel.insertApiKey(id, key);
       if (!mounted) return;
@@ -365,7 +370,7 @@ class _SettingPageState extends State<SettingPage> {
       // 初始化 StravaClientManager
       await StravaClientManager().initialize(id, key);
       if (!mounted) return;
-      
+
       Logger.d('StravaClientManager 初始化完成，开始进行认证', tag: 'SettingPage');
 
       // 进行认证
@@ -376,8 +381,10 @@ class _SettingPageState extends State<SettingPage> {
         token = tokenResponse;
         _textEditingController.text = tokenResponse.accessToken;
       });
-      
-      Logger.d('认证成功，获取到令牌，过期时间: ${DateTime.fromMillisecondsSinceEpoch(tokenResponse.expiresAt.toInt() * 1000)}', tag: 'SettingPage');
+
+      Logger.d(
+          '认证成功，获取到令牌，过期时间: ${DateTime.fromMillisecondsSinceEpoch(tokenResponse.expiresAt.toInt() * 1000)}',
+          tag: 'SettingPage');
 
       // 认证成功后加载运动员信息
       await _loadAthleteInfo();
@@ -388,10 +395,10 @@ class _SettingPageState extends State<SettingPage> {
       );
     } catch (e, stackTrace) {
       Logger.e('认证过程中出错', error: e, stackTrace: stackTrace, tag: 'SettingPage');
-      
+
       if (mounted) {
         showErrorMessage(e, stackTrace);
-        
+
         // 显示友好的错误提示
         String errorMsg = '认证失败';
         if (e is Fault) {
@@ -403,7 +410,7 @@ class _SettingPageState extends State<SettingPage> {
         } else {
           errorMsg += ': ${e.toString()}';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMsg),
@@ -464,7 +471,7 @@ class _SettingPageState extends State<SettingPage> {
     if (_athlete?.updatedAt == null || _lastActivitySyncTime == null) {
       return true;
     }
-    
+
     try {
       // 安全地处理updatedAt字段
       String updatedAtStr = '';
@@ -473,10 +480,10 @@ class _SettingPageState extends State<SettingPage> {
       } else {
         updatedAtStr = _athlete!.updatedAt.toString();
       }
-      
+
       final updatedAt = DateTime.parse(updatedAtStr);
       final lastSync = DateTime.parse(_lastActivitySyncTime!);
-      
+
       Logger.d('更新时间: $updatedAt, 最后同步: $lastSync', tag: 'ActivitySync');
       return updatedAt.isAfter(lastSync);
     } catch (e) {
@@ -506,28 +513,27 @@ class _SettingPageState extends State<SettingPage> {
     try {
       // 使用 ActivityService 同步活动数据
       await _activityService.syncActivities(
-        onProgress: (current, total, status) {
-          if (mounted) {
-            setState(() {
-              _syncProgress = current / total;
-              _syncStatus = status;
-            });
-          }
+          onProgress: (current, total, status) {
+        if (mounted) {
+          setState(() {
+            _syncProgress = current / total;
+            _syncStatus = status;
+          });
         }
-      );
-      
+      });
+
       // 更新活动计数和同步状态
       await _loadActivityCount();
       await _loadSyncStatus();
-      
+
       // 更新最后同步时间
       await _loadLastSyncTime();
       await _loadLastActivitySyncTime();
-      
+
       setState(() {
         _syncMessage = '同步成功，时间: ${_formatDateTime(DateTime.now().toString())}';
       });
-      
+
       Fluttertoast.showToast(msg: '同步成功');
     } catch (e) {
       Logger.e('同步活动数据失败: $e', tag: 'SettingPage');
@@ -564,7 +570,7 @@ class _SettingPageState extends State<SettingPage> {
           _athleteName = '用户'; // 暂时设置为默认值
           _athleteAvatar = null; // 暂时设置为 null
         });
-        
+
         // 尝试获取运动员信息并更新创建时间
         _updateAthleteCreatedTime();
       }
@@ -577,7 +583,8 @@ class _SettingPageState extends State<SettingPage> {
   Future<void> _updateAthleteCreatedTime() async {
     try {
       // 仅作为示例，实际上需要从Strava API获取
-      final createdAt = DateTime.now().subtract(const Duration(days: 365)).toIso8601String();
+      final createdAt =
+          DateTime.now().subtract(const Duration(days: 365)).toIso8601String();
       await _activityService.updateAthleteCreatedAt(createdAt);
       Logger.d('已更新运动员创建时间: $createdAt', tag: 'SettingPage');
     } catch (e) {
@@ -682,8 +689,9 @@ class _SettingPageState extends State<SettingPage> {
   @override
   Widget build(BuildContext context) {
     // 检测是否为横屏模式
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-    
+    final isLandscape =
+        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+
     if (isLandscape) {
       // 横屏布局 - 使用CustomScrollView来实现滚动隐藏AppBar
       return Scaffold(
@@ -744,7 +752,6 @@ class _SettingPageState extends State<SettingPage> {
           _buildUserInfoCard(context),
           const SizedBox(height: 8),
           _buildSyncCard(),
-
         ],
         // 布局切换开关
         _buildLayoutSwitchCard(),
@@ -763,7 +770,8 @@ class _SettingPageState extends State<SettingPage> {
         const SizedBox(height: 8),
         // 重置数据库按钮
         OutlinedButton.icon(
-          onPressed: _isLoading ? null : () => _showResetDatabaseConfirmation(context),
+          onPressed:
+              _isLoading ? null : () => _showResetDatabaseConfirmation(context),
           icon: const Icon(Icons.delete_forever),
           label: const Text('重置数据库'),
           style: OutlinedButton.styleFrom(
@@ -782,7 +790,7 @@ class _SettingPageState extends State<SettingPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 左侧用户信息
-        if (_athlete != null) 
+        if (_athlete != null)
           Expanded(
             flex: 1,
             child: Column(
@@ -793,7 +801,7 @@ class _SettingPageState extends State<SettingPage> {
               ],
             ),
           ),
-        
+
         // 右侧设置项
         Expanded(
           flex: 1,
@@ -818,7 +826,9 @@ class _SettingPageState extends State<SettingPage> {
                 const SizedBox(height: 8),
                 // 重置数据库按钮
                 OutlinedButton.icon(
-                  onPressed: _isLoading ? null : () => _showResetDatabaseConfirmation(context),
+                  onPressed: _isLoading
+                      ? null
+                      : () => _showResetDatabaseConfirmation(context),
                   icon: const Icon(Icons.delete_forever),
                   label: const Text('重置数据库'),
                   style: OutlinedButton.styleFrom(
@@ -914,7 +924,8 @@ class _SettingPageState extends State<SettingPage> {
               ),
               _buildSyncInfo(
                 '起始时间',
-                _formatDateTime(_syncStatusMap!['athlete_created_at']?.toString()),
+                _formatDateTime(
+                    _syncStatusMap!['athlete_created_at']?.toString()),
                 Icons.calendar_today,
               ),
             ],
@@ -967,15 +978,14 @@ class _SettingPageState extends State<SettingPage> {
               if (_athlete?.friendCount != null)
                 _buildDetailItem('关注中', '${_athlete!.friendCount!}'),
               if (_athlete?.createdAt != null)
-                _buildDetailItem(
-                    '创建时间', _formatDateTime(_athlete!.createdAt)),
+                _buildDetailItem('创建时间', _formatDateTime(_athlete!.createdAt)),
               if (_athlete?.updatedAt != null)
-                _buildDetailItem(
-                    '更新时间', _formatDateTime(_athlete!.updatedAt)),
+                _buildDetailItem('更新时间', _formatDateTime(_athlete!.updatedAt)),
               if (_lastSyncTime != null)
                 _buildDetailItem('最后同步时间', _formatDateTime(_lastSyncTime)),
               if (_lastActivitySyncTime != null)
-                _buildDetailItem('最后活动同步时间', _formatDateTime(_lastActivitySyncTime)),
+                _buildDetailItem(
+                    '最后活动同步时间', _formatDateTime(_lastActivitySyncTime)),
             ],
           ),
         ),
@@ -1019,11 +1029,13 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   // 通用的日期时间格式化方法
-  String _formatDateTime(dynamic dateTime, {String format = 'yyyy-MM-dd HH:mm', String defaultText = '未设置'}) {
-    if (dateTime == null || (dateTime is String && (dateTime == 'null' || dateTime.isEmpty))) {
+  String _formatDateTime(dynamic dateTime,
+      {String format = 'yyyy-MM-dd HH:mm', String defaultText = '未设置'}) {
+    if (dateTime == null ||
+        (dateTime is String && (dateTime == 'null' || dateTime.isEmpty))) {
       return defaultText;
     }
-    
+
     try {
       DateTime dt;
       if (dateTime is String) {
@@ -1095,6 +1107,20 @@ class _SettingPageState extends State<SettingPage> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8.0),
+            // 添加导出月历按钮
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _exportMonthCalendar,
+                icon: const Icon(Icons.calendar_month),
+                label: const Text('导出月历图片'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ),
           ],
         ),
@@ -1169,12 +1195,12 @@ class _SettingPageState extends State<SettingPage> {
               maxLines: 3,
               controller: _textEditingController,
               decoration: InputDecoration(
-                  border: OutlineInputBorder(),
+                border: OutlineInputBorder(),
                 labelText: "Access Token",
                 suffixIcon: IconButton(
                   icon: Icon(Icons.copy),
-                    onPressed: () {
-                      Clipboard.setData(
+                  onPressed: () {
+                    Clipboard.setData(
                       ClipboardData(text: _textEditingController.text),
                     ).then((_) {
                       if (mounted) {
@@ -1206,7 +1232,8 @@ class _SettingPageState extends State<SettingPage> {
                     Text('2. 授权回调域：localhost'),
                     Text('3. 确保添加了回调 URL：stravaflutter://redirect'),
                     SizedBox(height: 4),
-                    Text('如果认证失败，请检查您的 API 配置是否正确。', 
+                    Text(
+                      '如果认证失败，请检查您的 API 配置是否正确。',
                       style: TextStyle(color: Colors.red),
                     ),
                   ],
@@ -1285,32 +1312,34 @@ class _SettingPageState extends State<SettingPage> {
   Future<void> _debugAndFixDatabase() async {
     try {
       Logger.d('开始调试和修复数据库...', tag: 'DatabaseInit');
-      
+
       // 检查数据库表结构
       await _athleteModel.debugDatabaseTable();
-      
+
       // 尝试常规修复
       await _athleteModel.fixLastActivitySyncTime();
-      
+
       // 再次检查数据库状态
       await _athleteModel.debugDatabaseTable();
-      
+
       // 如果还是有问题，完全重置数据库
-      final lastActivitySyncTime = await _athleteModel.getLastActivitySyncTime();
+      final lastActivitySyncTime =
+          await _athleteModel.getLastActivitySyncTime();
       final lastSyncTime = await _athleteModel.getLastSyncTime();
-      
-      Logger.d('修复检查: 最后同步时间=$lastSyncTime, 最后活动同步时间=$lastActivitySyncTime', tag: 'DatabaseInit');
-      
+
+      Logger.d('修复检查: 最后同步时间=$lastSyncTime, 最后活动同步时间=$lastActivitySyncTime',
+          tag: 'DatabaseInit');
+
       // 如果最后活动同步时间依然为null但最后同步时间不为null，重置数据库
       if (lastSyncTime != null && lastActivitySyncTime == null) {
         Logger.w('检测到数据库异常，准备重置数据库', tag: 'DatabaseInit');
-        
+
         // 备份运动员信息
         final athleteData = await _athleteModel.getAthlete();
-        
+
         // 重置数据库
         await _athleteModel.resetDatabase();
-        
+
         // 如果有运动员数据，重新保存
         if (athleteData != null && _athlete != null) {
           // 重新保存运动员信息
@@ -1318,10 +1347,10 @@ class _SettingPageState extends State<SettingPage> {
           Logger.d('重置数据库后重新保存了运动员信息', tag: 'DatabaseInit');
         }
       }
-      
+
       // 最终检查
       await _athleteModel.debugDatabaseTable();
-      
+
       Logger.d('数据库调试和修复完成', tag: 'DatabaseInit');
     } catch (e) {
       Logger.e('数据库调试和修复失败', error: e, tag: 'DatabaseInit');
@@ -1334,14 +1363,14 @@ class _SettingPageState extends State<SettingPage> {
       Fluttertoast.showToast(msg: '请等待当前操作完成');
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
       _syncProgress = 0.0;
       _syncStatus = '准备生成SVG...';
       _syncMessage = '正在准备生成SVG...';
     });
-    
+
     // 将生成SVG的过程放在后台执行
     Future.delayed(Duration.zero, () async {
       try {
@@ -1352,67 +1381,70 @@ class _SettingPageState extends State<SettingPage> {
         int success = 0;
         int skipped = 0;
         int error = 0;
-        
+
         for (var activity in activities) {
           current++;
-          
+
           // 更新进度
           if (mounted) {
             setState(() {
               _syncProgress = current / total;
-              _syncStatus = '处理: ${activity['name'] ?? activity['id']} ($current/$total)';
+              _syncStatus =
+                  '处理: ${activity['name'] ?? activity['id']} ($current/$total)';
             });
           }
-          
+
           // 检查是否有map_polyline
           final polyline = activity['map_polyline'] as String?;
           final id = activity['id']?.toString() ?? '';
-          
+
           if (polyline == null || polyline.isEmpty) {
             skipped++;
             continue;
           }
-          
+
           try {
             // 提取日期，格式为"yyyy-MM-dd"
             final startDate = DateTime.parse(activity['start_date'].toString());
-            final dateStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
-            
+            final dateStr =
+                '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+
             // 设置SVG输出路径
             String svgPath;
             if (Platform.isAndroid) {
-              svgPath = '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
+              svgPath =
+                  '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
             } else {
               final dir = await getApplicationDocumentsDirectory();
               svgPath = '${dir.path}/strava_pro/svg/$dateStr.svg';
             }
-            
+
             // 确保目录存在
             final file = File(svgPath);
             final directory = file.parent;
             if (!await directory.exists()) {
               await directory.create(recursive: true);
             }
-            
+
             // 生成SVG文件
             await PolylineToSVG.generateAndSaveSVG(
               polyline,
               svgPath,
               strokeWidth: 6.0,
             );
-            
+
             success++;
           } catch (e) {
             Logger.e('为活动 $id 生成SVG失败: $e', error: e, tag: 'SVG');
             error++;
           }
-          
+
           // 每处理10个活动，暂停一下，避免阻塞UI
           if (current % 10 == 0) {
             await Future.delayed(const Duration(milliseconds: 50));
           }
         }
-        
+
         // 更新最终状态
         if (mounted) {
           setState(() {
@@ -1437,13 +1469,121 @@ class _SettingPageState extends State<SettingPage> {
         }
       }
     });
-    
+
     // 立即释放UI，让用户可以做其他操作
     setState(() {
       _isLoading = false;
       _syncMessage = '路线图生成在后台进行中...';
     });
-    
+
     Fluttertoast.showToast(msg: '路线图生成已在后台开始');
+  }
+
+  // 导出当前月份日历
+  Future<void> _exportMonthCalendar() async {
+    if (_isLoading) {
+      Fluttertoast.showToast(msg: '请等待当前操作完成');
+      return;
+    }
+
+    try {
+      setState(() {
+        _isLoading = true;
+        _syncMessage = '准备导出月历...';
+      });
+
+      // 获取当前月份
+      final now = DateTime.now();
+      final currentMonth = DateTime(now.year, now.month);
+
+      // 使用月份选择器选择要导出的月份
+      final DateTime? selectedMonth = await _showMonthPicker(currentMonth);
+      if (selectedMonth == null) {
+        setState(() {
+          _isLoading = false;
+          _syncMessage = '已取消导出';
+        });
+        return;
+      }
+
+      // 获取选中月份的SVG缓存
+      final svgCache = await _getSvgCacheForMonth(selectedMonth);
+
+      // 导出月历为图片
+      final String? exportedPath = await CalendarExporter.exportMonth(
+        context: context,
+        month: selectedMonth,
+        selectedDate: DateTime.now(),
+        svgCache: svgCache,
+      );
+
+      if (exportedPath != null) {
+        setState(() {
+          _syncMessage = '月历已导出至: $exportedPath';
+        });
+      } else {
+        setState(() {
+          _syncMessage = '导出失败，请检查权限设置';
+        });
+      }
+    } catch (e) {
+      Logger.e('导出月历失败', error: e, tag: 'ExportCalendar');
+      setState(() {
+        _syncMessage = '导出失败: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 显示月份选择器
+  Future<DateTime?> _showMonthPicker(DateTime initialDate) async {
+    final DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(initialDate.year - 2),
+      lastDate: initialDate,
+      initialDatePickerMode: DatePickerMode.year,
+      // 只显示月份
+      selectableDayPredicate: (DateTime date) {
+        // 只允许选择每月的第一天（显示月份选择器时）
+        return date.day == 1;
+      },
+    );
+
+    if (selectedDate != null) {
+      return DateTime(selectedDate.year, selectedDate.month);
+    }
+
+    return null;
+  }
+
+  // 获取指定月份的SVG缓存
+  Future<Map<String, bool>> _getSvgCacheForMonth(DateTime month) async {
+    try {
+      // 获取该月所有日期
+      final Map<String, bool> svgCache = {};
+
+      // 获取当月天数
+      final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+
+      // 遍历当月每一天，检查SVG文件是否存在
+      for (int day = 1; day <= daysInMonth; day++) {
+        final date = DateTime(month.year, month.month, day);
+        final dateStr = DateFormat('yyyy-MM-dd').format(date);
+        final svgPath =
+            '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
+
+        final file = File(svgPath);
+        svgCache[dateStr] = await file.exists();
+      }
+
+      return svgCache;
+    } catch (e) {
+      Logger.e('获取SVG缓存失败', error: e, tag: 'ExportCalendar');
+      return {};
+    }
   }
 }
