@@ -3,8 +3,7 @@
     android:id="@+id/widget_root_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="8dp"
-    android:background="#33000000">
+    android:padding="8dp">
 
     <ImageView
         android:id="@+id/widget_calendar_image"

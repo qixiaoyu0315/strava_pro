@@ -16,6 +16,7 @@ import '../service/activity_service.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
 import '../utils/calendar_exporter.dart';
+import '../utils/widget_manager.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -148,6 +149,15 @@ class _SettingPageState extends State<SettingPage> {
     });
     _saveSettings();
     _applyFullscreenMode();
+
+    // 全屏模式变化后更新小组件 - 因为这可能影响系统UI状态
+    WidgetManager.updateCalendarWidget().then((success) {
+      if (success) {
+        Logger.d('全屏模式切换后成功更新小组件', tag: 'SettingPage');
+      } else {
+        Logger.w('全屏模式切换后更新小组件失败', tag: 'SettingPage');
+      }
+    });
   }
 
   Future<void> _loadApiKey() async {

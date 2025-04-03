@@ -60,7 +60,7 @@ class MainApp extends StatefulWidget {
   State<MainApp> createState() => _MainAppState();
 }
 
-class _MainAppState extends State<MainApp> {
+class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   bool _isHorizontalLayout = true;
   List<Widget> _pages = [];
@@ -69,12 +69,51 @@ class _MainAppState extends State<MainApp> {
   bool _isAuthenticated = false;
   DetailedAthlete? _athlete;
 
+  // 添加当前主题模式的跟踪
+  Brightness? _lastBrightness;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initDefaultPages();
     _loadSettings();
     _checkAuthenticationStatus();
+    // 初始化当前亮度模式
+    _lastBrightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    final currentBrightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+
+    // 如果亮度模式发生变化，更新小组件
+    if (_lastBrightness != currentBrightness) {
+      _lastBrightness = currentBrightness;
+      Logger.d(
+          '系统主题模式变化: ${currentBrightness == Brightness.dark ? "暗色" : "亮色"}',
+          tag: 'Main');
+
+      // 更新小组件以应用新主题
+      WidgetManager.updateCalendarWidget().then((success) {
+        if (success) {
+          Logger.d('主题变化后成功更新小组件', tag: 'Main');
+        } else {
+          Logger.w('主题变化后更新小组件失败', tag: 'Main');
+        }
+      });
+    }
+
+    // 通知框架重建，但这通常不需要，因为我们使用了ThemeMode.system
+    if (mounted) setState(() {});
   }
 
   void _initDefaultPages() {

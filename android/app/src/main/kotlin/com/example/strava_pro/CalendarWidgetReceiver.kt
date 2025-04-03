@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import android.app.PendingIntent
 import android.os.Build
+import android.content.res.Configuration
 import java.io.File
 import es.antonborri.home_widget.HomeWidgetPlugin
 
@@ -50,6 +51,24 @@ class CalendarWidgetReceiver : AppWidgetProvider() {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(launchIntent)
             }
+        } else if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+            // 监听系统配置变更（包括主题变化）
+            Log.d(TAG, "系统配置变更，可能包含主题变化")
+            
+            // 获取所有小组件实例ID
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(
+                intent.component ?: context.packageName.let { 
+                    android.content.ComponentName(it, this::class.java.name) 
+                }
+            )
+            
+            // 更新所有小组件
+            if (appWidgetIds.isNotEmpty()) {
+                appWidgetIds.forEach { appWidgetId ->
+                    updateAppWidget(context, appWidgetManager, appWidgetId)
+                }
+            }
         }
     }
     
@@ -74,6 +93,21 @@ private fun updateAppWidget(
     // 获取小组件视图
     val views = RemoteViews(context.packageName, R.layout.calendar_widget_layout)
     
+    // 检测系统当前主题模式（日间/夜间）
+    val isDarkMode = when (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+    }
+    
+    // 根据主题设置背景
+    if (isDarkMode) {
+        Log.d("CalendarWidget", "使用夜间模式背景")
+        views.setInt(R.id.widget_root_layout, "setBackgroundResource", R.color.widget_background_dark)
+    } else {
+        Log.d("CalendarWidget", "使用日间模式背景")
+        views.setInt(R.id.widget_root_layout, "setBackgroundResource", R.color.widget_background_light)
+    }
+    
     // 获取存储的图片路径
     val widgetData = HomeWidgetPlugin.getData(context)
     val imagePath = widgetData.getString(
@@ -88,6 +122,8 @@ private fun updateAppWidget(
             // 从文件加载图片并设置到小组件
             val bitmap = BitmapFactory.decodeFile(imagePath)
             views.setImageViewBitmap(R.id.widget_calendar_image, bitmap)
+            views.setViewVisibility(R.id.widget_error_text, android.view.View.GONE)
+            views.setViewVisibility(R.id.widget_calendar_image, android.view.View.VISIBLE)
             Log.d("CalendarWidget", "设置图片成功: $imagePath")
         } else {
             Log.e("CalendarWidget", "图片文件不存在: $imagePath")
