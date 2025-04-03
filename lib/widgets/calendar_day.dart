@@ -11,6 +11,7 @@ class CalendarDay extends StatelessWidget {
   final Function(DateTime) onTap;
   final bool isAnimated;
   final Animation<double>? animation;
+  final double svgSizeFactor;
 
   /// 日历天组件
   /// [date] 日期
@@ -20,6 +21,7 @@ class CalendarDay extends StatelessWidget {
   /// [onTap] 点击回调
   /// [isAnimated] 是否使用动画
   /// [animation] 动画控制器
+  /// [svgSizeFactor] SVG图标尺寸因子
   const CalendarDay({
     super.key,
     required this.date,
@@ -29,6 +31,7 @@ class CalendarDay extends StatelessWidget {
     required this.onTap,
     this.isAnimated = false,
     this.animation,
+    this.svgSizeFactor = 1.0,
   });
 
   bool get _isToday {
@@ -59,7 +62,7 @@ class CalendarDay extends StatelessWidget {
       return Icon(
         Icons.sentiment_satisfied_alt_rounded,
         color: isSelected ? Colors.white : Colors.grey[400],
-        size: 20,
+        size: 20 * svgSizeFactor,
       );
     }
 
@@ -77,7 +80,7 @@ class CalendarDay extends StatelessWidget {
       return Icon(
         Icons.sentiment_satisfied_alt_rounded,
         color: isSelected ? Colors.white : Colors.grey[400],
-        size: 20,
+        size: 20 * svgSizeFactor,
       );
     }
   }

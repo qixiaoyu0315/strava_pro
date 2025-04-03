@@ -332,17 +332,17 @@ class CalendarExporter {
                         ],
                       ),
                     ),
-                    // 周视图
+                    // 周视图 - 调整高度为之前的两倍
                     RepaintBoundary(
                       key: repaintKey,
                       child: Container(
                         width: 380,
-                        height: 80,
+                        height: 160, // 从80增加到160
                         child: WeekGrid(
                           weekStart: weekStart,
                           selectedDate: selectedDate ?? DateTime.now(),
                           svgCache: svgCache ?? {},
-                          daySize: 45.0,
+                          daySize: 48.0, // 增加日期单元格尺寸
                         ),
                       ),
                     ),

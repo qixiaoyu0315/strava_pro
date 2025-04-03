@@ -1158,9 +1158,9 @@ class _SettingPageState extends State<SettingPage> {
           style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
         ),
         SizedBox(height: 8.0),
-        // 显示当前选中的周
+        // 显示当前选中的日期所在周
         InkWell(
-          onTap: _showWeekPicker,
+          onTap: _showDatePicker,
           child: Container(
             padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
             decoration: BoxDecoration(
@@ -1171,7 +1171,7 @@ class _SettingPageState extends State<SettingPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(weekTitle),
-                Icon(Icons.arrow_drop_down),
+                Icon(Icons.calendar_today),
               ],
             ),
           ),
@@ -1194,58 +1194,26 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
-  // 添加周选择器弹窗方法
-  void _showWeekPicker() {
-    showDialog(
+  // 添加日期选择器弹窗方法
+  void _showDatePicker() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('选择周'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: ListView.builder(
-            itemCount: 52, // 显示一年的周数
-            itemBuilder: (context, index) {
-              // 从当前日期开始，向前后各26周
-              final DateTime now = DateTime.now();
-              final DateTime weekStart = date_util.DateUtils.getWeekStart(now);
-              final DateTime targetWeekStart = DateTime(
-                weekStart.year,
-                weekStart.month,
-                weekStart.day - (26 - index) * 7,
-              );
-              final String weekTitle =
-                  date_util.DateUtils.formatWeekTitle(targetWeekStart);
-
-              // 判断是否为当前选中的周
-              final bool isSelected =
-                  targetWeekStart.year == _selectedWeekStart.year &&
-                      targetWeekStart.month == _selectedWeekStart.month &&
-                      targetWeekStart.day == _selectedWeekStart.day;
-
-              return ListTile(
-                title: Text(weekTitle),
-                subtitle: Text('第${index + 1}周'),
-                tileColor: isSelected ? Colors.blue.withOpacity(0.1) : null,
-                selected: isSelected,
-                onTap: () {
-                  setState(() {
-                    _selectedWeekStart = targetWeekStart;
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('取消'),
-          ),
-        ],
-      ),
+      initialDate: _selectedWeekStart,
+      firstDate: DateTime(DateTime.now().year - 1),
+      lastDate: DateTime(DateTime.now().year + 1),
+      helpText: '选择日期',
+      cancelText: '取消',
+      confirmText: '确定',
     );
+
+    if (picked != null) {
+      // 根据选择的日期计算所在周的开始日期
+      final weekStart = date_util.DateUtils.getWeekStart(picked);
+
+      setState(() {
+        _selectedWeekStart = weekStart;
+      });
+    }
   }
 
   // 添加导出周历的方法

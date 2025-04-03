@@ -50,18 +50,73 @@ class WeekGrid extends StatelessWidget {
             day.month == selectedDate.month &&
             day.day == selectedDate.day;
 
+        // 为SVG图提供更大的空间
         return SizedBox(
           width: daySize,
-          height: daySize,
-          child: CalendarDay(
-            date: day,
-            selectedDate: selectedDate,
-            isSelected: isSelected,
-            hasSvg: _hasSvg(day),
-            onTap: onDateSelected ?? (_) {},
+          height: daySize * 2, // 高度增加为宽度的两倍，增大SVG显示空间
+          child: Column(
+            children: [
+              // 日期文本
+              Container(
+                height: daySize * 0.4, // 占总高度的20%
+                alignment: Alignment.center,
+                child: Text(
+                  '${day.day}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: day.day == DateTime.now().day &&
+                                day.month == DateTime.now().month &&
+                                day.year == DateTime.now().year ||
+                            isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: _getDateColor(context, day, isSelected),
+                  ),
+                ),
+              ),
+              // SVG路线图，占更大空间
+              Expanded(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: _buildSvgIcon(context, day, isSelected),
+                ),
+              ),
+            ],
           ),
         );
       }).toList(),
+    );
+  }
+
+  // 获取日期颜色
+  Color _getDateColor(BuildContext context, DateTime date, bool isSelected) {
+    if (isSelected) {
+      return Colors.blue;
+    }
+
+    // 周末颜色
+    if (date.weekday == 6) {
+      // 周六
+      return Theme.of(context).colorScheme.primary;
+    } else if (date.weekday == 7) {
+      // 周日
+      return Colors.red;
+    }
+
+    // 普通日期颜色
+    return Theme.of(context).colorScheme.onSurface;
+  }
+
+  // 构建SVG图标
+  Widget _buildSvgIcon(BuildContext context, DateTime date, bool isSelected) {
+    return CalendarDay(
+      date: date,
+      selectedDate: selectedDate,
+      isSelected: isSelected,
+      hasSvg: _hasSvg(date),
+      onTap: onDateSelected ?? (_) {},
+      svgSizeFactor: 1.8, // 增大SVG图标尺寸
     );
   }
 }
