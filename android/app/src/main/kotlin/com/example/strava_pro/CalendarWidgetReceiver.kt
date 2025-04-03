@@ -36,40 +36,74 @@ class CalendarWidgetReceiver : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         
-        if (intent.action == WIDGET_CLICK) {
-            // 处理小组件点击事件
-            val appWidgetId = intent.getIntExtra(
-                AppWidgetManager.EXTRA_APPWIDGET_ID,
-                AppWidgetManager.INVALID_APPWIDGET_ID
-            )
-            
-            Log.d(TAG, "Widget clicked: $appWidgetId")
-            
-            // 启动主应用
-            val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(launchIntent)
-            }
-        } else if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
-            // 监听系统配置变更（包括主题变化）
-            Log.d(TAG, "系统配置变更，可能包含主题变化")
-            
-            // 获取所有小组件实例ID
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(
-                intent.component ?: context.packageName.let { 
-                    android.content.ComponentName(it, this::class.java.name) 
+        when (intent.action) {
+            WIDGET_CLICK -> {
+                // 处理小组件点击事件
+                val appWidgetId = intent.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+                )
+                
+                Log.d(TAG, "Widget clicked: $appWidgetId")
+                
+                // 启动主应用
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(launchIntent)
                 }
-            )
-            
-            // 更新所有小组件
-            if (appWidgetIds.isNotEmpty()) {
-                appWidgetIds.forEach { appWidgetId ->
-                    updateAppWidget(context, appWidgetManager, appWidgetId)
+            }
+            Intent.ACTION_CONFIGURATION_CHANGED -> {
+                // 监听系统配置变更（包括主题变化）
+                Log.d(TAG, "系统配置变更，可能包含主题变化")
+                
+                // 获取当前实例的所有小组件ID
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val thisAppWidget = android.content.ComponentName(
+                    context.packageName,
+                    this.javaClass.name
+                )
+                val appWidgetIds = appWidgetManager.getAppWidgetIds(thisAppWidget)
+                
+                // 如果有小组件实例存在，则更新它们
+                if (appWidgetIds.isNotEmpty()) {
+                    Log.d(TAG, "找到 ${appWidgetIds.size} 个小组件实例，正在更新")
+                    onUpdate(context, appWidgetManager, appWidgetIds)
+                } else {
+                    Log.d(TAG, "未找到小组件实例")
+                }
+            }
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                // 系统启动完成或应用更新后
+                Log.d(TAG, "系统启动完成或应用已更新，正在初始化小组件")
+                
+                // 获取当前实例的所有小组件ID
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val thisAppWidget = android.content.ComponentName(
+                    context.packageName,
+                    this.javaClass.name
+                )
+                val appWidgetIds = appWidgetManager.getAppWidgetIds(thisAppWidget)
+                
+                // 如果有小组件实例存在，则更新它们
+                if (appWidgetIds.isNotEmpty()) {
+                    Log.d(TAG, "找到 ${appWidgetIds.size} 个小组件实例，正在更新")
+                    onUpdate(context, appWidgetManager, appWidgetIds)
                 }
             }
         }
+    }
+
+    // 当小组件第一次添加到桌面时调用
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        Log.d(TAG, "小组件已启用")
+    }
+
+    // 当最后一个小组件实例从桌面移除时调用
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        Log.d(TAG, "小组件已禁用")
     }
     
     companion object {
