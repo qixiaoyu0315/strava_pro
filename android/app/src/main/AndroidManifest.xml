@@ -44,6 +44,20 @@
                             android:scheme="stravaflutter" />
             </intent-filter>
         </activity>
+        
+        <!-- 日历小组件接收器 -->
+        <receiver
+            android:name=".CalendarWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.strava_pro.CALENDAR_WIDGET_CLICK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/calendar_widget_info" />
+        </receiver>
+        
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

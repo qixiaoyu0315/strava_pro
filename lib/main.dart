@@ -8,6 +8,7 @@ import 'model/api_key_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:strava_client/strava_client.dart';
 import 'utils/logger.dart';
+import 'utils/widget_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,12 +31,24 @@ void main() async {
   // 加载并应用全屏设置
   final prefs = await SharedPreferences.getInstance();
   final isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
-  
+
   if (isFullscreenMode) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
   } else {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
+
+  // 初始化小组件服务
+  await WidgetManager.initialize();
+
+  // 尝试更新小组件显示，默认显示固定路径的日历图片
+  WidgetManager.updateCalendarWidget().then((success) {
+    if (success) {
+      Logger.d('应用启动时成功更新小组件', tag: 'Main');
+    } else {
+      Logger.w('应用启动时更新小组件失败', tag: 'Main');
+    }
+  });
 
   runApp(const MainApp());
 }
@@ -265,8 +278,12 @@ class _MainAppState extends State<MainApp> {
                           // 显示未选中的标签
                           showUnselectedLabels: true,
                           // 使用与NavigationRail一致的样式
-                          selectedItemColor: Theme.of(context).colorScheme.primary,
-                          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          selectedItemColor:
+                              Theme.of(context).colorScheme.primary,
+                          unselectedItemColor: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.7),
                         ),
                 );
               },

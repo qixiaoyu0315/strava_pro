@@ -9,6 +9,7 @@ import '../utils/logger.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'widget_manager.dart';
 
 /// 日历导出工具
 class CalendarExporter {
@@ -181,6 +182,10 @@ class CalendarExporter {
           toastLength: Toast.LENGTH_LONG,
         );
         Logger.d('日历导出成功: $savedPath', tag: 'CalendarExporter');
+
+        // 导出成功后，更新小组件显示
+        await WidgetManager.updateCalendarWidget(imagePath: savedPath);
+
         return savedPath;
       } else {
         Fluttertoast.showToast(
@@ -231,9 +236,40 @@ class CalendarExporter {
             },
             child: Text('查看图片'),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _updateWidget(path);
+            },
+            child: Text('更新小组件'),
+          ),
         ],
       ),
     );
+  }
+
+  // 更新小组件
+  static Future<void> _updateWidget(String imagePath) async {
+    try {
+      final success =
+          await WidgetManager.updateCalendarWidget(imagePath: imagePath);
+      if (success) {
+        Fluttertoast.showToast(
+          msg: '小组件已更新',
+          toastLength: Toast.LENGTH_SHORT,
+        );
+      } else {
+        Fluttertoast.showToast(
+          msg: '小组件更新失败',
+          toastLength: Toast.LENGTH_SHORT,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: '更新小组件失败: $e',
+        toastLength: Toast.LENGTH_SHORT,
+      );
+    }
   }
 
   // 打开导出的图片文件
