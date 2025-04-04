@@ -253,7 +253,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                     children: [
                       // 上方当前月日历
                       SizedBox(
-                        height: constraints.maxHeight * 0.62, // 占页面高度的62%
+                        height: constraints.maxHeight * 0.58, // 占页面高度的62%
                         child: MonthView(
                           month: month,
                           selectedDate: _selectedDate,

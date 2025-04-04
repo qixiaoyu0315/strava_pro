@@ -25,9 +25,9 @@ class RouteCard extends StatelessWidget {
         MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     // 根据屏幕方向调整高度
-    final cardHeight = isLandscape ? 120.0 : 150.0;
+    final cardHeight = isLandscape ? 140.0 : 150.0;
     // 根据屏幕方向调整图片宽度比例
-    final mapWidthRatio = isLandscape ? 0.3 : 0.35;
+    final mapWidthRatio = isLandscape ? 0.2 : 0.4;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
