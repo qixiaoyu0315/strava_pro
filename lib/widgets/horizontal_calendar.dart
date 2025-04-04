@@ -78,6 +78,13 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     super.dispose();
   }
 
+  // 获取指定月份的索引
+  int _getMonthIndex(DateTime month) {
+    final now = DateTime.now();
+    final startDate = DateTime(now.year - 2, now.month);
+    return (month.year - startDate.year) * 12 + (month.month - startDate.month);
+  }
+
   // 加载指定索引月份的SVG数据
   void _loadMonthSvgData(int monthIndex) {
     if (_monthSvgCaches.containsKey(monthIndex)) return;
@@ -183,6 +190,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0),
                             child: MonthlyStatsWidget(
+                              key: ValueKey('stats_${month.year}_${month.month}'),
                               month: month,
                               activityService: _activityService,
                               showCard: false,
@@ -271,6 +279,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0),
                             child: MonthlyStatsWidget(
+                              key: ValueKey('stats_${month.year}_${month.month}'),
                               month: month,
                               activityService: _activityService,
                               showCard: false,
@@ -326,18 +335,17 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
       context: context,
       builder: (BuildContext context) {
         return MonthPicker(
-          initialDate: _displayedMonth,
-          firstDate: DateTime(DateTime.now().year - 2),
-          lastDate: DateTime(DateTime.now().year + 2),
-          onMonthSelected: (DateTime date) {
-            if (mounted) {
-              setState(() {
-                _displayedMonth = date;
-              });
-              // 选择月份后也更新选中的日期
-              _selectDate(date);
-            }
+          initialMonth: _displayedMonth,
+          onMonthSelected: (DateTime selectedMonth) {
             Navigator.of(context).pop();
+            final index = _getMonthIndex(selectedMonth);
+            if (index >= 0 && index < _totalMonths) {
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
           },
         );
       },

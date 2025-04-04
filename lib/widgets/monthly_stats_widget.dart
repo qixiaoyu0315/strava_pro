@@ -22,11 +22,18 @@ class MonthlyStatsWidget extends StatefulWidget {
 class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
   bool _isLoading = true;
   Map<String, dynamic> _stats = {};
+  bool _canceled = false;
   
   @override
   void initState() {
     super.initState();
     _loadStats();
+  }
+  
+  @override
+  void dispose() {
+    _canceled = true; // 标记组件已被销毁
+    super.dispose();
   }
   
   @override
@@ -40,14 +47,21 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
   }
   
   Future<void> _loadStats() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
+    
+    // 使用一个本地变量存储取消状态，以便在异步操作中捕获当前状态
+    final cancelToken = _canceled;
     
     final stats = await widget.activityService.getMonthlyStats(
       widget.month.year, 
       widget.month.month
     );
+    
+    // 如果组件已被销毁或标记为取消，则不更新状态
+    if (cancelToken || !mounted) return;
     
     setState(() {
       _stats = stats;
