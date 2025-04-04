@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../utils/logger.dart';
 import '../utils/map_tile_cache_manager.dart';
 import 'dart:math' as math;
+import './region_manage_page.dart';
 
 /// 地图瓦片缓存管理页面
 class MapCachePage extends StatefulWidget {
@@ -173,8 +174,36 @@ class _MapCachePageState extends State<MapCachePage> {
         }
       }
       
-      // 模拟下载后刷新缓存统计
-      await _refreshCacheStats();
+      // 实际更新缓存统计信息
+      // 创建一个新的下载记录
+      final regionName = "区域_${DateTime.now().millisecondsSinceEpoch}";
+      final size = totalTiles * 15 * 1024; // 15KB per tile
+      
+      // 更新缓存统计
+      final oldStats = Map<String, dynamic>.from(_cacheStats);
+      setState(() {
+        _cacheStats = {
+          'size': (oldStats['size'] ?? 0) + size,
+          'tileCount': (oldStats['tileCount'] ?? 0) + totalTiles,
+          'regions': (oldStats['regions'] ?? 0) + 1,
+        };
+      });
+      
+      // 将区域信息保存到本地存储中
+      await _saveRegionInfo(regionName, {
+        'name': regionName,
+        'date': DateTime.now().toString(),
+        'bounds': {
+          'north': _currentBounds!.north,
+          'south': _currentBounds!.south,
+          'east': _currentBounds!.east,
+          'west': _currentBounds!.west,
+        },
+        'minZoom': _minZoom,
+        'maxZoom': _maxZoom,
+        'tileCount': totalTiles,
+        'size': size,
+      });
       
       if (mounted) {
         setState(() {
@@ -204,24 +233,44 @@ class _MapCachePageState extends State<MapCachePage> {
     }
   }
 
-  // 清除所有缓存 - 简化版本
+  // 保存区域信息到本地存储
+  Future<void> _saveRegionInfo(String regionName, Map<String, dynamic> info) async {
+    try {
+      // 获取之前保存的所有区域
+      final regionsJson = await MapTileCacheManager.instance.getSavedRegions();
+      final regions = Map<String, dynamic>.from(regionsJson);
+      
+      // 添加新区域
+      regions[regionName] = info;
+      
+      // 保存更新后的区域信息
+      await MapTileCacheManager.instance.saveRegions(regions);
+      
+      Logger.d('保存区域信息成功: $regionName', tag: 'MapCache');
+    } catch (e) {
+      Logger.e('保存区域信息失败', error: e, tag: 'MapCache');
+    }
+  }
+
+  // 清除所有缓存
   Future<void> _clearAllCache() async {
     try {
-      // 简化版本，只更新统计数据
-      setState(() {
-        _cacheStats = {
-          'size': 0,
-          'tileCount': 0,
-          'regions': 0,
-        };
-      });
+      // 使用缓存管理器的方法清除所有区域
+      final result = await MapTileCacheManager.instance.clearAllRegions();
       
-      if (mounted) {
-        Fluttertoast.showToast(
-          msg: "所有缓存已清除",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-        );
+      if (result) {
+        // 刷新缓存统计
+        await _refreshCacheStats();
+        
+        if (mounted) {
+          Fluttertoast.showToast(
+            msg: "所有缓存已清除",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+          );
+        }
+      } else {
+        throw Exception("清除失败");
       }
     } catch (e) {
       if (mounted) {
@@ -415,6 +464,17 @@ class _MapCachePageState extends State<MapCachePage> {
             tooltip: '刷新缓存统计',
           ),
           IconButton(
+            icon: const Icon(Icons.storage),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const RegionManagePage(),
+                ),
+              ).then((_) => _refreshCacheStats());
+            },
+            tooltip: '管理已缓存区域',
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_forever),
             onPressed: _isDownloading
                 ? null
@@ -550,6 +610,30 @@ class _MapCachePageState extends State<MapCachePage> {
                     ),
                   ),
                 ),
+                // 添加定位按钮到地图右下角
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: FloatingActionButton(
+                    heroTag: 'locationButton',
+                    onPressed: _isLocating ? null : _getCurrentLocation,
+                    mini: true, // 使用小一点的FAB
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.blue,
+                    elevation: 4,
+                    child: _isLocating
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.0,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                            ),
+                          )
+                        : Icon(Icons.my_location),
+                    tooltip: '定位到当前位置',
+                  ),
+                ),
               ],
             ),
           ),
@@ -610,43 +694,50 @@ class _MapCachePageState extends State<MapCachePage> {
                     textAlign: TextAlign.center,
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   
-                  // 下载进度显示
-                  if (_isDownloading)
-                    Column(
-                      children: [
-                        LinearProgressIndicator(value: _downloadProgress / 100),
-                        const SizedBox(height: 8),
-                        Text(
-                          '总进度: ${_downloadProgress.toStringAsFixed(1)}%',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        if (_currentProcessingZoom != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '当前处理缩放级别: $_currentProcessingZoom',
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(
-                            value: _currentZoomTileCount > 0 
-                                ? (_currentZoomProcessedTiles / _currentZoomTileCount).clamp(0.0, 1.0) 
-                                : 0.0,
-                            color: Colors.green,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '级别进度: $_currentZoomProcessedTiles/$_currentZoomTileCount 瓦片 (${(_currentZoomTileCount > 0 ? _currentZoomProcessedTiles / _currentZoomTileCount * 100 : 0).toStringAsFixed(1)}%)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12),
-                          ),
+                  // 使用Expanded+SingleChildScrollView确保下载进度区域可滚动，防止溢出
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          // 下载进度显示
+                          if (_isDownloading) ...[
+                            LinearProgressIndicator(value: _downloadProgress / 100),
+                            const SizedBox(height: 8),
+                            Text(
+                              '总进度: ${_downloadProgress.toStringAsFixed(1)}%',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            if (_currentProcessingZoom != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '当前处理缩放级别: $_currentProcessingZoom',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              LinearProgressIndicator(
+                                value: _currentZoomTileCount > 0 
+                                    ? (_currentZoomProcessedTiles / _currentZoomTileCount).clamp(0.0, 1.0) 
+                                    : 0.0,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '级别进度: $_currentZoomProcessedTiles/$_currentZoomTileCount 瓦片 (${(_currentZoomTileCount > 0 ? _currentZoomProcessedTiles / _currentZoomTileCount * 100 : 0).toStringAsFixed(1)}%)',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
+                  ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   
                   // 操作按钮
                   Row(
@@ -682,13 +773,6 @@ class _MapCachePageState extends State<MapCachePage> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isLocating ? null : _getCurrentLocation,
-        child: _isLocating
-            ? CircularProgressIndicator(color: Colors.white)
-            : Icon(Icons.my_location),
-        tooltip: '定位到当前位置',
       ),
     );
   }
