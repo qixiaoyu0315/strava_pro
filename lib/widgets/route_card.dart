@@ -25,9 +25,7 @@ class RouteCard extends StatelessWidget {
         MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     // 根据屏幕方向调整高度
-    final cardHeight = isLandscape ? 140.0 : 150.0;
-    // 根据屏幕方向调整图片宽度比例
-    final mapWidthRatio = isLandscape ? 0.2 : 0.4;
+    final cardHeight = isLandscape ? 160.0 : 170.0;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -38,28 +36,30 @@ class RouteCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onTap,
-        child: Column(
+        child: Stack(
           children: [
-            // 上半部分：地图和路线名称
+            // 底层：路线地图作为背景
             SizedBox(
-              height: cardHeight, // 动态高度
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 左侧地图，宽度根据屏幕方向调整
-                  SizedBox(
-                    width: screenWidth * mapWidthRatio,
-                    child: _buildMapImage(isDarkMode),
-                  ),
-
-                  // 右侧信息区域
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: _buildRouteInfo(context, isLandscape),
-                    ),
-                  ),
-                ],
+              height: cardHeight,
+              width: double.infinity,
+              child: _buildMapBackground(isDarkMode),
+            ),
+            
+            // 半透明遮罩层，增加对比度
+            Positioned.fill(
+              child: Container(
+                color: isDarkMode 
+                    ? Colors.black.withOpacity(0.5) 
+                    : Colors.white.withOpacity(0.65),
+              ),
+            ),
+            
+            // 上层：路线信息
+            SizedBox(
+              height: cardHeight,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: _buildRouteInfoOverlay(context, isLandscape, isDarkMode),
               ),
             ),
           ],
@@ -68,170 +68,180 @@ class RouteCard extends StatelessWidget {
     );
   }
 
-  /// 构建地图图片组件
-  Widget _buildMapImage(bool isDarkMode) {
-    return Container(
-      color: Colors.grey.shade200,
-      child: Image.network(
-        routeData['mapUrl'] != '无地图链接'
-            ? isDarkMode
-                ? routeData['mapDarkUrl']!
-                : routeData['mapUrl']!
-            : 'https://via.placeholder.com/150',
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Center(
-            child: Icon(Icons.broken_image, size: 50, color: Colors.grey)),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Center(
-            child: CircularProgressIndicator(
-              value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded /
-                      loadingProgress.expectedTotalBytes!
-                  : null,
-            ),
-          );
-        },
+  /// 构建地图背景
+  Widget _buildMapBackground(bool isDarkMode) {
+    return Image.network(
+      routeData['mapUrl'] != '无地图链接'
+          ? isDarkMode
+              ? routeData['mapDarkUrl']!
+              : routeData['mapUrl']!
+          : 'https://via.placeholder.com/700x292',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: Colors.grey.shade300,
+        child: Center(
+          child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
+        ),
       ),
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                    loadingProgress.expectedTotalBytes!
+                : null,
+          ),
+        );
+      },
     );
   }
 
-  /// 构建路线信息组件
-  Widget _buildRouteInfo(BuildContext context, bool isLandscape) {
+  /// 构建路线信息覆盖层
+  Widget _buildRouteInfoOverlay(BuildContext context, bool isLandscape, bool isDarkMode) {
+    // 设置文本颜色，以适应深色/浅色背景
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtitleColor = isDarkMode ? Colors.white70 : Colors.black54;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
       children: [
         // 路线名称
-        _buildRouteName(isLandscape),
+        Text(
+          routeData['name'],
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: isLandscape ? 18 : 20,
+            color: textColor,
+            shadows: [
+              Shadow(
+                blurRadius: 2.0,
+                color: Colors.black.withOpacity(0.3),
+                offset: const Offset(1.0, 1.0),
+              ),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        
+        const SizedBox(height: 12),
         
         // 距离和时间信息
-        _buildDistanceTimeInfo(isLandscape),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // 左侧：距离
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.directions_bike, size: 16, color: subtitleColor),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${routeData['distance']?.toStringAsFixed(1)} km',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isLandscape ? 14 : 16,
+                        color: textColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // 右侧：时间
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(Icons.access_time, size: 16, color: subtitleColor),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isLandscape ? 14 : 16,
+                        color: textColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 12),
         
         // 爬升和导航按钮
-        _buildElevationNavigation(isLandscape),
-      ],
-    );
-  }
-  
-  /// 构建路线名称组件
-  Widget _buildRouteName(bool isLandscape) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Text(
-        routeData['name'],
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: isLandscape ? 16 : 18,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // 左侧：爬升信息
+            Row(
+              children: [
+                Icon(Icons.trending_up, size: 16, color: subtitleColor),
+                const SizedBox(width: 4),
+                Text(
+                  '${routeData['elevationGain']?.toStringAsFixed(0)} m',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isLandscape ? 14 : 16,
+                    color: textColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+
+            // 右侧：导航按钮
+            InkWell(
+              onTap: onNavigate,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                    horizontal: isLandscape ? 15 : 20,
+                    vertical: isLandscape ? 6 : 8),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrangeAccent,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.navigation,
+                      size: isLandscape ? 16 : 18,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '导航',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: isLandscape ? 12 : 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-  
-  /// 构建距离和时间信息组件
-  Widget _buildDistanceTimeInfo(bool isLandscape) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 4),
-      padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // 左侧：距离
-          Expanded(
-            child: Row(
-              children: [
-                Icon(Icons.directions_bike, size: 16, color: Colors.black54),
-                SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '${routeData['distance']?.toStringAsFixed(1)} km',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isLandscape ? 14 : 16,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(width: 8),
-
-          // 右侧：时间
-          Expanded(
-            child: Row(
-              children: [
-                Icon(Icons.access_time, size: 16, color: Colors.black54),
-                SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isLandscape ? 14 : 16,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  /// 构建爬升和导航按钮组件
-  Widget _buildElevationNavigation(bool isLandscape) {
-    return Container(
-      margin: EdgeInsets.symmetric(vertical: 4),
-      padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // 左侧：爬升信息
-          Expanded(
-            child: Row(
-              children: [
-                Icon(Icons.trending_up, size: 16, color: Colors.black54),
-                SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '${routeData['elevationGain']?.toStringAsFixed(0)} m',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isLandscape ? 14 : 16,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 右侧：导航按钮
-          InkWell(
-            onTap: onNavigate,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                  horizontal: isLandscape ? 15 : 25,
-                  vertical: isLandscape ? 2 : 4),
-              decoration: BoxDecoration(
-                color: Colors.deepOrangeAccent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                Icons.navigation,
-                size: isLandscape ? 18 : 20,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 } 
