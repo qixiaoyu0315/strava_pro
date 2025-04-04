@@ -20,10 +20,16 @@ class RouteLandscapeLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 计算横屏下的卡片宽高比
+    final screenWidth = MediaQuery.of(context).size.width;
+    final itemWidth = (screenWidth - 24) / 2; // 两列的宽度减去间距
+    final itemHeight = 200.0; // 与RouteCard中的横屏高度保持一致
+    final aspectRatio = itemWidth / itemHeight;
+    
     return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2, // 两列
-        childAspectRatio: 2.8, // 调整宽高比，使卡片更扁平
+        childAspectRatio: aspectRatio, // 动态计算宽高比，确保高度正确
         crossAxisSpacing: 8.0,
         mainAxisSpacing: 8.0,
       ),

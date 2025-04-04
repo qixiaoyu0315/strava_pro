@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
 /// 路线卡片组件，在不同布局下显示路线信息
 class RouteCard extends StatelessWidget {
@@ -25,44 +26,74 @@ class RouteCard extends StatelessWidget {
         MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     // 根据屏幕方向调整高度
-    final cardHeight = isLandscape ? 160.0 : 160.0;
+    final cardHeight = isLandscape ? 200.0 : 180.0;
+    // 底部信息栏高度
+    final infoBarHeight = isLandscape ? 56.0 : 48.0;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      elevation: 4,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Stack(
-          children: [
-            // 底层：路线地图作为背景
-            SizedBox(
-              height: cardHeight,
-              width: double.infinity,
-              child: _buildMapBackground(isDarkMode),
-            ),
-            
-            // 半透明遮罩层，增加对比度
-            Positioned.fill(
-              child: Container(
-                color: isDarkMode 
-                    ? Colors.black.withOpacity(0.3) 
-                    : Colors.white.withOpacity(0.3),
+    return SizedBox(
+      height: cardHeight,
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        elevation: 4,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              // 底层：路线地图作为背景
+              Positioned.fill(
+                child: _buildMapBackground(isDarkMode),
               ),
-            ),
-            
-            // 上层：路线信息
-            SizedBox(
-              height: cardHeight,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: _buildRouteInfoOverlay(context, isLandscape, isDarkMode),
+              
+              // 半透明遮罩层，增加对比度
+              Positioned.fill(
+                child: Container(
+                  color: isDarkMode 
+                      ? Colors.black.withOpacity(0.3) 
+                      : Colors.white.withOpacity(0.3),
+                ),
               ),
-            ),
-          ],
+              
+              // 上层：路线信息
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 路线名称
+                      Text(
+                        routeData['name'],
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: isLandscape ? 18 : 20,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 2.0,
+                              color: Colors.black.withOpacity(0.4),
+                              offset: const Offset(1.0, 1.0),
+                            ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      
+                      // 弹性空间，使底部信息栏固定在底部
+                      const Spacer(),
+                      
+                      // 底部信息栏
+                      _buildInfoBar(isLandscape, isDarkMode),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -76,7 +107,7 @@ class RouteCard extends StatelessWidget {
               ? routeData['mapDarkUrl']!
               : routeData['mapUrl']!
           : 'https://via.placeholder.com/700x292',
-      fit: BoxFit.fill,
+      fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => Container(
         color: Colors.grey.shade300,
         child: Center(
@@ -97,42 +128,32 @@ class RouteCard extends StatelessWidget {
     );
   }
 
-  /// 构建路线信息覆盖层
-  Widget _buildRouteInfoOverlay(BuildContext context, bool isLandscape, bool isDarkMode) {
-    // 设置文本颜色，以适应深色/浅色背景
+  /// 构建底部信息栏
+  Widget _buildInfoBar(bool isLandscape, bool isDarkMode) {
     final textColor = isDarkMode ? Colors.white : Colors.black87;
     final subtitleColor = isDarkMode ? Colors.white70 : Colors.black54;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 路线名称
-        Text(
-          routeData['name'],
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: isLandscape ? 18 : 20,
-            color: textColor,
-            shadows: [
-              Shadow(
-                blurRadius: 2.0,
-                color: Colors.black.withOpacity(0.3),
-                offset: const Offset(1.0, 1.0),
-              ),
-            ],
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-const Spacer(),
-        // 添加磨砂背景
-        Container(
+    
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+        child: Container(
           decoration: BoxDecoration(
-            color: isDarkMode ? Colors.black.withOpacity(0.5) : Colors.white.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(10),
+            color: isDarkMode 
+                ? Colors.black.withOpacity(0.1) 
+                : Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: isDarkMode 
+                  ? Colors.white.withOpacity(0.1) 
+                  : Colors.black.withOpacity(0.1),
+              width: 0.5,
+            ),
           ),
-          padding: const EdgeInsets.all(8.0),
-          margin: const EdgeInsets.only(top: 8.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12.0, 
+            vertical: isLandscape ? 10.0 : 8.0
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -140,13 +161,15 @@ const Spacer(),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.directions_bike, size: 16, color: subtitleColor),
+                  Icon(Icons.directions_bike, 
+                      size: isLandscape ? 18 : 16, 
+                      color: subtitleColor),
                   const SizedBox(width: 4),
                   Text(
                     '${routeData['distance']?.toStringAsFixed(1)} km',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: isLandscape ? 14 : 13,
                       color: textColor,
                     ),
                   ),
@@ -157,13 +180,15 @@ const Spacer(),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.access_time, size: 16, color: subtitleColor),
+                  Icon(Icons.access_time, 
+                       size: isLandscape ? 18 : 16, 
+                       color: subtitleColor),
                   const SizedBox(width: 4),
                   Text(
-                    '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
+                    '${routeData['estimatedMovingTime']?.toStringAsFixed(1)} h',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: isLandscape ? 14 : 13,
                       color: textColor,
                     ),
                   ),
@@ -174,13 +199,15 @@ const Spacer(),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.trending_up, size: 16, color: subtitleColor),
+                  Icon(Icons.trending_up, 
+                       size: isLandscape ? 18 : 16, 
+                       color: subtitleColor),
                   const SizedBox(width: 4),
                   Text(
                     '${routeData['elevationGain']?.toStringAsFixed(0)} m',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: isLandscape ? 14 : 13,
                       color: textColor,
                     ),
                   ),
@@ -191,22 +218,35 @@ const Spacer(),
               InkWell(
                 onTap: onNavigate,
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isLandscape ? 12 : 10,
+                    vertical: isLandscape ? 6 : 4),
                   decoration: BoxDecoration(
                     color: Colors.deepOrangeAccent,
                     borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.navigation, size: 14, color: Colors.white),
-                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.navigation,
+                        size: isLandscape ? 16 : 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
                       Text(
                         '导航',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: isLandscape ? 14 : 12,
                         ),
                       ),
                     ],
@@ -216,7 +256,7 @@ const Spacer(),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 } 

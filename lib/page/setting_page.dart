@@ -704,58 +704,23 @@ class _SettingPageState extends State<SettingPage>
 
   @override
   Widget build(BuildContext context) {
-    // 检测是否为横屏模式
-    final isLandscape =
-        MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-
-    if (isLandscape) {
-      // 横屏布局 - 使用CustomScrollView来实现滚动隐藏AppBar
-      return Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              title: const Text('设置'),
-              floating: true,
-              snap: true,
-              pinned: false,
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.all(16.0),
-              sliver: SliverToBoxAdapter(
-                child: _buildLandscapeLayout(context),
-              ),
-            ),
-          ],
-        ),
-      );
-    } else {
-      // 竖屏布局 - 使用CustomScrollView实现滚动隐藏AppBar
-      return Scaffold(
-        body: RefreshIndicator(
-          onRefresh: () async {
-            if (widget.isAuthenticated) {
-              await _syncActivities();
-            }
-          },
-          child: CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                title: const Text('设置'),
-                floating: true,
-                snap: true,
-                pinned: false,
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.all(16.0),
-                sliver: SliverToBoxAdapter(
-                  child: _buildPortraitLayout(context),
-                ),
-              ),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('设置'),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return constraints.maxWidth < 600
+                  ? _buildPortraitLayout(context)
+                  : _buildLandscapeLayout(context);
+            },
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   // 竖屏布局
