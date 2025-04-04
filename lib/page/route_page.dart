@@ -10,6 +10,7 @@ import '../service/route_service.dart';
 import '../widgets/route_landscape_layout.dart';
 import '../widgets/route_portrait_layout.dart';
 import '../page/strava_api_page.dart';
+import '../utils/logger.dart';
 
 /// 路线页面组件
 class RoutePage extends StatefulWidget {
@@ -34,6 +35,12 @@ class _RoutePageState extends State<RoutePage> {
   DetailedAthlete? athlete;
   List<Map<String, dynamic>> routeList = [];
   bool _isLoading = false;
+  
+  // 分页相关属性
+  int _currentPage = 1;
+  int _totalRoutes = 0;
+  final int _perPage = 20;
+  int get _totalPages => (_totalRoutes / _perPage).ceil();
 
   @override
   void initState() {
@@ -45,6 +52,7 @@ class _RoutePageState extends State<RoutePage> {
                              
       if (isAuthenticated) {
         _loadAthleteAndRoutes();
+        _loadTotalRoutes();
       }
     });
   }
@@ -55,12 +63,27 @@ class _RoutePageState extends State<RoutePage> {
     // 当认证状态从外部变化时，重新加载数据
     if (!oldWidget.isAuthenticated && widget.isAuthenticated) {
       _loadAthleteAndRoutes();
+      _loadTotalRoutes();
     }
   }
 
   /// 加载API密钥
   Future<void> _loadApiKey() async {
     await _apiKeyModel.getApiKey();
+  }
+  
+  /// 加载路线总数
+  Future<void> _loadTotalRoutes() async {
+    try {
+      final count = await _routeService.getRoutesCount();
+      if (mounted) {
+        setState(() {
+          _totalRoutes = count;
+        });
+      }
+    } catch (e) {
+      _showToast('获取路线总数失败: $e');
+    }
   }
 
   /// 加载运动员信息和路线数据
@@ -87,13 +110,61 @@ class _RoutePageState extends State<RoutePage> {
   /// 加载路线数据
   Future<void> _loadRoutes() async {
     try {
-      final routes = await _routeService.getRoutes();
+      final routes = await _routeService.getRoutes(
+        page: _currentPage, 
+        perPage: _perPage
+      );
       setState(() {
         routeList = routes;
       });
     } catch (e) {
       _showToast('获取路线失败: $e');
     }
+  }
+  
+  /// 加载指定页码的数据
+  Future<void> _loadPage(int page) async {
+    if (page < 1 || page > _totalPages) return;
+    
+    setState(() {
+      _currentPage = page;
+      _isLoading = true;
+    });
+    
+    await _loadRoutes();
+    
+    setState(() {
+      _isLoading = false;
+    });
+  }
+  
+  /// 加载下一页
+  void _loadNextPage() {
+    if (_currentPage < _totalPages) {
+      _loadPage(_currentPage + 1);
+    }
+  }
+  
+  /// 加载上一页
+  void _loadPrevPage() {
+    if (_currentPage > 1) {
+      _loadPage(_currentPage - 1);
+    }
+  }
+  
+  /// 刷新数据
+  Future<void> _refreshData() async {
+    setState(() {
+      _currentPage = 1;
+      _isLoading = true;
+    });
+    
+    await _loadTotalRoutes();
+    await _loadRoutes();
+    
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   /// 跳转到Strava API设置页面
@@ -110,7 +181,7 @@ class _RoutePageState extends State<RoutePage> {
               setState(() {
                 athlete = newAthlete;
               });
-              _loadRoutes();
+              _refreshData();
             }
           },
         ),
@@ -118,7 +189,7 @@ class _RoutePageState extends State<RoutePage> {
     ).then((_) {
       // 如果已认证，刷新路线数据
       if (widget.isAuthenticated) {
-        _loadRoutes();
+        _refreshData();
       }
     });
   }
@@ -175,11 +246,114 @@ class _RoutePageState extends State<RoutePage> {
           Text('没有找到路线数据'),
           SizedBox(height: 16),
           ElevatedButton(
-            onPressed: widget.isAuthenticated ? _loadRoutes : _navigateToStravaApiPage,
+            onPressed: widget.isAuthenticated ? _refreshData : _navigateToStravaApiPage,
             child: Text(widget.isAuthenticated ? '刷新数据' : '登录Strava'),
           )
         ],
       ),
+    );
+  }
+  
+  /// 构建分页控件
+  Widget _buildPaginationControls() {
+    if (_totalRoutes <= _perPage) return SizedBox.shrink();
+    
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '第 $_currentPage/$_totalPages 页 (共$_totalRoutes条路线)',
+            style: TextStyle(fontSize: 14),
+          ),
+          SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 首页按钮
+              IconButton(
+                icon: Icon(Icons.first_page),
+                onPressed: _currentPage > 1 ? () => _loadPage(1) : null,
+              ),
+              // 上一页按钮
+              IconButton(
+                icon: Icon(Icons.chevron_left),
+                onPressed: _currentPage > 1 ? _loadPrevPage : null,
+              ),
+              // 页码选择器
+              _buildPageSelector(),
+              // 下一页按钮
+              IconButton(
+                icon: Icon(Icons.chevron_right),
+                onPressed: _currentPage < _totalPages ? _loadNextPage : null,
+              ),
+              // 尾页按钮
+              IconButton(
+                icon: Icon(Icons.last_page),
+                onPressed: _currentPage < _totalPages ? () => _loadPage(_totalPages) : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// 构建页码选择器
+  Widget _buildPageSelector() {
+    // 最多显示5个页码按钮
+    List<Widget> pageButtons = [];
+    int startPage = 1;
+    int endPage = _totalPages;
+    
+    // 如果总页数超过5页，则只显示当前页附近的页码
+    if (_totalPages > 5) {
+      startPage = _currentPage - 2;
+      endPage = _currentPage + 2;
+      
+      // 确保起始页和结束页在有效范围内
+      if (startPage < 1) {
+        startPage = 1;
+        endPage = 5;
+      } else if (endPage > _totalPages) {
+        endPage = _totalPages;
+        startPage = _totalPages - 4;
+      }
+    }
+    
+    // 添加页码按钮
+    for (int i = startPage; i <= endPage; i++) {
+      pageButtons.add(
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: 4),
+          child: ElevatedButton(
+            onPressed: i == _currentPage ? null : () => _loadPage(i),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: i == _currentPage ? Theme.of(context).primaryColor : null,
+              foregroundColor: i == _currentPage ? Colors.white : null,
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              minimumSize: Size(36, 36),
+            ),
+            child: Text('$i'),
+          ),
+        ),
+      );
+    }
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: pageButtons,
     );
   }
 
@@ -189,37 +363,55 @@ class _RoutePageState extends State<RoutePage> {
     final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
 
     return Scaffold(
-      body: _isLoading
+      body: _isLoading && routeList.isEmpty 
           ? Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: () async {
-                await _loadRoutes();
+                await _refreshData();
               },
               child: routeList.isEmpty
                   ? _buildEmptyView()
-                  : CustomScrollView(
-                      slivers: [
-                        SliverAppBar(
-                          title: const Text('STRAVA-路线'),
-                          floating: true,
-                          snap: true,
-                        ),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
-                          sliver: isLandscape
-                              // 横屏模式：使用横向布局组件
-                              ? RouteLandscapeLayout(
-                                  routeList: routeList,
-                                  onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
-                                  onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
-                                )
-                              // 竖屏模式：使用纵向布局组件
-                              : RoutePortraitLayout(
-                                  routeList: routeList,
-                                  onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
-                                  onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: CustomScrollView(
+                            slivers: [
+                              SliverAppBar(
+                                title: const Text('STRAVA-路线'),
+                                floating: true,
+                                snap: true,
+                              ),
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
+                                sliver: isLandscape
+                                    // 横屏模式：使用横向布局组件
+                                    ? RouteLandscapeLayout(
+                                        routeList: routeList,
+                                        onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
+                                        onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
+                                      )
+                                    // 竖屏模式：使用纵向布局组件
+                                    : RoutePortraitLayout(
+                                        routeList: routeList,
+                                        onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
+                                        onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
+                                      ),
+                              ),
+                              // 加载状态指示器
+                              if (_isLoading && routeList.isNotEmpty)
+                                SliverToBoxAdapter(
+                                  child: Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
                                 ),
+                            ],
+                          ),
                         ),
+                        // 分页控件
+                        _buildPaginationControls(),
                       ],
                     ),
             ),
