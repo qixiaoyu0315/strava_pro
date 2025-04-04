@@ -133,129 +133,124 @@ class RouteCard extends StatelessWidget {
     final textColor = isDarkMode ? Colors.white : Colors.black87;
     final subtitleColor = isDarkMode ? Colors.white70 : Colors.black54;
     
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-        child: Container(
-          decoration: BoxDecoration(
-            color: isDarkMode 
-                ? Colors.black.withOpacity(0.1) 
-                : Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: isDarkMode 
-                  ? Colors.white.withOpacity(0.1) 
-                  : Colors.black.withOpacity(0.1),
-              width: 0.5,
-            ),
-          ),
-          padding: EdgeInsets.symmetric(
-            horizontal: 12.0, 
-            vertical: isLandscape ? 10.0 : 8.0
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // 使用普通半透明容器而不是磨砂效果，降低质感
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode 
+            ? Colors.black.withOpacity(0.7) 
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: isDarkMode 
+              ? Colors.white.withOpacity(0.1) 
+              : Colors.black.withOpacity(0.1),
+          width: 0.5,
+        ),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: 12.0, 
+        vertical: isLandscape ? 10.0 : 8.0
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // 距离信息
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // 距离信息
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.directions_bike, 
-                      size: isLandscape ? 18 : 16, 
-                      color: subtitleColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${routeData['distance']?.toStringAsFixed(1)} km',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isLandscape ? 14 : 13,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-
-              // 时间信息
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.access_time, 
-                       size: isLandscape ? 18 : 16, 
-                       color: subtitleColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${routeData['estimatedMovingTime']?.toStringAsFixed(1)} h',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isLandscape ? 14 : 13,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-
-              // 爬升信息
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.trending_up, 
-                       size: isLandscape ? 18 : 16, 
-                       color: subtitleColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${routeData['elevationGain']?.toStringAsFixed(0)} m',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isLandscape ? 14 : 13,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-
-              // 导航按钮
-              InkWell(
-                onTap: onNavigate,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isLandscape ? 12 : 10,
-                    vertical: isLandscape ? 6 : 4),
-                  decoration: BoxDecoration(
-                    color: Colors.deepOrangeAccent,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.navigation,
-                        size: isLandscape ? 16 : 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '导航',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: isLandscape ? 14 : 12,
-                        ),
-                      ),
-                    ],
-                  ),
+              Icon(Icons.directions_bike, 
+                  size: isLandscape ? 18 : 16, 
+                  color: subtitleColor),
+              const SizedBox(width: 4),
+              Text(
+                '${routeData['distance']?.toStringAsFixed(1)} km',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isLandscape ? 14 : 13,
+                  color: textColor,
                 ),
               ),
             ],
           ),
-        ),
+
+          // 时间信息
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.access_time, 
+                   size: isLandscape ? 18 : 16, 
+                   color: subtitleColor),
+              const SizedBox(width: 4),
+              Text(
+                '${routeData['estimatedMovingTime']?.toStringAsFixed(1)} h',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isLandscape ? 14 : 13,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+
+          // 爬升信息
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.trending_up, 
+                   size: isLandscape ? 18 : 16, 
+                   color: subtitleColor),
+              const SizedBox(width: 4),
+              Text(
+                '${routeData['elevationGain']?.toStringAsFixed(0)} m',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: isLandscape ? 14 : 13,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+
+          // 导航按钮
+          InkWell(
+            onTap: onNavigate,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isLandscape ? 12 : 10,
+                vertical: isLandscape ? 6 : 4),
+              decoration: BoxDecoration(
+                color: Colors.deepOrangeAccent,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.navigation,
+                    size: isLandscape ? 16 : 14,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '导航',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: isLandscape ? 14 : 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

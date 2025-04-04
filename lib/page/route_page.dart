@@ -38,12 +38,24 @@ class _RoutePageState extends State<RoutePage> {
   @override
   void initState() {
     super.initState();
-    _loadApiKey().then((_) {
-      if (widget.isAuthenticated) {
-        // 如果已认证，直接加载数据
+    _loadApiKey().then((_) async {
+      // 检查认证状态并加载路线数据
+      final isAuthenticated = widget.isAuthenticated || 
+                             await StravaClientManager().isAuthenticated();
+                             
+      if (isAuthenticated) {
         _loadAthleteAndRoutes();
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(RoutePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当认证状态从外部变化时，重新加载数据
+    if (!oldWidget.isAuthenticated && widget.isAuthenticated) {
+      _loadAthleteAndRoutes();
+    }
   }
 
   /// 加载API密钥
