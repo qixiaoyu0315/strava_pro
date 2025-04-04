@@ -102,7 +102,7 @@ class RouteCard extends StatelessWidget {
     // 设置文本颜色，以适应深色/浅色背景
     final textColor = isDarkMode ? Colors.white : Colors.black87;
     final subtitleColor = isDarkMode ? Colors.white70 : Colors.black54;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -124,127 +124,97 @@ class RouteCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        
-        // 弹性空间，使下方信息栏固定在底部
-        const Spacer(),
-        
-        // 底部信息栏：距离、时间、爬升和导航按钮在一行
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 距离信息
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.directions_bike, size: 16, color: subtitleColor),
-                const SizedBox(width: 4),
-                Text(
-                  '${routeData['distance']?.toStringAsFixed(1)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                ),
-                Text(
-                  ' km',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                ),
-              ],
-            ),
-
-            // 时间信息
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.access_time, size: 16, color: subtitleColor),
-                const SizedBox(width: 4),
-                Text(
-                  '${routeData['estimatedMovingTime']?.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                ),
-                Text(
-                  ' h',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                ),
-              ],
-            ),
-            
-            // 爬升信息
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.trending_up, size: 16, color: subtitleColor),
-                const SizedBox(width: 4),
-                Text(
-                  '${routeData['elevationGain']?.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                ),
-                Text(
-                  ' m',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                ),
-              ],
-            ),
-
-            // 导航按钮
-            InkWell(
-              onTap: onNavigate,
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: isLandscape ? 10 : 12,
-                    vertical: isLandscape ? 4 : 6),
-                decoration: BoxDecoration(
-                  color: Colors.deepOrangeAccent,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+const Spacer(),
+        // 添加磨砂背景
+        Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.black.withOpacity(0.5) : Colors.white.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.all(8.0),
+          margin: const EdgeInsets.only(top: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 距离信息
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.directions_bike, size: 16, color: subtitleColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${routeData['distance']?.toStringAsFixed(1)} km',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: textColor,
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.navigation,
-                      size: 14,
-                      color: Colors.white,
+                  ),
+                ],
+              ),
+
+              // 时间信息
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 16, color: subtitleColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${routeData['estimatedMovingTime']?.toStringAsFixed(2)} h',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: textColor,
                     ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '导航',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                  ),
+                ],
+              ),
+
+              // 爬升信息
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.trending_up, size: 16, color: subtitleColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${routeData['elevationGain']?.toStringAsFixed(0)} m',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: textColor,
+                    ),
+                  ),
+                ],
+              ),
+
+              // 导航按钮
+              InkWell(
+                onTap: onNavigate,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrangeAccent,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.navigation, size: 14, color: Colors.white),
+                      const SizedBox(width: 2),
+                      Text(
+                        '导航',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
