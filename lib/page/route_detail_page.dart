@@ -14,6 +14,10 @@ import '../widgets/elevation_chart.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import '../utils/logger.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import '../service/activity_service.dart';
+import '../utils/poly2svg.dart';
+import '../utils/map_tile_cache_manager.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final String idStr;
@@ -41,6 +45,8 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       ValueNotifier<Position?>(null);
   late strava.Route _routeData; // 缓存路线数据，避免旋转重载
   bool _isDataLoaded = false;
+  bool _isMapInitialized = false; // 添加地图初始化状态变量
+  int? _selectedPointIndex; // 添加选中点索引变量
   
   // 添加选中的距离范围选项
   String _selectedRangeOption = '全程';
@@ -51,6 +57,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   // 添加可视范围
   double? _visibleRangeStart;
   double? _visibleRangeEnd;
+
+  // 添加地图缓存管理器
+  // 这行已被移除
 
   @override
   void initState() {
@@ -68,6 +77,18 @@ class _RouteDetailPageState extends State<RouteDetailPage>
           _startNavigationWhenReady();
         }
       }
+    });
+
+    // 初始化地图缓存管理器 
+    // 这行替换了 _mapTileCacheManager = MapTileCacheManager();
+    MapTileCacheManager.instance.initialize().then((_) {
+      if (mounted) {
+        setState(() {
+          _isMapInitialized = true;
+        });
+      }
+    }).catchError((error) {
+      Logger.e('地图缓存初始化失败', error: error, tag: 'Route');
     });
   }
 
@@ -569,11 +590,8 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                 },
               ),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  subdomains: const ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.example.app',
-                ),
+                // 使用缓存管理器创建离线优先的图层
+                MapTileCacheManager.instance.createOfflineTileLayer(),
                 PolylineLayer(
                   polylines: [
                     Polyline(

@@ -18,6 +18,7 @@ import 'package:path_provider/path_provider.dart';
 import '../utils/calendar_exporter.dart';
 import '../utils/widget_manager.dart';
 import '../utils/date_utils.dart' as date_util;
+import '../page/map_cache_page.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -771,6 +772,9 @@ class _SettingPageState extends State<SettingPage> {
         // 布局切换开关
         _buildLayoutSwitchCard(),
         const SizedBox(height: 8),
+        // 地图设置卡片
+        _buildMapSettingsCard(),
+        const SizedBox(height: 8),
         // API设置卡片
         _buildApiSettingsCard(context),
         // 重置同步按钮
@@ -826,6 +830,8 @@ class _SettingPageState extends State<SettingPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildLayoutSwitchCard(),
+                const SizedBox(height: 8),
+                _buildMapSettingsCard(),
                 const SizedBox(height: 8),
                 _buildApiSettingsCard(context),
                 const SizedBox(height: 8),
@@ -1280,6 +1286,31 @@ class _SettingPageState extends State<SettingPage> {
             subtitle: const Text('隐藏状态栏和导航栏，获得更多显示空间'),
             value: _isFullscreenMode,
             onChanged: _toggleFullscreenMode,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 地图设置卡片
+  Widget _buildMapSettingsCard() {
+    return Card(
+      elevation: 2,
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.map),
+            title: const Text('地图瓦片下载'),
+            subtitle: const Text('下载地图瓦片用于离线浏览'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MapCachePage(),
+                ),
+              );
+            },
           ),
         ],
       ),

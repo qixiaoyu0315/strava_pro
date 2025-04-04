@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_webview_window
   gtk
+  objectbox_flutter_libs
   open_file_linux
   url_launcher_linux
   window_to_front
