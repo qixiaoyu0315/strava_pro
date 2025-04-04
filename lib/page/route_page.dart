@@ -39,11 +39,18 @@ class _RoutePageState extends State<RoutePage> {
   void initState() {
     super.initState();
     _loadApiKey().then((_) {
-      if (widget.isAuthenticated) {
-        // 如果已认证，直接加载数据
-        _loadAthleteAndRoutes();
-      }
+      // 无论是否已认证，都尝试加载数据
+      _loadAthleteAndRoutes();
     });
+  }
+
+  @override
+  void didUpdateWidget(RoutePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当认证状态从外部变化时，重新加载数据
+    if (widget.isAuthenticated != oldWidget.isAuthenticated) {
+      _loadAthleteAndRoutes();
+    }
   }
 
   /// 加载API密钥
@@ -58,6 +65,18 @@ class _RoutePageState extends State<RoutePage> {
     });
 
     try {
+      // 判断是否已认证
+      final isAuthenticated = widget.isAuthenticated || 
+                            await StravaClientManager().isAuthenticated();
+      
+      if (!isAuthenticated) {
+        setState(() {
+          _isLoading = false;
+          routeList = []; // 清空路线列表
+        });
+        return; // 未认证，直接返回
+      }
+      
       if (athlete == null) {
         athlete = await _routeService.getAthleteInfo();
         widget.onAuthenticationChanged?.call(true, athlete);
