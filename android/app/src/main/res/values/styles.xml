@@ -35,8 +35,9 @@
         <item name="android:gravity">center</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textColor">@android:color/white</item>
-        <item name="android:padding">4dp</item>
+        <item name="android:padding">2dp</item>
         <item name="android:lineSpacingExtra">2dp</item>
-        <item name="android:minHeight">36dp</item>
+        <item name="android:minHeight">45dp</item>
+        <item name="android:minWidth">42dp</item>
     </style>
 </resources>

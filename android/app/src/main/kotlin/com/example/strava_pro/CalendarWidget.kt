@@ -16,6 +16,9 @@ import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.util.Log
 import android.widget.Toast
+import android.graphics.drawable.Icon
+import java.io.FileInputStream
+import android.net.Uri
 
 class CalendarWidget : AppWidgetProvider() {
     
@@ -23,6 +26,7 @@ class CalendarWidget : AppWidgetProvider() {
         private const val ACTION_PREV_MONTH = "com.example.strava_pro.ACTION_PREV_MONTH"
         private const val ACTION_NEXT_MONTH = "com.example.strava_pro.ACTION_NEXT_MONTH"
         private const val ACTION_SELECT_DATE = "com.example.strava_pro.ACTION_SELECT_DATE"
+        private const val ACTION_VIEW_PNG = "com.example.strava_pro.ACTION_VIEW_PNG"
         private const val PREF_MONTH_KEY = "calendar_widget_month"
         private const val PREF_YEAR_KEY = "calendar_widget_year"
         private const val PREF_SELECTED_DAY_KEY = "calendar_widget_selected_day"
@@ -90,6 +94,28 @@ class CalendarWidget : AppWidgetProvider() {
                 val month = intent.getIntExtra("month", 0)
                 val year = intent.getIntExtra("year", 2023)
                 
+                // 获取日期字符串
+                val dateStr = "${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
+                
+                // 检查是否有对应的PNG图片
+                val pngPath = "/storage/emulated/0/Download/strava_pro/png/$dateStr.png"
+                val pngExists = File(pngPath).exists()
+                
+                if (pngExists) {
+                    // 如果有PNG图片，打开图片查看器
+                    try {
+                        val viewIntent = Intent(Intent.ACTION_VIEW)
+                        val photoUri = Uri.fromFile(File(pngPath))
+                        viewIntent.setDataAndType(photoUri, "image/png")
+                        viewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(viewIntent)
+                        return
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error opening PNG image", e)
+                        // 如果打开图片失败，继续执行下面的代码
+                    }
+                }
+                
                 // 保存选中的日期
                 val prefs = context.getSharedPreferences("CalendarWidgetPrefs", Context.MODE_PRIVATE)
                 prefs.edit().putInt(PREF_SELECTED_DAY_KEY, day).apply()
@@ -107,6 +133,18 @@ class CalendarWidget : AppWidgetProvider() {
                 // 更新所有小组件
                 for (appWidgetId in appWidgetIds) {
                     updateCalendarWidget(context, appWidgetManager, appWidgetId)
+                }
+            }
+            ACTION_VIEW_PNG -> {
+                val pngPath = intent.getStringExtra("png_path") ?: return
+                try {
+                    val viewIntent = Intent(Intent.ACTION_VIEW)
+                    val photoUri = Uri.fromFile(File(pngPath))
+                    viewIntent.setDataAndType(photoUri, "image/png")
+                    viewIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(viewIntent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error opening PNG image", e)
                 }
             }
         }
@@ -194,7 +232,51 @@ class CalendarWidget : AppWidgetProvider() {
             views.setInt(dayId, "setBackgroundResource", 0)
         }
         
-        // 填充日期
+        // 内存管理 - 计算最大可用于PNG图像的内存量
+        val maxMemoryForAllImages = 12_000_000 // 小于Android的限制15,552,000字节
+        var usedMemory = 0
+        val maxImagesPerWidget = 15 // 增加允许显示的图片数量
+        var loadedImagesCount = 0
+        
+        // 首先扫描该月有多少天有PNG图片，以便合理分配内存
+        val daysWithPng = mutableListOf<Int>()
+        for (day in 1..daysInMonth) {
+            val dateStr = "${displayYear}-${(displayMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
+            val pngPath = "/storage/emulated/0/Download/strava_pro/png/$dateStr.png"
+            if (File(pngPath).exists()) {
+                daysWithPng.add(day)
+            }
+        }
+        
+        Log.d(TAG, "Found ${daysWithPng.size} days with PNG images")
+        
+        // 如果一个月中的PNG图片数量超过了最大允许数量，则均匀选择要显示的日期
+        val daysToShow = if (daysWithPng.size > maxImagesPerWidget) {
+            // 计算选择间隔，确保均匀分布
+            val interval = daysWithPng.size / maxImagesPerWidget
+            val selectedDays = mutableListOf<Int>()
+            
+            // 选择均匀分布的日期，优先显示最后几天的图片(更新的活动)
+            if (interval > 1) {
+                for (i in daysWithPng.size - 1 downTo 0 step interval) {
+                    if (selectedDays.size < maxImagesPerWidget) {
+                        selectedDays.add(daysWithPng[i])
+                    }
+                }
+            } else {
+                // 如果间隔小于1，则取前maxImagesPerWidget个
+                selectedDays.addAll(daysWithPng.takeLast(maxImagesPerWidget))
+            }
+            
+            selectedDays.sorted() // 确保按日期顺序排列
+        } else {
+            // 如果PNG图片数量不超过最大允许数量，则显示所有图片
+            daysWithPng
+        }
+        
+        Log.d(TAG, "Will show PNG images for these days: $daysToShow")
+        
+        // 填充日期，采用高效的内存管理
         for (day in 1..daysInMonth) {
             val position = firstDayOfWeek + day
             val dayId = context.resources.getIdentifier("day_$position", "id", context.packageName)
@@ -215,65 +297,146 @@ class CalendarWidget : AppWidgetProvider() {
                              day == selectedDay &&
                              selectedDay > 0
             
-            // 判断是否有SVG图片或PNG图片（活动数据）
+            // 判断是否有PNG图片（活动数据）
             val dateStr = "${displayYear}-${(displayMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
-            val svgPath = "/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg"
             val pngPath = "/storage/emulated/0/Download/strava_pro/png/$dateStr.png"
-            val svgExists = File(svgPath).exists()
             val pngExists = File(pngPath).exists()
             
-            // 设置日期颜色和背景样式 - 先应用基本样式
-            when {
-                isSelected -> {
-                    // 选中日期用蓝色背景，白色文字
-                    views.setTextColor(dayId, Color.WHITE)
-                    views.setInt(dayId, "setBackgroundResource", R.drawable.selected_background)
-                    views.setTextViewText(dayId, day.toString())
-                }
-                isToday -> {
-                    // 当天日期用绿色背景，白色文字
-                    views.setTextColor(dayId, Color.WHITE)
-                    views.setInt(dayId, "setBackgroundResource", R.drawable.today_background)
-                    views.setTextViewText(dayId, day.toString())
-                }
-                pngExists -> {
-                    // 如果存在PNG，使用特殊的背景颜色标记
-                    views.setTextColor(dayId, Color.WHITE)
-                    // 使用紫色底色代表有PNG
-                    views.setInt(dayId, "setBackgroundColor", Color.rgb(128, 0, 128))  // 紫色
-                    views.setTextViewText(dayId, day.toString())
-                    Log.d(TAG, "Setting purple background for day $day with PNG: $pngPath")
-                }
-                svgExists -> {
-                    // 如果存在SVG，使用笑脸符号
-                    views.setTextViewText(dayId, "$day\n😊")
-                    if (dayOfWeek == Calendar.SATURDAY) {
-                        views.setTextColor(dayId, Color.rgb(64, 149, 255))
-                    } else if (dayOfWeek == Calendar.SUNDAY) {
-                        views.setTextColor(dayId, Color.rgb(255, 64, 64))
-                    } else {
-                        views.setTextColor(dayId, Color.WHITE)
+            // 设置日期颜色和背景样式
+            if (pngExists && day in daysToShow && loadedImagesCount < maxImagesPerWidget && usedMemory < maxMemoryForAllImages) {
+                try {
+                    // 创建一个新的日期单元格视图，包含ImageView和TextView
+                    val cellView = RemoteViews(context.packageName, R.layout.calendar_day_cell)
+                    
+                    // 设置日期文本
+                    cellView.setTextViewText(R.id.day_text, day.toString())
+                    
+                    // 根据周几设置文本颜色
+                    when (dayOfWeek) {
+                        Calendar.SATURDAY -> cellView.setTextColor(R.id.day_text, Color.rgb(64, 149, 255))
+                        Calendar.SUNDAY -> cellView.setTextColor(R.id.day_text, Color.rgb(255, 64, 64))
+                        else -> cellView.setTextColor(R.id.day_text, Color.WHITE)
                     }
-                    views.setInt(dayId, "setBackgroundResource", 0)
+                    
+                    // 如果是当天或选中的日期，设置文本背景
+                    if (isSelected) {
+                        cellView.setInt(R.id.day_text, "setBackgroundResource", R.drawable.selected_background)
+                    } else if (isToday) {
+                        cellView.setInt(R.id.day_text, "setBackgroundResource", R.drawable.today_background)
+                    }
+                    
+                    // 设置图片
+                    val file = File(pngPath)
+                    if (file.exists()) {
+                        try {
+                            // 加载PNG图片，严格控制内存使用
+                            val options = BitmapFactory.Options().apply {
+                                // 先仅解码尺寸信息
+                                inJustDecodeBounds = true
+                            }
+                            BitmapFactory.decodeFile(pngPath, options)
+                            
+                            // 计算合适的缩放比例，确保图片大小适应日历单元格
+                            val targetSize = 96 // 目标大小，减小以节省内存
+                            
+                            // 计算缩放系数
+                            val widthScale = options.outWidth / targetSize
+                            val heightScale = options.outHeight / targetSize
+                            var sampleSize = 1
+                            
+                            // 不断增加采样率直到适合目标大小
+                            while (widthScale / sampleSize > 2 || heightScale / sampleSize > 2) {
+                                sampleSize *= 2
+                            }
+                            
+                            // 确保采样不要太大，以便图片清晰可见
+                            sampleSize = sampleSize.coerceAtMost(8)
+                            
+                            Log.d(TAG, "Day $day image: original size ${options.outWidth}x${options.outHeight}, sample size: $sampleSize")
+                            
+                            // 使用新的配置加载图片
+                            options.inJustDecodeBounds = false
+                            options.inSampleSize = sampleSize
+                            options.inPreferredConfig = Bitmap.Config.RGB_565 // 使用16位位图节省内存
+                            
+                            val bitmap = BitmapFactory.decodeFile(pngPath, options)
+                            if (bitmap != null) {
+                                val imageMemory = bitmap.byteCount
+                                
+                                // 只检查内存是否超出总限制
+                                if (usedMemory + imageMemory <= maxMemoryForAllImages) {
+                                    try {
+                                        // 确保日期文本位于图片上方且清晰可见
+                                        cellView.setInt(R.id.day_text, "setTextColor", Color.WHITE)
+                                        
+                                        // 设置图片到ImageView
+                                        cellView.setImageViewBitmap(R.id.day_image, bitmap)
+                                        cellView.setViewVisibility(R.id.day_image, View.VISIBLE)
+                                        
+                                        // 更新内存使用计数
+                                        usedMemory += imageMemory
+                                        loadedImagesCount++
+                                        
+                                        Log.d(TAG, "Loaded PNG for day $day: size=${bitmap.width}x${bitmap.height}, memory=${bitmap.byteCount} bytes, total=$usedMemory")
+                                        
+                                        // 将整个日期单元格视图添加到布局中
+                                        views.removeAllViews(dayId)
+                                        views.addView(dayId, cellView)
+                                        
+                                        // 设置点击事件
+                                        val selectIntent = Intent(context, CalendarWidget::class.java).apply {
+                                            action = ACTION_SELECT_DATE
+                                            putExtra("day", day)
+                                            putExtra("month", displayMonth)
+                                            putExtra("year", displayYear)
+                                        }
+                                        
+                                        val pendingIntent = PendingIntent.getBroadcast(
+                                            context,
+                                            day * 100 + displayMonth * 10 + (displayYear % 10),
+                                            selectIntent,
+                                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                                        )
+                                        
+                                        views.setOnClickPendingIntent(dayId, pendingIntent)
+                                        continue // 跳过后面的默认样式设置
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Error setting image to view for day $day", e)
+                                        bitmap.recycle() // 出错时释放内存
+                                    }
+                                } else {
+                                    Log.w(TAG, "Skipping PNG for day $day due to memory limit: would use ${bitmap.byteCount}, limit=$maxMemoryForAllImages, current=$usedMemory")
+                                    bitmap.recycle() // 立即释放内存
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error loading PNG image for day $day", e)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error creating cell view for day $day", e)
                 }
-                dayOfWeek == Calendar.SATURDAY -> {
-                    // 周六显示蓝色
-                    views.setTextColor(dayId, Color.rgb(64, 149, 255))
-                    views.setInt(dayId, "setBackgroundResource", 0)
-                    views.setTextViewText(dayId, day.toString())
-                }
-                dayOfWeek == Calendar.SUNDAY -> {
-                    // 周日显示红色
-                    views.setTextColor(dayId, Color.rgb(255, 64, 64))
-                    views.setInt(dayId, "setBackgroundResource", 0)
-                    views.setTextViewText(dayId, day.toString())
-                }
-                else -> {
-                    // 普通日期白色
-                    views.setTextColor(dayId, Color.WHITE)
-                    views.setInt(dayId, "setBackgroundResource", 0)
-                    views.setTextViewText(dayId, day.toString())
-                }
+            }
+            
+            // 如果没有加载PNG图片或者加载失败，则使用普通样式
+            if (isSelected) {
+                // 选中日期用蓝色背景，白色文字
+                views.setTextColor(dayId, Color.WHITE)
+                views.setInt(dayId, "setBackgroundResource", R.drawable.selected_background)
+                views.setTextViewText(dayId, day.toString())
+            } else if (isToday) {
+                // 当天日期用绿色背景，白色文字
+                views.setTextColor(dayId, Color.WHITE)
+                views.setInt(dayId, "setBackgroundResource", R.drawable.today_background)
+                views.setTextViewText(dayId, day.toString())
+            } else if (pngExists) {
+                // 对于有PNG但未加载的日期，使用紫色背景标记
+                views.setTextColor(dayId, Color.WHITE)
+                views.setInt(dayId, "setBackgroundColor", Color.rgb(128, 0, 128))  // 紫色
+                views.setTextViewText(dayId, day.toString())
+            } else {
+                // 其他日期使用默认样式
+                defaultStyle(views, dayId, day, dayOfWeek)
             }
             
             // 设置点击事件
@@ -283,19 +446,45 @@ class CalendarWidget : AppWidgetProvider() {
                 putExtra("month", displayMonth)
                 putExtra("year", displayYear)
             }
+            
             views.setOnClickPendingIntent(
                 dayId,
                 PendingIntent.getBroadcast(
                     context,
-                    day * 100 + displayMonth * 10 + (displayYear % 10), // 生成唯一的请求码
+                    day * 100 + displayMonth * 10 + (displayYear % 10),
                     selectIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )
         }
         
+        Log.d(TAG, "Widget update complete. Total memory used: $usedMemory bytes for $loadedImagesCount images")
+        
         // 更新小组件
         appWidgetManager.updateAppWidget(appWidgetId, views)
+    }
+
+    // 设置默认日期样式
+    private fun defaultStyle(views: RemoteViews, dayId: Int, day: Int, dayOfWeek: Int) {
+        views.setTextViewText(dayId, day.toString())
+        
+        when (dayOfWeek) {
+            Calendar.SATURDAY -> {
+                // 周六显示蓝色
+                views.setTextColor(dayId, Color.rgb(64, 149, 255))
+                views.setInt(dayId, "setBackgroundResource", 0)
+            }
+            Calendar.SUNDAY -> {
+                // 周日显示红色
+                views.setTextColor(dayId, Color.rgb(255, 64, 64))
+                views.setInt(dayId, "setBackgroundResource", 0)
+            }
+            else -> {
+                // 普通日期白色
+                views.setTextColor(dayId, Color.WHITE)
+                views.setInt(dayId, "setBackgroundResource", 0)
+            }
+        }
     }
 
     // 创建一个带有突出显示背景色的Bitmap
