@@ -1,7 +1,7 @@
 name: strava_pro
 description: "A new Flutter project."
 publish_to: "none"
-version: 0.2.0+14
+version: 0.2.0+23
 
 environment:
   sdk: ^3.6.1
@@ -30,6 +30,10 @@ dependencies:
   http: ^1.3.0
   open_file: ^3.5.10
   home_widget: ^0.7.0+1 # 用于创建桌面小组件
+  package_info_plus: ^8.3.0 # 获取应用版本信息
+  dio: ^5.4.1 # 下载文件
+  # install_plugin: ^2.1.0 # 安装APK - 暂时禁用，等待修复命名空间问题
+  url_launcher: ^6.2.4 # 打开URL
 
 dev_dependencies:
   flutter_test:

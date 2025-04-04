@@ -5,6 +5,9 @@ allprojects {
     }
 }
 
+// 引入命名空间修复脚本
+apply from: 'fix_install_plugin.gradle'
+
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"

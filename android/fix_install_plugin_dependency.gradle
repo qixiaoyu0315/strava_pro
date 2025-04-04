@@ -1,0 +1,19 @@
+// 这个文件将禁用install_plugin依赖，以避免命名空间错误
+
+configurations.all {
+    exclude group: 'com.zaihui.installplugin', module: 'install_plugin'
+}
+
+// 添加一个提示，告知用户需要修复install_plugin插件
+println """
+=========================================================================
+注意: 暂时禁用了install_plugin依赖以解决构建问题
+要完全修复此问题，请执行以下操作:
+
+1. 找到插件目录: ${System.getProperty('user.home')}/.pub-cache/hosted/pub.dev/install_plugin-2.1.0/android
+2. 编辑插件的build.gradle文件，添加命名空间:
+   namespace 'com.zaihui.installplugin'
+
+此临时解决方案将允许应用构建，但安装APK功能将不可用
+=========================================================================
+""" 

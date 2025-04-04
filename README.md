@@ -10,13 +10,57 @@ https://developers.strava.com/
 
  strava_client: ^2.1.3
 
-## 2.
+## 2.应用更新与发布
 
+### 2.1 设置GitHub Actions自动构建
 
+本项目使用GitHub Actions自动构建和发布Android应用。当推送带有标签(tag)的提交时，将触发自动构建并创建GitHub Release。
 
+要设置自动构建，需要添加以下GitHub Secrets:
 
+1. `KEYSTORE_BASE64`: 密钥库文件的Base64编码
+2. `KEYSTORE_PASSWORD`: 密钥库密码
+3. `KEY_PASSWORD`: 密钥密码
+4. `KEY_ALIAS`: 密钥别名
 
+可以使用以下命令将密钥库编码为Base64格式:
 
+```bash
+./scripts/encode_keystore.sh android/app/keystore/strava_pro.keystore
+```
+
+### 2.2 创建新发布版本
+
+使用以下脚本创建新版本并推送到GitHub:
+
+```bash
+./scripts/create_release.sh
+```
+
+### 2.3 应用内自动更新
+
+应用内置了自动更新检查功能，定期检查GitHub上的最新发布版本。如有更新，将提示用户下载并安装。
+
+> **注意**：当前版本暂时禁用了自动安装APK功能，因为`install_plugin`插件存在命名空间兼容性问题。
+> 下载APK后，系统将使用默认方式打开APK文件，需要用户手动完成安装。
+> 
+> 如需恢复自动安装功能，请参阅[应用更新功能指南](docs/APP_UPDATE_GUIDE.md)了解如何修复`install_plugin`插件问题。
+
+### 2.4 Android构建问题修复
+
+如果在构建过程中遇到以下错误：
+
+```
+Namespace not specified. Specify a namespace in the module's build file.
+```
+
+请运行修复脚本：
+
+```bash
+./scripts/fix_install_plugin.sh
+```
+
+详细信息请参阅[命名空间修复指南](android/NAMESPACE_FIX_README.md)。
 
 ## 已知待修复问题
 
@@ -25,8 +69,6 @@ https://developers.strava.com/
 3. 进入导航缓慢
 4. 定位刷新可以更快些
 5. 海拔图中的提示框会超出边界
-
-
 
 ## 功能更新
 
@@ -59,9 +101,6 @@ https://developers.strava.com/
 3.瓦片地图的缓存，减少数据加载
 4.路线页面可切换其他授权用户
 
-
-
-
 ## 问题结局
 
 ### 1.Flutter 卡在 "Running Gradle task 'assembleDebug'... "
@@ -83,7 +122,7 @@ https://developers.strava.com/
 
 ​        需要增加判断
 
-```dart 
+```dart
 country: json["country"] == null ? "" : json["country"],
 ```
 

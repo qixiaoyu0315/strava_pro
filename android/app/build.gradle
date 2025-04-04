@@ -5,6 +5,9 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// 注释掉临时修复脚本，因为我们已经修复了install_plugin的命名空间问题
+// apply from: '../fix_install_plugin_dependency.gradle'
+
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {

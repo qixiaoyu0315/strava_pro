@@ -1,0 +1,17 @@
+// 这个文件将被Android项目加载，用于修复install_plugin的命名空间问题
+// 应用于每个install_plugin模块的配置
+
+gradle.allprojects { project ->
+    // 检查是否是install_plugin模块
+    if (project.name == 'install_plugin') {
+        // 确保该模块使用了Android库插件
+        if (project.plugins.hasPlugin('com.android.library')) {
+            // 添加命名空间设置
+            project.android {
+                namespace 'com.zaihui.installplugin'
+            }
+            
+            println "已为install_plugin模块添加命名空间: com.zaihui.installplugin"
+        }
+    }
+} 

@@ -23,6 +23,8 @@ import '../page/strava_api_page.dart';
 import '../main.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import '../service/app_update_service.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -76,6 +78,15 @@ class _SettingPageState extends State<SettingPage>
       date_util.DateUtils.getWeekStart(DateTime.now());
   // 添加月历选择日期
   DateTime _selectedMonthDate = DateTime(DateTime.now().year, DateTime.now().month);
+  
+  // 应用版本信息
+  String _appVersion = '';
+  String _buildNumber = '';
+  bool _isCheckingUpdate = false;
+  bool _updateAvailable = false;
+  final AppUpdateService _updateService = AppUpdateService();
+  Map<String, dynamic>? _updateInfo;
+  Timer? _updateCheckTimer;
 
   @override
   void initState() {
@@ -102,6 +113,66 @@ class _SettingPageState extends State<SettingPage>
     _checkAuthStatus();
     _loadActivityCount();
     _loadSyncStatus();
+    
+    // 获取当前应用版本信息
+    _loadAppVersionInfo();
+    
+    // 检查应用更新
+    _checkForUpdate();
+    
+    // 设置定期检查更新（每隔10分钟检查一次）
+    _updateCheckTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+      _checkForUpdate();
+    });
+  }
+  
+  @override
+  void dispose() {
+    _updateCheckTimer?.cancel();
+    super.dispose();
+  }
+  
+  // 加载应用版本信息
+  Future<void> _loadAppVersionInfo() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = packageInfo.version;
+          _buildNumber = packageInfo.buildNumber;
+        });
+      }
+    } catch (e) {
+      Logger.e('获取应用版本信息失败', error: e, tag: 'AppUpdate');
+    }
+  }
+  
+  // 检查应用更新
+  Future<void> _checkForUpdate() async {
+    if (_isCheckingUpdate) return;
+    
+    try {
+      setState(() {
+        _isCheckingUpdate = true;
+      });
+      
+      final updateInfo = await _updateService.checkForUpdate();
+      
+      if (mounted) {
+        setState(() {
+          _updateAvailable = updateInfo != null;
+          _updateInfo = updateInfo;
+          _isCheckingUpdate = false;
+        });
+      }
+    } catch (e) {
+      Logger.e('检查更新失败', error: e, tag: 'AppUpdate');
+      if (mounted) {
+        setState(() {
+          _isCheckingUpdate = false;
+        });
+      }
+    }
   }
 
   @override
@@ -743,6 +814,9 @@ class _SettingPageState extends State<SettingPage>
         // 地图设置卡片
         _buildMapSettingsCard(),
         const SizedBox(height: 8),
+        // 应用更新卡片
+        _buildAppUpdateCard(),
+        const SizedBox(height: 8),
         // 权限管理卡片
         _buildPermissionCard(),
         const SizedBox(height: 8),
@@ -781,6 +855,9 @@ class _SettingPageState extends State<SettingPage>
                 _buildLayoutSwitchCard(),
                 const SizedBox(height: 8),
                 _buildMapSettingsCard(),
+                const SizedBox(height: 8),
+                // 应用更新卡片
+                _buildAppUpdateCard(),
                 const SizedBox(height: 8),
                 // 权限管理卡片
                 _buildPermissionCard(),
@@ -1871,6 +1948,95 @@ class _SettingPageState extends State<SettingPage>
           ],
         );
       },
+    );
+  }
+
+  // 应用更新卡片
+  Widget _buildAppUpdateCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.system_update, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  '应用更新',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 当前版本信息
+            Row(
+              children: [
+                const Text('当前版本: '),
+                Text('$_appVersion+$_buildNumber',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_isCheckingUpdate) ...[
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              const Center(child: Text('正在检查更新...')),
+            ] else if (_updateAvailable && _updateInfo != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text('最新版本: '),
+                  Text(
+                    _updateInfo!['version'] as String,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: FilledButton.icon(
+                  onPressed: () {
+                    _updateService.showUpdateDialog(context, _updateInfo!);
+                  },
+                  icon: const Icon(Icons.download),
+                  label: const Text('立即更新'),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 16),
+              Center(
+                child: Text(
+                  '当前已是最新版本',
+                  style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _checkForUpdate,
+                child: const Text('检查更新'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
