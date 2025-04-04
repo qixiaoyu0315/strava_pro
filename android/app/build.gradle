@@ -5,6 +5,16 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    println("Successfully loaded key.properties file")
+    println("storeFile path: ${keystoreProperties['storeFile']}")
+} else {
+    println("Warning: key.properties file not found")
+}
+
 android {
     namespace = "com.example.strava_pro"
     compileSdk = flutter.compileSdkVersion
@@ -30,15 +40,46 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
+    signingConfigs {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            def storeFilePath = keystoreProperties['storeFile']?.trim()
+            if (storeFilePath) {
+                storeFile file(storeFilePath)
+                println("Actual keystore path: ${file(storeFilePath).absolutePath}")
+            }
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
+        release {
+            signingConfig signingConfigs.release
+            shrinkResources false
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+// 在构建之前自动递增版本号
+tasks.register('incrementVersion') {
+    exec {
+        workingDir './'
+        executable "./increment_version.sh"
+    }
+}
+
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleRelease') {
+        task.dependsOn('incrementVersion')
+    }
 }

@@ -3,4 +3,5 @@
     <!-- 小组件背景颜色 -->
     <color name="widget_background_light">#E6F0F0F0</color> <!-- 磨砂白色（90%不透明度） -->
     <color name="widget_background_dark">#E6303030</color>  <!-- 磨砂黑色（90%不透明度） -->
+	<color name="ic_launcher_background">#FFFFFF</color>
 </resources> 
