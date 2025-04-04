@@ -20,6 +20,9 @@ import '../utils/widget_manager.dart';
 import '../utils/date_utils.dart' as date_util;
 import '../page/map_cache_page.dart';
 import '../page/strava_api_page.dart';
+import '../main.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -740,6 +743,9 @@ class _SettingPageState extends State<SettingPage>
         // 地图设置卡片
         _buildMapSettingsCard(),
         const SizedBox(height: 8),
+        // 权限管理卡片
+        _buildPermissionCard(),
+        const SizedBox(height: 8),
         // 高级选项（折叠面板）
         _buildAdvancedOptionsCard(),
       ],
@@ -775,6 +781,9 @@ class _SettingPageState extends State<SettingPage>
                 _buildLayoutSwitchCard(),
                 const SizedBox(height: 8),
                 _buildMapSettingsCard(),
+                const SizedBox(height: 8),
+                // 权限管理卡片
+                _buildPermissionCard(),
                 const SizedBox(height: 8),
                 // 高级选项（折叠面板）
                 _buildAdvancedOptionsCard(),
@@ -1598,5 +1607,270 @@ class _SettingPageState extends State<SettingPage>
     });
 
     Fluttertoast.showToast(msg: '路线图生成已在后台开始');
+  }
+
+  // 权限管理卡片
+  Widget _buildPermissionCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.security, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  '权限管理',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '应用需要某些权限才能正常运行。如果您在使用某些功能时遇到问题，可能是因为缺少必要的权限。',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: FilledButton.icon(
+                onPressed: () {
+                  _checkAndRequestPermissions();
+                },
+                icon: const Icon(Icons.check_circle),
+                label: const Text('检查和请求权限'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // 检查和请求权限方法
+  Future<void> _checkAndRequestPermissions() async {
+    try {
+      // 需要检查的权限列表
+      List<Permission> permissions = [
+        Permission.location,
+        Permission.locationWhenInUse,
+        Permission.storage,
+      ];
+      
+      // 在Android 13+上额外请求媒体权限
+      if (Platform.isAndroid) {
+        try {
+          final deviceInfoPlugin = DeviceInfoPlugin();
+          final androidInfo = await deviceInfoPlugin.androidInfo;
+          final sdkInt = androidInfo.version.sdkInt;
+          if (sdkInt >= 33) { // Android 13+
+            permissions.addAll([
+              Permission.photos,
+              Permission.videos,
+              Permission.audio,
+            ]);
+          }
+        } catch (e) {
+          Logger.e('获取设备信息失败', error: e, tag: 'Permissions');
+        }
+      }
+      
+      // 检查权限状态
+      Map<Permission, PermissionStatus> statuses = {};
+      for (var permission in permissions) {
+        statuses[permission] = await permission.status;
+      }
+      
+      // 找出未授权的权限
+      List<Permission> deniedPermissions = [];
+      statuses.forEach((permission, status) {
+        if (!status.isGranted) {
+          deniedPermissions.add(permission);
+        }
+      });
+      
+      // 如果有未授权权限，显示权限请求对话框
+      if (deniedPermissions.isNotEmpty) {
+        _showPermissionDialog(deniedPermissions);
+      } else {
+        // 所有权限已授予
+        Fluttertoast.showToast(
+          msg: "所有必要权限已授予",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+        );
+      }
+    } catch (e) {
+      Logger.e('检查权限出错', error: e, tag: 'Permissions');
+      Fluttertoast.showToast(
+        msg: "权限检查过程中发生错误",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+      );
+    }
+  }
+
+  // 显示权限对话框
+  void _showPermissionDialog(List<Permission> deniedPermissions) {
+    if (!mounted) return;
+    
+    // 创建权限名称和描述的映射
+    Map<Permission, String> permissionNames = {
+      Permission.location: '位置信息',
+      Permission.locationWhenInUse: '使用时的位置信息',
+      Permission.storage: '存储空间',
+      Permission.photos: '照片',
+      Permission.videos: '视频',
+      Permission.audio: '音频',
+    };
+    
+    Map<Permission, String> permissionDescriptions = {
+      Permission.location: '用于跟踪您的位置并记录跑步路线',
+      Permission.locationWhenInUse: '用于在使用应用时获取您的位置信息',
+      Permission.storage: '用于存储路线数据和导出GPX文件',
+      Permission.photos: '用于访问照片媒体，保存和导出图片',
+      Permission.videos: '用于访问视频媒体，保存相关数据',
+      Permission.audio: '用于访问音频媒体，支持相关功能',
+    };
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('需要权限'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: [
+                const Text('此应用需要以下权限才能正常运行:'),
+                const SizedBox(height: 16),
+                ...deniedPermissions.map((permission) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          permissionNames[permission] ?? permission.toString(),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          permissionDescriptions[permission] ?? '需要此权限以确保应用正常运行',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('稍后再说'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                
+                // 请求所有未授权的权限
+                Map<Permission, PermissionStatus> results = {};
+                for (var permission in deniedPermissions) {
+                  final status = await permission.request();
+                  results[permission] = status;
+                  Logger.d('$permission 请求结果: $status', tag: 'Permissions');
+                }
+                
+                // 检查权限请求结果
+                int granted = 0;
+                bool hasPermanentlyDenied = false;
+                
+                for (var entry in results.entries) {
+                  if (entry.value.isGranted) {
+                    granted++;
+                  } else if (await entry.key.isPermanentlyDenied) {
+                    hasPermanentlyDenied = true;
+                  }
+                }
+                
+                // 显示结果提示
+                if (granted == deniedPermissions.length) {
+                  // 全部授予
+                  Fluttertoast.showToast(
+                    msg: "已获得所有所需权限",
+                    toastLength: Toast.LENGTH_LONG,
+                    gravity: ToastGravity.BOTTOM,
+                  );
+                } else if (granted > 0) {
+                  // 部分授予
+                  Fluttertoast.showToast(
+                    msg: "已获得部分权限，某些功能可能受限",
+                    toastLength: Toast.LENGTH_LONG,
+                    gravity: ToastGravity.BOTTOM,
+                  );
+                }
+                
+                // 如果有永久拒绝的权限，提示用户前往设置
+                if (hasPermanentlyDenied && mounted) {
+                  _showAppSettingsDialog();
+                }
+              },
+              child: const Text('授予权限'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示前往设置的对话框
+  void _showAppSettingsDialog() {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('权限被永久拒绝'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('某些权限被永久拒绝，需要在应用设置中手动开启。'),
+              SizedBox(height: 8),
+              Text(
+                '这些权限对于应用的正常运行至关重要，没有这些权限，某些功能可能无法使用。',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                openAppSettings();
+              },
+              child: const Text('前往设置'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

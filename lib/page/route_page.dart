@@ -27,6 +27,13 @@ class RoutePage extends StatefulWidget {
   State<RoutePage> createState() => _RoutePageState();
 }
 
+/// 排序方式
+enum SortOrder {
+  none,       // 默认排序
+  ascending,  // 由短到长
+  descending, // 由长到短
+}
+
 class _RoutePageState extends State<RoutePage> {
   final ApiKeyModel _apiKeyModel = ApiKeyModel();
   final RouteService _routeService = RouteService();
@@ -41,6 +48,15 @@ class _RoutePageState extends State<RoutePage> {
   int _totalRoutes = 0;
   final int _perPage = 20;
   int get _totalPages => (_totalRoutes / _perPage).ceil();
+  
+  // 搜索相关属性
+  bool _isSearching = false;
+  String _searchQuery = "";
+  List<Map<String, dynamic>> _filteredRouteList = [];
+  final TextEditingController _searchController = TextEditingController();
+  
+  // 排序相关属性
+  SortOrder _sortOrder = SortOrder.none;
 
   @override
   void initState() {
@@ -67,6 +83,12 @@ class _RoutePageState extends State<RoutePage> {
     }
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   /// 加载API密钥
   Future<void> _loadApiKey() async {
     await _apiKeyModel.getApiKey();
@@ -79,6 +101,7 @@ class _RoutePageState extends State<RoutePage> {
       if (mounted) {
         setState(() {
           _totalRoutes = count;
+          Logger.d('路线总数: $_totalRoutes, 每页数量: $_perPage, 总页数: $_totalPages', tag: 'RoutePage');
         });
       }
     } catch (e) {
@@ -114,8 +137,15 @@ class _RoutePageState extends State<RoutePage> {
         page: _currentPage, 
         perPage: _perPage
       );
+      
+      Logger.d('加载路线数据成功，数量: ${routes.length}', tag: 'RoutePage');
+      
       setState(() {
         routeList = routes;
+        // 重置筛选的路线列表
+        _filteredRouteList = List.from(routes);
+        // 应用当前排序
+        _applySorting();
       });
     } catch (e) {
       _showToast('获取路线失败: $e');
@@ -254,19 +284,204 @@ class _RoutePageState extends State<RoutePage> {
     );
   }
   
+  /// 搜索路线
+  void _searchRoutes(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+      if (_searchQuery.isEmpty) {
+        // 如果搜索词为空，显示所有路线
+        _filteredRouteList = List.from(routeList);
+      } else {
+        // 否则进行模糊匹配
+        _filteredRouteList = routeList.where((route) {
+          // 搜索路线名称，支持模糊匹配
+          final routeName = route['name']?.toString().toLowerCase() ?? '';
+          return routeName.contains(_searchQuery);
+        }).toList();
+      }
+      // 应用当前排序
+      _applySorting(_filteredRouteList);
+    });
+  }
+  
+  /// 切换搜索状态
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        // 退出搜索模式，清空搜索内容并恢复原始列表
+        _searchController.clear();
+        _searchQuery = "";
+        _filteredRouteList = List.from(routeList);
+        // 应用当前排序
+        _applySorting(_filteredRouteList);
+      }
+    });
+  }
+  
+  /// 切换排序方式
+  void _toggleSortOrder() {
+    setState(() {
+      // 循环切换排序方式：无排序 -> 由短到长 -> 由长到短 -> 无排序
+      switch (_sortOrder) {
+        case SortOrder.none:
+          _sortOrder = SortOrder.ascending;
+          _showToast('按路线长度从短到长排序');
+          break;
+        case SortOrder.ascending:
+          _sortOrder = SortOrder.descending;
+          _showToast('按路线长度从长到短排序');
+          break;
+        case SortOrder.descending:
+          _sortOrder = SortOrder.none;
+          _showToast('恢复默认排序');
+          // 恢复默认排序时重新加载数据以获取原始顺序
+          if (!_isSearching) {
+            _refreshData();
+          } else {
+            // 如果在搜索模式，重新应用搜索过滤
+            _searchRoutes(_searchQuery);
+          }
+          return; // 提前返回避免应用排序
+          break;
+      }
+      // 应用排序
+      _applySorting();
+    });
+  }
+  
+  /// 应用排序
+  void _applySorting([List<Map<String, dynamic>>? listToSort]) {
+    final targetList = listToSort ?? (_isSearching ? _filteredRouteList : routeList);
+    
+    switch (_sortOrder) {
+      case SortOrder.ascending:
+        // 由短到长排序
+        targetList.sort((a, b) {
+          final distanceA = a['distance'] as num? ?? 0;
+          final distanceB = b['distance'] as num? ?? 0;
+          return distanceA.compareTo(distanceB);
+        });
+        break;
+      case SortOrder.descending:
+        // 由长到短排序
+        targetList.sort((a, b) {
+          final distanceA = a['distance'] as num? ?? 0;
+          final distanceB = b['distance'] as num? ?? 0;
+          return distanceB.compareTo(distanceA);
+        });
+        break;
+      case SortOrder.none:
+        // 无需排序，直接使用API返回的原始顺序
+        // 注意：如果需要刷新列表，会在_loadRoutes方法中重新获取数据
+        break;
+    }
+    
+    // 如果是操作的引用列表，还需要更新状态触发重绘
+    if (listToSort == null) {
+      setState(() {
+        if (_isSearching) {
+          _filteredRouteList = List.from(_filteredRouteList);
+        } else {
+          routeList = List.from(routeList);
+        }
+      });
+    }
+  }
+  
+  /// 构建正常AppBar
+  Widget _buildNormalAppBar() {
+    return SliverAppBar(
+      title: const Text('STRAVA-路线'),
+      floating: true,
+      snap: true,
+      actions: [
+        // 排序按钮
+        IconButton(
+          icon: Icon(_getSortIcon()),
+          onPressed: _toggleSortOrder,
+          tooltip: _getSortTooltip(),
+        ),
+        // 搜索按钮
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: _toggleSearch,
+          tooltip: '搜索路线',
+        ),
+      ],
+    );
+  }
+  
+  /// 获取当前排序状态的图标
+  IconData _getSortIcon() {
+    switch (_sortOrder) {
+      case SortOrder.ascending:
+        return Icons.arrow_upward;
+      case SortOrder.descending:
+        return Icons.arrow_downward;
+      default:
+        return Icons.sort;
+    }
+  }
+  
+  /// 获取当前排序状态的提示文本
+  String _getSortTooltip() {
+    switch (_sortOrder) {
+      case SortOrder.ascending:
+        return '当前：由短到长';
+      case SortOrder.descending:
+        return '当前：由长到短';
+      default:
+        return '排序路线';
+    }
+  }
+  
+  /// 构建搜索AppBar
+  Widget _buildSearchAppBar() {
+    return SliverAppBar(
+      floating: true,
+      snap: true,
+      title: TextField(
+        controller: _searchController,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: '搜索路线名称...',
+          border: InputBorder.none,
+          hintStyle: TextStyle(color: Colors.white70),
+        ),
+        style: const TextStyle(color: Colors.white),
+        onChanged: _searchRoutes,
+      ),
+      actions: [
+        // 搜索模式下也保留排序按钮
+        IconButton(
+          icon: Icon(_getSortIcon()),
+          onPressed: _toggleSortOrder,
+          tooltip: _getSortTooltip(),
+        ),
+        IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: _toggleSearch,
+          tooltip: '退出搜索',
+        ),
+      ],
+    );
+  }
+  
   /// 构建分页控件
   Widget _buildPaginationControls() {
-    if (_totalRoutes <= _perPage) return SizedBox.shrink();
+    // 始终显示调试信息，以便排查问题
+    Logger.d('构建分页控件: totalRoutes=$_totalRoutes, perPage=$_perPage, totalPages=$_totalPages', tag: 'RoutePage');
     
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 4,
-            offset: Offset(0, -2),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -274,33 +489,33 @@ class _RoutePageState extends State<RoutePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '第 $_currentPage/$_totalPages 页 (共$_totalRoutes条路线)',
-            style: TextStyle(fontSize: 14),
+            '第 $_currentPage/$_totalPages 页 (共 $_totalRoutes 条路线)',
+            style: const TextStyle(fontSize: 14),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // 首页按钮
               IconButton(
-                icon: Icon(Icons.first_page),
+                icon: const Icon(Icons.first_page),
                 onPressed: _currentPage > 1 ? () => _loadPage(1) : null,
               ),
               // 上一页按钮
               IconButton(
-                icon: Icon(Icons.chevron_left),
+                icon: const Icon(Icons.chevron_left),
                 onPressed: _currentPage > 1 ? _loadPrevPage : null,
               ),
               // 页码选择器
               _buildPageSelector(),
               // 下一页按钮
               IconButton(
-                icon: Icon(Icons.chevron_right),
+                icon: const Icon(Icons.chevron_right),
                 onPressed: _currentPage < _totalPages ? _loadNextPage : null,
               ),
               // 尾页按钮
               IconButton(
-                icon: Icon(Icons.last_page),
+                icon: const Icon(Icons.last_page),
                 onPressed: _currentPage < _totalPages ? () => _loadPage(_totalPages) : null,
               ),
             ],
@@ -361,57 +576,112 @@ class _RoutePageState extends State<RoutePage> {
   Widget build(BuildContext context) {
     // 检测是否为横屏模式
     final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
+    // 确定显示的路线列表（原始列表或搜索过滤后的列表）
+    final displayedRouteList = _isSearching ? _filteredRouteList : routeList;
 
     return Scaffold(
       body: _isLoading && routeList.isEmpty 
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: () async {
                 await _refreshData();
               },
               child: routeList.isEmpty
                   ? _buildEmptyView()
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: CustomScrollView(
-                            slivers: [
-                              SliverAppBar(
-                                title: const Text('STRAVA-路线'),
-                                floating: true,
-                                snap: true,
+                  : CustomScrollView(
+                      slivers: [
+                        // 动态选择AppBar
+                        _isSearching ? _buildSearchAppBar() : _buildNormalAppBar(),
+                        
+                        // 搜索结果提示
+                        if (_isSearching && _searchQuery.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                '搜索 "$_searchQuery" 的结果: ${_filteredRouteList.length} 条',
+                                style: const TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey,
+                                ),
                               ),
-                              SliverPadding(
-                                padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
-                                sliver: isLandscape
-                                    // 横屏模式：使用横向布局组件
-                                    ? RouteLandscapeLayout(
-                                        routeList: routeList,
-                                        onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
-                                        onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
-                                      )
-                                    // 竖屏模式：使用纵向布局组件
-                                    : RoutePortraitLayout(
-                                        routeList: routeList,
-                                        onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
-                                        onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
-                                      ),
+                            ),
+                          ),
+                        
+                        // 路线内容
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(8.0, 0, 8, 16),
+                          sliver: isLandscape
+                              // 横屏模式：使用横向布局组件
+                              ? RouteLandscapeLayout(
+                                  routeList: displayedRouteList,
+                                  onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
+                                  onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
+                                )
+                              // 竖屏模式：使用纵向布局组件
+                              : RoutePortraitLayout(
+                                  routeList: displayedRouteList,
+                                  onRouteTap: (routeId) => _navigateToRouteDetail(routeId),
+                                  onNavigateTap: (routeId) => _navigateToRouteDetail(routeId, startNavigation: true),
+                                ),
+                        ),
+                        
+                        // 加载状态指示器
+                        if (_isLoading && routeList.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: CircularProgressIndicator(),
                               ),
-                              // 加载状态指示器
-                              if (_isLoading && routeList.isNotEmpty)
-                                SliverToBoxAdapter(
-                                  child: Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.all(16.0),
-                                      child: CircularProgressIndicator(),
+                            ),
+                          ),
+                        
+                        // 没有搜索结果时显示提示
+                        if (_isSearching && _filteredRouteList.isEmpty)
+                          SliverToBoxAdapter(
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Column(
+                                  children: [
+                                    const Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Colors.grey,
                                     ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      '找不到包含 "$_searchQuery" 的路线',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        
+                        // 路线列表底部显示分页控件或路线总数信息
+                        if (!_isSearching && displayedRouteList.isNotEmpty)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16.0),
+                              child: _totalRoutes > _perPage && _totalPages > 1 
+                                ? _buildPaginationControls() 
+                                : Container(
+                                  padding: const EdgeInsets.all(16.0),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '共 $_totalRoutes 条路线',
+                                    style: const TextStyle(fontSize: 14, color: Colors.grey),
                                   ),
                                 ),
-                            ],
+                            ),
                           ),
-                        ),
-                        // 分页控件
-                        _buildPaginationControls(),
                       ],
                     ),
             ),
