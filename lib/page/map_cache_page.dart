@@ -212,8 +212,8 @@ class _MapCachePageState extends State<MapCachePage> {
         });
         
         Fluttertoast.showToast(
-          msg: "下载完成！共下载 $totalTiles 个瓦片",
-          toastLength: Toast.LENGTH_SHORT,
+          msg: "下载完成！共下载 $totalTiles 个瓦片，可在区域管理页面查看",
+          toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
         );
       }
@@ -249,37 +249,6 @@ class _MapCachePageState extends State<MapCachePage> {
       Logger.d('保存区域信息成功: $regionName', tag: 'MapCache');
     } catch (e) {
       Logger.e('保存区域信息失败', error: e, tag: 'MapCache');
-    }
-  }
-
-  // 清除所有缓存
-  Future<void> _clearAllCache() async {
-    try {
-      // 使用缓存管理器的方法清除所有区域
-      final result = await MapTileCacheManager.instance.clearAllRegions();
-      
-      if (result) {
-        // 刷新缓存统计
-        await _refreshCacheStats();
-        
-        if (mounted) {
-          Fluttertoast.showToast(
-            msg: "所有缓存已清除",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-          );
-        }
-      } else {
-        throw Exception("清除失败");
-      }
-    } catch (e) {
-      if (mounted) {
-        Fluttertoast.showToast(
-          msg: "清除缓存出错：${e.toString()}",
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-        );
-      }
     }
   }
 
@@ -459,48 +428,15 @@ class _MapCachePageState extends State<MapCachePage> {
         title: const Text('地图瓦片下载'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshCacheStats,
-            tooltip: '刷新缓存统计',
-          ),
-          IconButton(
             icon: const Icon(Icons.storage),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const RegionManagePage(),
                 ),
-              ).then((_) => _refreshCacheStats());
+              );
             },
             tooltip: '管理已缓存区域',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_forever),
-            onPressed: _isDownloading
-                ? null
-                : () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('清除所有缓存'),
-                        content: const Text('确定要清除所有已下载的地图瓦片吗？这将删除所有离线地图数据。'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('取消'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              _clearAllCache();
-                            },
-                            child: const Text('确定'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-            tooltip: '清除所有缓存',
           ),
         ],
       ),
@@ -646,24 +582,6 @@ class _MapCachePageState extends State<MapCachePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 缓存状态信息
-                  Text(
-                    '已缓存瓦片: ${_cacheStats['tileCount']} 个',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '缓存大小: ${_formatSize(_cacheStats['size'] ?? 0)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '已保存区域: ${_cacheStats['regions']} 个',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  
                   // 缩放级别调整
                   Row(
                     children: [
