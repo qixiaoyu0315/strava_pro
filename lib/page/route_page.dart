@@ -9,6 +9,7 @@ import '../service/strava_client_manager.dart';
 import '../service/route_service.dart';
 import '../widgets/route_landscape_layout.dart';
 import '../widgets/route_portrait_layout.dart';
+import '../page/strava_api_page.dart';
 
 /// 路线页面组件
 class RoutePage extends StatefulWidget {
@@ -41,9 +42,6 @@ class _RoutePageState extends State<RoutePage> {
       if (widget.isAuthenticated) {
         // 如果已认证，直接加载数据
         _loadAthleteAndRoutes();
-      } else {
-        // 否则尝试认证
-        _authenticate();
       }
     });
   }
@@ -86,34 +84,30 @@ class _RoutePageState extends State<RoutePage> {
     }
   }
 
-  /// 执行Strava认证
-  void _authenticate() {
-    setState(() {
-      _isLoading = true;
-    });
-
-    StravaClientManager().authenticate().then((token) async {
-      setState(() {
-        this.token = token;
-      });
-
-      // 获取运动员信息并通知状态变化
-      try {
-        athlete = await _routeService.getAthleteInfo();
-        widget.onAuthenticationChanged?.call(true, athlete);
-      } catch (e) {
-        debugPrint('获取运动员信息失败: $e');
+  /// 跳转到Strava API设置页面
+  void _navigateToStravaApiPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StravaApiPage(
+          isAuthenticated: widget.isAuthenticated,
+          athlete: athlete,
+          onAuthenticationChanged: (isAuthenticated, newAthlete) {
+            widget.onAuthenticationChanged?.call(isAuthenticated, newAthlete);
+            if (isAuthenticated && newAthlete != null) {
+              setState(() {
+                athlete = newAthlete;
+              });
+              _loadRoutes();
+            }
+          },
+        ),
+      ),
+    ).then((_) {
+      // 如果已认证，刷新路线数据
+      if (widget.isAuthenticated) {
+        _loadRoutes();
       }
-
-      _showToast('认证成功');
-      _loadRoutes();
-    }).catchError((error) {
-      _showErrorMessage(error);
-      _showToast('认证失败: 请检查您的 API ID 和密钥。');
-    }).whenComplete(() {
-      setState(() {
-        _isLoading = false;
-      });
     });
   }
 
@@ -169,7 +163,7 @@ class _RoutePageState extends State<RoutePage> {
           Text('没有找到路线数据'),
           SizedBox(height: 16),
           ElevatedButton(
-            onPressed: widget.isAuthenticated ? _loadRoutes : _authenticate,
+            onPressed: widget.isAuthenticated ? _loadRoutes : _navigateToStravaApiPage,
             child: Text(widget.isAuthenticated ? '刷新数据' : '登录Strava'),
           )
         ],

@@ -19,6 +19,7 @@ import '../utils/calendar_exporter.dart';
 import '../utils/widget_manager.dart';
 import '../utils/date_utils.dart' as date_util;
 import '../page/map_cache_page.dart';
+import '../page/strava_api_page.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -38,8 +39,8 @@ class SettingPage extends StatefulWidget {
   State<SettingPage> createState() => _SettingPageState();
 }
 
-class _SettingPageState extends State<SettingPage> {
-  final TextEditingController _textEditingController = TextEditingController();
+class _SettingPageState extends State<SettingPage>
+    with SingleTickerProviderStateMixin {
   TokenResponse? token;
   DetailedAthlete? _athlete;
   bool _isSyncing = false;
@@ -70,6 +71,8 @@ class _SettingPageState extends State<SettingPage> {
   // 在_SettingPageState类中添加字段
   DateTime _selectedWeekStart =
       date_util.DateUtils.getWeekStart(DateTime.now());
+  // 添加月历选择日期
+  DateTime _selectedMonthDate = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
   void initState() {
@@ -90,7 +93,6 @@ class _SettingPageState extends State<SettingPage> {
       setState(() {
         _athlete = widget.athlete;
         token = StravaClientManager().token;
-        _textEditingController.text = token?.accessToken ?? '';
       });
     }
 
@@ -109,11 +111,9 @@ class _SettingPageState extends State<SettingPage> {
         if (widget.isAuthenticated && widget.athlete != null) {
           _athlete = widget.athlete;
           token = StravaClientManager().token;
-          _textEditingController.text = token?.accessToken ?? '';
         } else {
           _athlete = null;
           token = null;
-          _textEditingController.clear();
         }
       });
     }
@@ -395,7 +395,7 @@ class _SettingPageState extends State<SettingPage> {
 
       setState(() {
         token = tokenResponse;
-        _textEditingController.text = tokenResponse.accessToken;
+        _syncMessage = tokenResponse.accessToken;
       });
 
       Logger.d(
@@ -453,7 +453,7 @@ class _SettingPageState extends State<SettingPage> {
       setState(() {
         token = null;
         _athlete = null;
-        _textEditingController.clear();
+        _syncMessage = '';
         _idController.clear();
         _keyController.clear();
         _lastSyncTime = null;
@@ -775,30 +775,8 @@ class _SettingPageState extends State<SettingPage> {
         // 地图设置卡片
         _buildMapSettingsCard(),
         const SizedBox(height: 8),
-        // API设置卡片
-        _buildApiSettingsCard(context),
-        // 重置同步按钮
-        OutlinedButton.icon(
-          onPressed: _isLoading ? null : _resetSyncStatus,
-          icon: const Icon(Icons.restart_alt),
-          label: const Text('重置同步状态'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 48),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // 重置数据库按钮
-        OutlinedButton.icon(
-          onPressed:
-              _isLoading ? null : () => _showResetDatabaseConfirmation(context),
-          icon: const Icon(Icons.delete_forever),
-          label: const Text('重置数据库'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 48),
-            foregroundColor: Colors.red,
-          ),
-        ),
-        // 同步按钮和进度
+        // 高级选项（折叠面板）
+        _buildAdvancedOptionsCard(),
       ],
     );
   }
@@ -833,30 +811,8 @@ class _SettingPageState extends State<SettingPage> {
                 const SizedBox(height: 8),
                 _buildMapSettingsCard(),
                 const SizedBox(height: 8),
-                _buildApiSettingsCard(context),
-                const SizedBox(height: 8),
-                // 重置同步按钮
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _resetSyncStatus,
-                  icon: const Icon(Icons.restart_alt),
-                  label: const Text('重置同步状态'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // 重置数据库按钮
-                OutlinedButton.icon(
-                  onPressed: _isLoading
-                      ? null
-                      : () => _showResetDatabaseConfirmation(context),
-                  icon: const Icon(Icons.delete_forever),
-                  label: const Text('重置数据库'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                    foregroundColor: Colors.red,
-                  ),
-                ),
+                // 高级选项（折叠面板）
+                _buildAdvancedOptionsCard(),
               ],
             ),
           ),
@@ -900,13 +856,6 @@ class _SettingPageState extends State<SettingPage> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             const SizedBox(height: 8),
-            // 显示最后同步时间
-            if (_lastSyncTime != null)
-              Text(
-                '上次同步: ${_formatDateTime(_lastSyncTime)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            const SizedBox(height: 8),
             // 运动统计
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -925,31 +874,6 @@ class _SettingPageState extends State<SettingPage> {
                 ),
               ],
             ),
-            // 显示同步状态信息
-            if (_syncStatusMap != null) ...[
-              const Divider(height: 32),
-              Text(
-                '同步信息',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              _buildSyncInfo(
-                '当前页数',
-                '${_syncStatusMap!['last_page'] ?? 0}',
-                Icons.bookmark,
-              ),
-              _buildSyncInfo(
-                '最后同步',
-                _formatDateTime(_syncStatusMap!['last_sync_time']?.toString()),
-                Icons.access_time,
-              ),
-              _buildSyncInfo(
-                '起始时间',
-                _formatDateTime(
-                    _syncStatusMap!['athlete_created_at']?.toString()),
-                Icons.calendar_today,
-              ),
-            ],
             const SizedBox(height: 8),
             // 详细信息按钮
             TextButton(
@@ -1094,47 +1018,99 @@ class _SettingPageState extends State<SettingPage> {
                 ],
               ),
             const SizedBox(height: 8.0),
-            // 添加一个文本显示最后同步时间
-            Text('最后同步: ${_lastSyncTime ?? "未同步"}'),
-            Text('最后获取活动时间: ${_lastActivitySyncTime ?? "未同步"}'),
+            // 同步信息
+            if (_lastSyncTime != null)
+              Text('上次同步: ${_formatDateTime(_lastSyncTime)}'),
+            if (_lastActivitySyncTime != null)
+              Text('上次活动同步: ${_formatDateTime(_lastActivitySyncTime)}'),
             if (_syncMessage.isNotEmpty)
-              Text(
-                _syncMessage,
-                style: const TextStyle(fontStyle: FontStyle.italic),
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  _syncMessage,
+                  style: const TextStyle(fontStyle: FontStyle.italic),
+                ),
               ),
             const SizedBox(height: 16.0),
-            // 按钮行：添加同步按钮和生成SVG按钮
+            // 同步按钮和生成SVG按钮
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _syncActivities,
+                    icon: const Icon(Icons.sync),
+                    label: const Text('同步活动'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('同步活动数据'),
                   ),
                 ),
                 const SizedBox(width: 8.0),
                 Expanded(
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _generateAllSVG,
+                    icon: const Icon(Icons.route),
+                    label: const Text('生成路线'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text('生成SVG路线'),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16.0),
+            // 日历导出区域
+            _buildCalendarExportSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 日历导出区域组件
+  Widget _buildCalendarExportSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '日历导出',
+          style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12.0),
+        
+        // 月历选择和导出
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '月历',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 8.0),
-            // 添加导出月历按钮
+            InkWell(
+              onTap: () => _selectDateForCalendarExport(isMonth: true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(_formatMonthTitle()),
+                    const Icon(Icons.calendar_today),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8.0),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _exportMonthCalendar,
+                onPressed: _isLoading ? null : () => _exportCalendar(isMonth: true),
                 icon: const Icon(Icons.calendar_month),
                 label: const Text('导出月历图片'),
                 style: ElevatedButton.styleFrom(
@@ -1143,110 +1119,137 @@ class _SettingPageState extends State<SettingPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 8.0),
-            // 周历选择和导出功能区域
-            _buildWeekExportSection(),
           ],
         ),
-      ),
-    );
-  }
-
-  // 添加周历选择和导出功能组件
-  Widget _buildWeekExportSection() {
-    final weekTitle = date_util.DateUtils.formatWeekTitle(_selectedWeekStart);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '周历导出',
-          style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-        ),
-        SizedBox(height: 8.0),
-        // 显示当前选中的日期所在周
-        InkWell(
-          onTap: _showDatePicker,
-          child: Container(
-            padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(4.0),
+        
+        const SizedBox(height: 16.0),
+        
+        // 周历选择和导出
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '周历',
+              style: TextStyle(fontWeight: FontWeight.w500),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(weekTitle),
-                Icon(Icons.calendar_today),
-              ],
+            const SizedBox(height: 8.0),
+            InkWell(
+              onTap: () => _selectDateForCalendarExport(isMonth: false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(date_util.DateUtils.formatWeekTitle(_selectedWeekStart)),
+                    const Icon(Icons.calendar_today),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-        SizedBox(height: 8.0),
-        // 导出周历按钮
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _isLoading ? null : _exportWeekCalendar,
-            icon: const Icon(Icons.calendar_view_week),
-            label: const Text('导出周历图片'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.indigo,
-              foregroundColor: Colors.white,
+            const SizedBox(height: 8.0),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : () => _exportCalendar(isMonth: false),
+                icon: const Icon(Icons.calendar_view_week),
+                label: const Text('导出周历图片'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ],
     );
   }
 
-  // 添加日期选择器弹窗方法
-  void _showDatePicker() async {
+  // 选择日期（月历或周历）
+  Future<void> _selectDateForCalendarExport({required bool isMonth}) async {
+    final DateTime initialDate = isMonth 
+        ? DateTime(DateTime.now().year, DateTime.now().month) 
+        : _selectedWeekStart;
+    
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedWeekStart,
+      initialDate: initialDate,
       firstDate: DateTime(DateTime.now().year - 1),
       lastDate: DateTime(DateTime.now().year + 1),
-      helpText: '选择日期',
+      helpText: isMonth ? '选择月份' : '选择周',
       cancelText: '取消',
       confirmText: '确定',
     );
 
     if (picked != null) {
-      // 根据选择的日期计算所在周的开始日期
-      final weekStart = date_util.DateUtils.getWeekStart(picked);
-
       setState(() {
-        _selectedWeekStart = weekStart;
+        if (isMonth) {
+          // 选择的是月份，取当月第一天
+          _selectedMonthDate = DateTime(picked.year, picked.month);
+        } else {
+          // 选择的是周，取周一
+          _selectedWeekStart = date_util.DateUtils.getWeekStart(picked);
+        }
       });
     }
   }
 
-  // 添加导出周历的方法
-  Future<void> _exportWeekCalendar() async {
+  // 格式化月份标题
+  String _formatMonthTitle() {
+    final monthNames = [
+      '', '一月', '二月', '三月', '四月', '五月', '六月',
+      '七月', '八月', '九月', '十月', '十一月', '十二月'
+    ];
+    
+    return '${_selectedMonthDate.year}年${monthNames[_selectedMonthDate.month]}';
+  }
+
+  // 导出日历（月历或周历）
+  Future<void> _exportCalendar({required bool isMonth}) async {
+    if (_isLoading) {
+      Fluttertoast.showToast(msg: '请等待当前操作完成');
+      return;
+    }
+
     try {
-      final now = DateTime.now();
-
-      // 获取当前所有活动数据的SVG缓存
-      final svgCache = await _activityService.getSvgCache();
-
       setState(() {
         _isLoading = true;
-        _syncStatus = '正在导出周历...';
+        _syncStatus = isMonth ? '正在导出月历...' : '正在导出周历...';
         _syncProgress = 0.5;
       });
 
-      final result = await CalendarExporter.exportWeek(
-        context: context,
-        weekStart: _selectedWeekStart,
-        selectedDate: now,
-        svgCache: svgCache,
-      );
+      // 获取SVG缓存
+      final svgCache = await _activityService.getSvgCache();
+
+      String? result;
+      if (isMonth) {
+        // 导出月历
+        result = await CalendarExporter.exportMonth(
+          context: context,
+          month: _selectedMonthDate,
+          selectedDate: DateTime.now(),
+          svgCache: svgCache,
+        );
+      } else {
+        // 导出周历
+        result = await CalendarExporter.exportWeek(
+          context: context,
+          weekStart: _selectedWeekStart,
+          selectedDate: DateTime.now(),
+          svgCache: svgCache,
+        );
+      }
 
       setState(() {
         _isLoading = false;
         _syncStatus = '';
-        _syncMessage = result != null ? '周历导出成功' : '周历导出失败';
+        _syncMessage = result != null 
+            ? '${isMonth ? "月历" : "周历"}导出成功' 
+            : '${isMonth ? "月历" : "周历"}导出失败';
       });
 
       // 延迟清除消息
@@ -1255,12 +1258,21 @@ class _SettingPageState extends State<SettingPage> {
       setState(() {
         _isLoading = false;
         _syncStatus = '';
-        _syncMessage = '周历导出错误: $e';
+        _syncMessage = '${isMonth ? "月历" : "周历"}导出错误: $e';
       });
 
       // 延迟清除消息
       _clearMessageAfterDelay();
     }
+  }
+
+  // 延迟清除消息
+  void _clearMessageAfterDelay() {
+    Future.delayed(Duration(seconds: 5), () {
+      setState(() {
+        _syncMessage = '';
+      });
+    });
   }
 
   // 布局切换卡片
@@ -1317,117 +1329,27 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
-  // API设置卡片
-  Widget _buildApiSettingsCard(BuildContext context) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'API 设置',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _idController,
-              decoration: const InputDecoration(
-                labelText: '请输入 API ID',
-                border: OutlineInputBorder(),
-                helperText: '在 Strava 开发者网站获取的客户端 ID',
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _keyController,
-              decoration: const InputDecoration(
-                labelText: '请输入 API Key',
-                border: OutlineInputBorder(),
-                helperText: '在 Strava 开发者网站获取的客户端密钥',
-              ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              minLines: 1,
-              maxLines: 3,
-              controller: _textEditingController,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: "Access Token",
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.copy),
-                  onPressed: () {
-                    Clipboard.setData(
-                      ClipboardData(text: _textEditingController.text),
-                    ).then((_) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("已复制到剪贴板")),
-                        );
-                      }
-                    });
-                  },
-                ),
-              ),
-              readOnly: true,
-            ),
-            const SizedBox(height: 8),
-            // Strava API 配置提示
-            const Card(
-              color: Color(0xFFF5F5F5),
-              child: Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Strava API 配置说明',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 4),
-                    Text('1. 在 Strava 开发者网站创建应用'),
-                    Text('2. 授权回调域：localhost'),
-                    Text('3. 确保添加了回调 URL：stravaflutter://redirect'),
-                    SizedBox(height: 4),
-                    Text(
-                      '如果认证失败，请检查您的 API 配置是否正确。',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: testAuthentication,
-                  icon: Icon(Icons.login),
-                  label: const Text('认证'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: testDeauth,
-                  icon: Icon(Icons.logout),
-                  label: const Text('取消认证'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ],
+  // 跳转到Strava API设置页面
+  void _navigateToStravaApiPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StravaApiPage(
+          isAuthenticated: _isAuthenticated,
+          athlete: _athlete,
+          onAuthenticationChanged: (isAuthenticated, athlete) {
+            setState(() {
+              _isAuthenticated = isAuthenticated;
+              _athlete = athlete;
+            });
+            widget.onAuthenticationChanged?.call(isAuthenticated, athlete);
+          },
         ),
       ),
-    );
+    ).then((_) {
+      // 返回后刷新认证状态
+      _checkAuthStatus();
+    });
   }
 
   // 构建统计项小部件
@@ -1453,16 +1375,90 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
-  // 构建同步状态信息项
-  Widget _buildSyncInfo(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+  // 高级选项卡片
+  Widget _buildAdvancedOptionsCard() {
+    return Card(
+      elevation: 2,
+      child: ExpansionTile(
+        title: const Text(
+          '高级选项',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: const Text('Strava API设置及数据管理'),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          Icon(icon, size: 18),
-          const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value, overflow: TextOverflow.ellipsis)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // API相关按钮
+                if (!_isAuthenticated) 
+                  ElevatedButton.icon(
+                    onPressed: _navigateToStravaApiPage,
+                    icon: const Icon(Icons.login),
+                    label: const Text('登录 Strava'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      minimumSize: const Size(double.infinity, 48),
+                    ),
+                  )
+                else 
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _navigateToStravaApiPage,
+                          icon: const Icon(Icons.settings),
+                          label: const Text('API设置'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: testDeauth,
+                          icon: const Icon(Icons.logout),
+                          label: const Text('取消认证'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 48),
+                            foregroundColor: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                
+                // 重置同步按钮
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _resetSyncStatus,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('重置同步状态'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 重置数据库按钮
+                OutlinedButton.icon(
+                  onPressed:
+                      _isLoading ? null : () => _showResetDatabaseConfirmation(context),
+                  icon: const Icon(Icons.delete_forever),
+                  label: const Text('重置数据库'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    foregroundColor: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1637,122 +1633,5 @@ class _SettingPageState extends State<SettingPage> {
     });
 
     Fluttertoast.showToast(msg: '路线图生成已在后台开始');
-  }
-
-  // 导出当前月份日历
-  Future<void> _exportMonthCalendar() async {
-    if (_isLoading) {
-      Fluttertoast.showToast(msg: '请等待当前操作完成');
-      return;
-    }
-
-    try {
-      setState(() {
-        _isLoading = true;
-        _syncMessage = '准备导出月历...';
-      });
-
-      // 获取当前月份
-      final now = DateTime.now();
-      final currentMonth = DateTime(now.year, now.month);
-
-      // 使用月份选择器选择要导出的月份
-      final DateTime? selectedMonth = await _showMonthPicker(currentMonth);
-      if (selectedMonth == null) {
-        setState(() {
-          _isLoading = false;
-          _syncMessage = '已取消导出';
-        });
-        return;
-      }
-
-      // 获取选中月份的SVG缓存
-      final svgCache = await _getSvgCacheForMonth(selectedMonth);
-
-      // 导出月历为图片
-      final String? exportedPath = await CalendarExporter.exportMonth(
-        context: context,
-        month: selectedMonth,
-        selectedDate: DateTime.now(),
-        svgCache: svgCache,
-      );
-
-      if (exportedPath != null) {
-        setState(() {
-          _syncMessage = '月历已导出至: $exportedPath';
-        });
-      } else {
-        setState(() {
-          _syncMessage = '导出失败，请检查权限设置';
-        });
-      }
-    } catch (e) {
-      Logger.e('导出月历失败', error: e, tag: 'ExportCalendar');
-      setState(() {
-        _syncMessage = '导出失败: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // 显示月份选择器
-  Future<DateTime?> _showMonthPicker(DateTime initialDate) async {
-    final DateTime? selectedDate = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(initialDate.year - 2),
-      lastDate: initialDate,
-      initialDatePickerMode: DatePickerMode.year,
-      // 只显示月份
-      selectableDayPredicate: (DateTime date) {
-        // 只允许选择每月的第一天（显示月份选择器时）
-        return date.day == 1;
-      },
-    );
-
-    if (selectedDate != null) {
-      return DateTime(selectedDate.year, selectedDate.month);
-    }
-
-    return null;
-  }
-
-  // 获取指定月份的SVG缓存
-  Future<Map<String, bool>> _getSvgCacheForMonth(DateTime month) async {
-    try {
-      // 获取该月所有日期
-      final Map<String, bool> svgCache = {};
-
-      // 获取当月天数
-      final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-
-      // 遍历当月每一天，检查SVG文件是否存在
-      for (int day = 1; day <= daysInMonth; day++) {
-        final date = DateTime(month.year, month.month, day);
-        final dateStr = DateFormat('yyyy-MM-dd').format(date);
-        final svgPath =
-            '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
-
-        final file = File(svgPath);
-        svgCache[dateStr] = await file.exists();
-      }
-
-      return svgCache;
-    } catch (e) {
-      Logger.e('获取SVG缓存失败', error: e, tag: 'ExportCalendar');
-      return {};
-    }
-  }
-
-  // 延迟清除消息
-  void _clearMessageAfterDelay() {
-    Future.delayed(Duration(seconds: 5), () {
-      setState(() {
-        _syncMessage = '';
-      });
-    });
   }
 }
