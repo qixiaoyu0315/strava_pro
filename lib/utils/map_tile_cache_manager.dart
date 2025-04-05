@@ -52,29 +52,36 @@ class MapTileCacheManager {
       // 计算缓存大小和数量
       int size = 0;
       int tileCount = 0;
+      Map<String, int> zoomLevelStats = {};
       
       if (_cacheDir != null && await _cacheDir!.exists()) {
-        final files = await _cacheDir!.list(recursive: true)
-            .where((entity) => entity is File)
-            .cast<File>()
-            .toList();
-            
-        for (var file in files) {
-          if (file.path.endsWith('.png')) {
-            final fileSize = await file.length();
+        // 递归遍历所有文件
+        await for (final entity in _cacheDir!.list(recursive: true)) {
+          if (entity is File && entity.path.endsWith('.png')) {
+            final fileSize = await entity.length();
             size += fileSize;
             tileCount++;
+            
+            // 从路径中提取缩放级别
+            try {
+              final pathParts = entity.path.split('/');
+              final zoomLevel = int.parse(pathParts[pathParts.length - 3]); // z/x/y.png
+              zoomLevelStats[zoomLevel.toString()] = (zoomLevelStats[zoomLevel.toString()] ?? 0) + 1;
+            } catch (e) {
+              Logger.w('无法从路径提取缩放级别: ${entity.path}', error: e, tag: 'MapCache');
+            }
           }
         }
       }
       
       final regions = await getSavedRegions();
       
-      // 更新缓存统计并保存
+      // 更新缓存统计
       final stats = {
         'size': size,
         'tileCount': tileCount,
         'regions': regions.length,
+        'zoomLevelStats': zoomLevelStats,
         'lastUpdated': DateTime.now().millisecondsSinceEpoch,
       };
       
@@ -84,7 +91,13 @@ class MapTileCacheManager {
       return stats;
     } catch (e) {
       Logger.e('获取缓存统计信息失败', error: e, tag: 'MapCache');
-      return {'size': 0, 'tileCount': 0, 'regions': 0, 'lastUpdated': DateTime.now().millisecondsSinceEpoch};
+      return {
+        'size': 0, 
+        'tileCount': 0, 
+        'regions': 0, 
+        'zoomLevelStats': {},
+        'lastUpdated': DateTime.now().millisecondsSinceEpoch
+      };
     }
   }
   

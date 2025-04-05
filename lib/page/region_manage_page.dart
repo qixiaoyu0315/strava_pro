@@ -3,6 +3,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import '../utils/map_tile_cache_manager.dart';
 import '../utils/logger.dart';
+import './region_preview_page.dart';
 
 /// 区域管理页面
 class RegionManagePage extends StatefulWidget {
@@ -232,6 +233,37 @@ class _RegionManagePageState extends State<RegionManagePage> {
     );
   }
 
+  // 显示删除确认对话框
+  void _showDeleteConfirmation(
+    BuildContext context,
+    String regionId,
+    Map<String, dynamic> regionInfo,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除区域'),
+        content: const Text('确定要删除此区域的缓存吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteRegion(regionId, regionInfo);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -322,121 +354,57 @@ class _RegionManagePageState extends State<RegionManagePage> {
                           itemBuilder: (context, index) {
                             final regionId = _regions.keys.elementAt(index);
                             final regionInfo = _regions[regionId] as Map<String, dynamic>;
-                            final dateStr = _formatDateTime(regionInfo['date'] as String? ?? '');
-                            final tileCount = regionInfo['tileCount'] as int? ?? 0;
-                            final size = regionInfo['size'] as int? ?? 0;
-                            final minZoom = regionInfo['minZoom'] as int? ?? 0;
-                            final maxZoom = regionInfo['maxZoom'] as int? ?? 0;
                             
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
+                              child: ListTile(
+                                title: Text(
+                                  regionInfo['name'] ?? '未命名区域',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            regionInfo['name'] as String? ?? '未命名区域',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
+                                    Text('下载时间: ${_formatDateTime(regionInfo['date'] as String)}'),
+                                    Text('瓦片数量: ${regionInfo['tileCount']} 个'),
+                                    Text('缓存大小: ${_formatSize(regionInfo['size'] as int)}'),
+                                    Text('缩放级别: ${regionInfo['minZoom']}-${regionInfo['maxZoom']}'),
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // 添加预览按钮
+                                    IconButton(
+                                      icon: const Icon(Icons.map),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => RegionPreviewPage(
+                                              regionInfo: regionInfo,
+                                              regionName: regionInfo['name'] ?? '未命名区域',
                                             ),
-                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline),
-                                          color: Colors.red,
-                                          tooltip: '删除此区域',
-                                          onPressed: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text('删除区域'),
-                                                content: const Text('确定要删除此区域的缓存吗？此操作不可恢复。'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () => Navigator.of(context).pop(),
-                                                    child: const Text('取消'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Navigator.of(context).pop();
-                                                      _deleteRegion(regionId, regionInfo);
-                                                    },
-                                                    style: TextButton.styleFrom(
-                                                      foregroundColor: Colors.red,
-                                                    ),
-                                                    child: const Text('删除'),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ],
+                                        );
+                                      },
+                                      tooltip: '预览区域',
                                     ),
-                                    const Divider(),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                '下载日期: $dateStr',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '瓦片数量: $tileCount',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '占用空间: ${_formatSize(size)}',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '缩放级别: $minZoom-$maxZoom',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(
-                                            Icons.map,
-                                            color: Colors.blue.shade700,
-                                            size: 32,
-                                          ),
-                                        ),
-                                      ],
+                                    IconButton(
+                                      icon: const Icon(Icons.delete),
+                                      onPressed: () => _showDeleteConfirmation(
+                                        context,
+                                        regionId,
+                                        regionInfo,
+                                      ),
+                                      tooltip: '删除区域',
                                     ),
                                   ],
                                 ),
+                                isThreeLine: true,
                               ),
                             );
                           },
