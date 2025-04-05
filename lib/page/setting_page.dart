@@ -151,6 +151,9 @@ class _SettingPageState extends State<SettingPage>
   Future<void> _checkForUpdate() async {
     if (_isCheckingUpdate) return;
     
+    // 记录用户点击"检查更新"的行为
+    Logger.d('用户点击检查更新按钮', tag: 'AppUpdate');
+    
     try {
       setState(() {
         _isCheckingUpdate = true;
@@ -164,6 +167,25 @@ class _SettingPageState extends State<SettingPage>
           _updateInfo = updateInfo;
           _isCheckingUpdate = false;
         });
+        
+        // 显示结果提示
+        if (updateInfo != null) {
+          // 有可用更新
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('发现新版本：${updateInfo['version']}，点击更新按钮进行下载'),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        } else {
+          // 没有可用更新
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('当前已是最新版本'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       Logger.e('检查更新失败', error: e, tag: 'AppUpdate');
@@ -171,6 +193,15 @@ class _SettingPageState extends State<SettingPage>
         setState(() {
           _isCheckingUpdate = false;
         });
+        
+        // 显示错误提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('检查更新失败：${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
@@ -1984,6 +2015,16 @@ class _SettingPageState extends State<SettingPage>
                     style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                const Text('版本号比较: '),
+                Text(_appVersion,
+                    style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12)),
+                const Text(' (仅比较此部分，不比较构建号)', 
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
             const SizedBox(height: 8),
             if (_isCheckingUpdate) ...[
               const Center(
@@ -2030,7 +2071,10 @@ class _SettingPageState extends State<SettingPage>
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: _checkForUpdate,
+                onPressed: () {
+                  Logger.d('用户点击检查更新按钮', tag: 'AppUpdate');
+                  _checkForUpdate();
+                },
                 child: const Text('检查更新'),
               ),
             ),

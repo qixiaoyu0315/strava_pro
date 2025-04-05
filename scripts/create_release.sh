@@ -49,6 +49,7 @@ git tag -a "$TAG_NAME" -m "Release ${FULL_VERSION}"
 
 echo "已创建标签: $TAG_NAME （对应版本: ${FULL_VERSION}）"
 echo "注意: 标签名仅包含语义版本部分(${TAG_NAME})，但完整版本(${FULL_VERSION})已更新到pubspec.yaml"
+echo "      在版本检测时，系统只会比较语义版本部分(${NEW_VERSION})，不比较构建号"
 
 # 询问是否推送
 read -p "是否推送变更和标签到GitHub? (y/n): " SHOULD_PUSH

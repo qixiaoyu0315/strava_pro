@@ -40,7 +40,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Fetch tag if exists
+      # 获取版本号
+      - name: Get version
         id: check_tag
         run: |
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
@@ -75,14 +76,13 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Build App Bundle
-        run: flutter build appbundle --release
-
-      - name: Rename output files
+      # 移除APP Bundle构建步骤
+      
+      # 重命名APK
+      - name: Rename APK
         run: |
           VERSION=${{ steps.check_tag.outputs.version }}
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/strava_pro-$VERSION.apk
-          mv build/app/outputs/bundle/release/app-release.aab build/app/outputs/bundle/release/strava_pro-$VERSION.aab
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -90,7 +90,6 @@ jobs:
           name: release-artifacts
           path: |
             build/app/outputs/flutter-apk/strava_pro-*.apk
-            build/app/outputs/bundle/release/strava_pro-*.aab
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -98,7 +97,6 @@ jobs:
         with:
           files: |
             build/app/outputs/flutter-apk/strava_pro-*.apk
-            build/app/outputs/bundle/release/strava_pro-*.aab
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }} 
