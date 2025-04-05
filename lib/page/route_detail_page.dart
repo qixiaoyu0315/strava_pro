@@ -829,6 +829,31 @@ class _RouteDetailPageState extends State<RouteDetailPage>
             floating: true,
             snap: true,
             forceElevated: innerBoxIsScrolled,
+            actions: [
+              // 添加开始导航按钮
+              IconButton(
+                icon: Icon(Icons.navigation),
+                tooltip: '开始导航',
+                onPressed: () {
+                  if (gpxFilePath == null) {
+                    // 如果没有GPX文件，先导出
+                    _exportGPX(_routeData).then((_) {
+                      if (mounted) {
+                        setState(() {
+                          isNavigationMode = true;
+                        });
+                        _checkLocationPermission();
+                      }
+                    });
+                  } else {
+                    setState(() {
+                      isNavigationMode = true;
+                    });
+                    _checkLocationPermission();
+                  }
+                },
+              ),
+            ],
           ),
       ],
       body: CustomScrollView(
@@ -1574,17 +1599,21 @@ class _RouteDetailPageState extends State<RouteDetailPage>
     );
   }
 
-  // 添加手势处理方法
+  // 修改手势处理方法
   void _handleTouchCountChange(int count) {
-    _touchCount = count;
+    setState(() {
+      _touchCount = count;
+    });
     
     // 取消之前的定时器
     _longPressTimer?.cancel();
     
     // 如果是双指触摸，开始计时
-    if (_touchCount == 2) {
+    if (_touchCount == 2 && isNavigationMode && !_isExiting) {
+      Logger.d('检测到双指触摸，开始计时', tag: 'Navigation');
       _longPressTimer = Timer(const Duration(seconds: 3), () {
         if (_touchCount == 2 && mounted && !_isExiting) {
+          Logger.d('双指触摸持续3秒，退出导航模式', tag: 'Navigation');
           setState(() {
             _isExiting = true;
             isNavigationMode = false;
@@ -1597,6 +1626,12 @@ class _RouteDetailPageState extends State<RouteDetailPage>
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
           );
+          
+          // 重置状态
+          setState(() {
+            _isExiting = false;
+            _touchCount = 0;
+          });
         }
       });
     }
