@@ -172,9 +172,9 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
               ),
               _buildStatItem(
                 context,
-                '活动时间',
-                '$totalMovingTimeMinutes分钟',
-                Icons.access_time,
+                '总能量',
+                '${kilojouleFormat.format(_stats['totalKilojoules'])}千焦',
+                Icons.local_fire_department,
               ),
             ],
           ),

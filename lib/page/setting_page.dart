@@ -1208,14 +1208,14 @@ class _SettingPageState extends State<SettingPage>
                     Icons.trending_up,
                   ),
                 ),
-                // 总能量
+                // 总时间
                 GestureDetector(
-                  onTap: () => _showActivityTypeStats(context, '总能量'),
+                  onTap: () => _showActivityTypeStats(context, '总时间'),
                   child: _buildStatItem(
                     context,
-                    '总能量',
-                    '${_totalKilojoules.toStringAsFixed(0)} kJ',
-                    Icons.bolt,
+                    '总时间',
+                    _formatDuration(_totalMovingTime),
+                    Icons.timer,
                   ),
                 ),
               ],
@@ -1292,10 +1292,10 @@ class _SettingPageState extends State<SettingPage>
         field = 'total_elevation_gain';
         unit = 'm';
         break;
-      case '总能量':
-        title = '各类型活动能量消耗';
-        field = 'kilojoules';
-        unit = 'kJ';
+      case '总时间':
+        title = '各类型活动用时';
+        field = 'moving_time';
+        unit = '';
         break;
       default:
         title = '活动类型统计';
@@ -1320,7 +1320,10 @@ class _SettingPageState extends State<SettingPage>
       if (value == null || (value is num && value <= 0)) continue;
       
       String displayValue;
-      if (value is int) {
+      if (field == 'moving_time') {
+        displayValue = _formatDuration(value as int);
+        unit = ''; // 时间不需要单位，因为_formatDuration已经包含了
+      } else if (value is int) {
         displayValue = value.toString();
       } else if (value is double) {
         displayValue = field == 'distance' 
