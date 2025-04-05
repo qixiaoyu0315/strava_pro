@@ -16,7 +16,7 @@ class RouteService {
   /// 转换为App内部使用的路线数据格式
   /// [page] 页码，从1开始
   /// [perPage] 每页显示数量，默认20
-  Future<List<Map<String, dynamic>>> getRoutes({int page = 1, int perPage = 10}) async {
+  Future<List<Map<String, dynamic>>> getRoutes({int page = 1, int perPage = 20}) async {
     List<Map<String, dynamic>> routeList = [];
     
     try {
@@ -74,7 +74,7 @@ class RouteService {
       final routes = await StravaClientManager()
           .stravaClient
           .routes
-          .listAthleteRoutes(athleteId, 1, 50);
+          .listAthleteRoutes(athleteId, 1, 100);
           
       return routes.length;
     } catch (e) {
