@@ -37,15 +37,18 @@ FULL_VERSION="${NEW_VERSION}+${BUILD_NUMBER}"
 sed -i.bak "s/version: ${CURRENT_VERSION}/version: ${FULL_VERSION}/" pubspec.yaml
 rm pubspec.yaml.bak
 
+echo "已更新pubspec.yaml中的版本号为 ${FULL_VERSION}"
+
 # 提交版本变更
 git add pubspec.yaml
 git commit -m "chore: 版本升级到 ${FULL_VERSION}"
 
-# 创建标签
-TAG_NAME="v${FULL_VERSION}"
+# 创建标签（只使用语义版本部分，不包括构建号）
+TAG_NAME="v${NEW_VERSION}"
 git tag -a "$TAG_NAME" -m "Release ${FULL_VERSION}"
 
-echo "已创建标签: $TAG_NAME"
+echo "已创建标签: $TAG_NAME （对应版本: ${FULL_VERSION}）"
+echo "注意: 标签名仅包含语义版本部分(${TAG_NAME})，但完整版本(${FULL_VERSION})已更新到pubspec.yaml"
 
 # 询问是否推送
 read -p "是否推送变更和标签到GitHub? (y/n): " SHOULD_PUSH

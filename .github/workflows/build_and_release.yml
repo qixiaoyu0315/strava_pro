@@ -2,9 +2,8 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
     tags:
-      - 'v*'
+      - 'v*'  # 只有推送标签时才触发
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -76,7 +75,7 @@ jobs:
           mv build/app/outputs/bundle/release/app-release.aab build/app/outputs/bundle/release/strava_pro-$VERSION.aab
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
           path: |
