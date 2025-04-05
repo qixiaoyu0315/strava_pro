@@ -16,11 +16,6 @@ class RegionManagePage extends StatefulWidget {
 class _RegionManagePageState extends State<RegionManagePage> {
   bool _isLoading = true;
   Map<String, dynamic> _regions = {};
-  Map<String, dynamic> _cacheStats = {
-    'size': 0,
-    'tileCount': 0,
-    'regions': 0,
-  };
   
   @override
   void initState() {
@@ -36,11 +31,11 @@ class _RegionManagePageState extends State<RegionManagePage> {
     
     try {
       final regions = await MapTileCacheManager.instance.getSavedRegions();
-      final stats = await MapTileCacheManager.instance.getCacheStats();
+      
+      if (!mounted) return;
       
       setState(() {
         _regions = regions;
-        _cacheStats = stats;
         _isLoading = false;
       });
     } catch (e) {
@@ -64,7 +59,7 @@ class _RegionManagePageState extends State<RegionManagePage> {
       final result = await MapTileCacheManager.instance.deleteRegion(regionId);
       
       if (result) {
-        // 刷新加载区域和统计信息
+        // 刷新加载区域
         await _loadRegions();
         
         Fluttertoast.showToast(
@@ -90,7 +85,7 @@ class _RegionManagePageState extends State<RegionManagePage> {
       final result = await MapTileCacheManager.instance.clearAllRegions();
       
       if (result) {
-        // 刷新加载区域和统计信息
+        // 刷新加载区域
         await _loadRegions();
         
         if (mounted) {
@@ -132,105 +127,6 @@ class _RegionManagePageState extends State<RegionManagePage> {
     } catch (e) {
       return dateTimeStr;
     }
-  }
-  
-  // 构建缓存统计卡片
-  Widget _buildCacheStatsCard() {
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.storage,
-                  color: Colors.blue,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '缓存统计',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Column(
-                  children: [
-                    Text(
-                      '${_cacheStats['tileCount']}',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                    Text(
-                      '瓦片数量',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    Text(
-                      _formatSize(_cacheStats['size'] ?? 0),
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange,
-                      ),
-                    ),
-                    Text(
-                      '缓存大小',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  children: [
-                    Text(
-                      '${_cacheStats['regions']}',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
-                    Text(
-                      '区域数量',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // 显示删除确认对话框
@@ -307,111 +203,101 @@ class _RegionManagePageState extends State<RegionManagePage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // 缓存统计卡片
-                _buildCacheStatsCard(),
-                
-                // 区域列表
-                Expanded(
-                  child: _regions.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.map_outlined,
-                                size: 60,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                '暂无缓存区域',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                '返回地图页面下载区域以使用离线地图',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(Icons.arrow_back),
-                                label: const Text('返回地图页面'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _regions.length,
-                          itemBuilder: (context, index) {
-                            final regionId = _regions.keys.elementAt(index);
-                            final regionInfo = _regions[regionId] as Map<String, dynamic>;
-                            
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: ListTile(
-                                title: Text(
-                                  regionInfo['name'] ?? '未命名区域',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('下载时间: ${_formatDateTime(regionInfo['date'] as String)}'),
-                                    Text('瓦片数量: ${regionInfo['tileCount']} 个'),
-                                    Text('缓存大小: ${_formatSize(regionInfo['size'] as int)}'),
-                                    Text('缩放级别: ${regionInfo['minZoom']}-${regionInfo['maxZoom']}'),
-                                  ],
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // 添加预览按钮
-                                    IconButton(
-                                      icon: const Icon(Icons.map),
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => RegionPreviewPage(
-                                              regionInfo: regionInfo,
-                                              regionName: regionInfo['name'] ?? '未命名区域',
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      tooltip: '预览区域',
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete),
-                                      onPressed: () => _showDeleteConfirmation(
-                                        context,
-                                        regionId,
-                                        regionInfo,
-                                      ),
-                                      tooltip: '删除区域',
-                                    ),
-                                  ],
-                                ),
-                                isThreeLine: true,
-                              ),
-                            );
-                          },
+          : _regions.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.map_outlined,
+                        size: 60,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '暂无缓存区域',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '返回地图页面下载区域以使用离线地图',
+                        style: TextStyle(
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('返回地图页面'),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _regions.length,
+                  itemBuilder: (context, index) {
+                    final regionId = _regions.keys.elementAt(index);
+                    final regionInfo = _regions[regionId] as Map<String, dynamic>;
+                    
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          regionInfo['name'] ?? '未命名区域',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('下载时间: ${_formatDateTime(regionInfo['date'] as String)}'),
+                            Text('瓦片数量: ${regionInfo['tileCount']} 个'),
+                            Text('缓存大小: ${_formatSize(regionInfo['size'] as int)}'),
+                            Text('缩放级别: ${regionInfo['minZoom']}-${regionInfo['maxZoom']}'),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 添加预览按钮
+                            IconButton(
+                              icon: const Icon(Icons.map),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => RegionPreviewPage(
+                                      regionInfo: regionInfo,
+                                      regionName: regionInfo['name'] ?? '未命名区域',
+                                    ),
+                                  ),
+                                );
+                              },
+                              tooltip: '预览区域',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _showDeleteConfirmation(
+                                context,
+                                regionId,
+                                regionInfo,
+                              ),
+                              tooltip: '删除区域',
+                            ),
+                          ],
+                        ),
+                        isThreeLine: true,
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
     );
   }
 } 

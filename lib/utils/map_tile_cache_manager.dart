@@ -54,8 +54,8 @@ class MapTileCacheManager {
       int tileCount = 0;
       Map<String, int> zoomLevelStats = {};
       
+      // 从文件系统获取实际统计数据
       if (_cacheDir != null && await _cacheDir!.exists()) {
-        // 递归遍历所有文件
         await for (final entity in _cacheDir!.list(recursive: true)) {
           if (entity is File && entity.path.endsWith('.png')) {
             final fileSize = await entity.length();
@@ -136,24 +136,10 @@ class MapTileCacheManager {
         return;
       }
       
-      // 同时更新缓存统计
-      int totalSize = 0;
-      int totalTileCount = 0;
-      int regionCount = regions.length;
+      // 更新缓存统计
+      await getCacheStats(); // 直接调用getCacheStats来更新统计信息，它会从文件系统获取实际数据
       
-      regions.forEach((_, value) {
-        final regionInfo = value as Map<String, dynamic>;
-        totalSize += (regionInfo['size'] as int?) ?? 0;
-        totalTileCount += (regionInfo['tileCount'] as int?) ?? 0;
-      });
-      
-      await saveCacheStats({
-        'size': totalSize,
-        'tileCount': totalTileCount,
-        'regions': regionCount,
-      });
-      
-      Logger.d('保存区域信息成功，包含 $regionCount 个区域', tag: 'MapCache');
+      Logger.d('保存区域信息成功，包含 ${regions.length} 个区域', tag: 'MapCache');
     } catch (e) {
       Logger.e('保存区域信息失败', error: e, tag: 'MapCache');
     }
