@@ -48,16 +48,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   bool _isMapInitialized = false; // 添加地图初始化状态变量
   int? _selectedPointIndex; // 添加选中点索引变量
   
-  // 添加选中的距离范围选项
-  String _selectedRangeOption = '全程';
-  
-  // 添加距离选项列表
-  final List<String> _rangeOptions = ['500米', '1000米', '2000米', '5000米', '10000米', '全程'];
-  
-  // 添加可视范围
-  double? _visibleRangeStart;
-  double? _visibleRangeEnd;
-
   // 添加手势相关变量
   int _touchCount = 0;
   Timer? _longPressTimer;
@@ -417,57 +407,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
       if (result != null) {
         currentSegmentIndex.value = result.$1;
         currentMinDistance.value = result.$2;
-        
-        // 当选择了某个距离范围选项（非全程）时，检查是否需要更新可视范围
-        if (_selectedRangeOption != '全程' && elevationData != null) {
-          // 获取当前位置的距离
-          int index = result.$1;
-          if (index < elevationData!.elevationPoints.length) {
-            double currentDistance = elevationData!.elevationPoints[index].distance;
-            
-            // 检查当前位置是否在现有可视范围内
-            bool isOutOfRange = false;
-            
-            // 只有当已设置了可视范围时才检查
-            if (_visibleRangeStart != null && _visibleRangeEnd != null) {
-              // 只需要检查当前位置是否小于起点或大于终点
-              // 我们关心的是当前位置是否在范围内，或者已经超出了右侧终点
-              isOutOfRange = currentDistance < _visibleRangeStart! || 
-                             currentDistance > _visibleRangeEnd!;
-            } else {
-              // 如果尚未设置可视范围，则需要设置初始范围
-              isOutOfRange = true;
-            }
-            
-            // 只有当位置超出当前范围时，才更新范围
-            if (isOutOfRange) {
-              setState(() {
-                switch (_selectedRangeOption) {
-                  case '500米':
-                    _visibleRangeStart = currentDistance;
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
-                    break;
-                  case '1000米':
-                    _visibleRangeStart = currentDistance;
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
-                    break;
-                  case '2000米':
-                    _visibleRangeStart = currentDistance;
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.0);
-                    break;
-                  case '5000米':
-                    _visibleRangeStart = currentDistance;
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
-                    break;
-                  case '10000米':
-                    _visibleRangeStart = currentDistance;
-                    _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 10.0);
-                    break;
-                }
-              });
-            }
-          }
-        }
       }
     }
   }
@@ -1068,8 +1007,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                                                 50
                                                                         ? segmentIndex
                                                                         : null,
-                                                                visibleRangeStart: _visibleRangeStart,
-                                                                visibleRangeEnd: _visibleRangeEnd,
                                                               );
                                                             },
                                                           );
@@ -1078,8 +1015,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                     : SizedBox(),
                                               ),
                                             ),
-                                            // 添加距离选择器
-                                            _buildRangeSelector(),
                                           ],
                                         ),
                                       ),
@@ -1263,8 +1198,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                                                   minDistance <= 50
                                                               ? segmentIndex
                                                               : null,
-                                                      visibleRangeStart: _visibleRangeStart,
-                                                      visibleRangeEnd: _visibleRangeEnd,
                                                     );
                                                   },
                                                 );
@@ -1273,8 +1206,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                           : SizedBox(),
                                     ),
                                   ),
-                                  // 添加距离选择器
-                                  _buildRangeSelector(),
                                 ],
                               ),
                             ),
@@ -1319,13 +1250,9 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                   selectedPoint.value = point.position;
                                 },
                                 currentSegmentIndex: null,
-                                visibleRangeStart: _visibleRangeStart,
-                                visibleRangeEnd: _visibleRangeEnd,
                               ),
                             ),
                           ),
-                          // 添加距离选择器
-                          _buildRangeSelector(),
                         ],
                       ),
                     ),
@@ -1486,117 +1413,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         }
       });
     }
-  }
-
-  // 添加处理距离范围更改的方法
-  void _updateVisibleRange(String option) {
-    if (!mounted || elevationData == null) return;
-    
-    setState(() {
-      _selectedRangeOption = option;
-      
-      // 如果选择全程，直接设置为null（显示整个范围）并返回
-      if (option == '全程') {
-        _visibleRangeStart = null;
-        _visibleRangeEnd = null;
-        return;
-      }
-      
-      // 获取当前位置索引
-      int? currentIndex = currentSegmentIndex.value;
-      if (currentIndex == null || currentIndex >= elevationData!.elevationPoints.length) {
-        // 如果没有当前位置，使用总距离的起点
-        double startPoint = 0;
-        
-        // 根据选项设置可视范围
-        switch (option) {
-          case '500米':
-            _visibleRangeStart = startPoint;
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 0.5);
-            break;
-          case '1000米':
-            _visibleRangeStart = startPoint;
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 1.0);
-            break;
-          case '2000米':
-            _visibleRangeStart = startPoint;
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 2.0);
-            break;
-          case '5000米':
-            _visibleRangeStart = startPoint;
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 5.0);
-            break;
-          case '10000米':
-            _visibleRangeStart = startPoint;
-            _visibleRangeEnd = math.min(elevationData!.totalDistance, startPoint + 10.0);
-            break;
-        }
-        return;
-      }
-      
-      // 获取当前位置的距离
-      double currentDistance = elevationData!.elevationPoints[currentIndex].distance;
-      
-      // 根据选项设置可视范围，从当前位置向右延伸
-      switch (option) {
-        case '500米':
-          _visibleRangeStart = currentDistance;
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 0.5);
-          break;
-        case '1000米':
-          _visibleRangeStart = currentDistance;
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 1.0);
-          break;
-        case '2000米':
-          _visibleRangeStart = currentDistance;
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 2.0);
-          break;
-        case '5000米':
-          _visibleRangeStart = currentDistance;
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 5.0);
-          break;
-        case '10000米':
-          _visibleRangeStart = currentDistance;
-          _visibleRangeEnd = math.min(elevationData!.totalDistance, currentDistance + 10.0);
-          break;
-      }
-    });
-  }
-
-  // 添加距离选择器UI组件
-  Widget _buildRangeSelector() {
-    return Container(
-      height: 40,
-      margin: EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _rangeOptions.length,
-        itemBuilder: (context, index) {
-          final option = _rangeOptions[index];
-          final isSelected = _selectedRangeOption == option;
-          
-          return Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Text(option),
-              selected: isSelected,
-              onSelected: (selected) {
-                if (selected) {
-                  _updateVisibleRange(option);
-                }
-              },
-              selectedColor: Theme.of(context).colorScheme.primary,
-              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-              labelStyle: TextStyle(
-                color: isSelected 
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 
   // 修改手势处理方法
