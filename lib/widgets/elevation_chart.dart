@@ -130,16 +130,21 @@ class _ElevationChartState extends State<ElevationChart> {
   Timer? _tooltipTimer;
   bool _showTooltip = false;
   int? _lastSegmentIndex;
+  double _currentRangeValue = 7; // 默认显示全程
+  List<double> _rangeValues = [];
 
   @override
-  void dispose() {
-    _tooltipTimer?.cancel();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _calculateRangeValues();
   }
 
   @override
   void didUpdateWidget(ElevationChart oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.data.totalDistance != widget.data.totalDistance) {
+      _calculateRangeValues();
+    }
     // 当位置发生变化时重置计时器
     if (widget.currentSegmentIndex != _lastSegmentIndex &&
         widget.currentSegmentIndex != null) {
@@ -155,6 +160,22 @@ class _ElevationChartState extends State<ElevationChart> {
           });
         }
       });
+    }
+  }
+
+  void _calculateRangeValues() {
+    final baseRange = widget.data.totalDistance / 2;
+    _rangeValues = List.generate(7, (index) => baseRange / math.pow(2, 6 - index));
+    _rangeValues.add(widget.data.totalDistance); // 添加全程选项
+  }
+
+  // 获取当前范围的描述文本
+  String _getRangeText() {
+    final range = _rangeValues[_currentRangeValue.toInt()];
+    if (_currentRangeValue == 7) {
+      return '全程';
+    } else {
+      return '${range.toStringAsFixed(1)}km';
     }
   }
 
@@ -260,10 +281,19 @@ class _ElevationChartState extends State<ElevationChart> {
     double minX = 0;
     double maxX = widget.data.totalDistance;
     
-    // 如果设置了可见范围，则使用设置的范围
-    if (widget.visibleRangeStart != null && widget.visibleRangeEnd != null) {
-      minX = widget.visibleRangeStart!;
-      maxX = widget.visibleRangeEnd!;
+    // 根据滑块值计算实际显示范围
+    if (_currentRangeValue < 7) { // 不是全程
+      final rangeDistance = _rangeValues[_currentRangeValue.toInt()];
+      if (widget.currentSegmentIndex != null && 
+          widget.currentSegmentIndex! < widget.data.elevationPoints.length) {
+        // 以当前位置为中心
+        final currentX = widget.data.points[widget.currentSegmentIndex!].x;
+        minX = math.max(0, currentX - rangeDistance / 2);
+        maxX = math.min(widget.data.totalDistance, currentX + rangeDistance / 2);
+      } else {
+        // 没有当前位置时，显示起点开始的范围
+        maxX = math.min(widget.data.totalDistance, rangeDistance);
+      }
     }
     
     // 确保范围不超出总距离
@@ -363,7 +393,7 @@ class _ElevationChartState extends State<ElevationChart> {
                       ),
                     ),
                   Text(
-                    '总距离: ${widget.data.totalDistance.toStringAsFixed(2)}km',
+                    _getRangeText(),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
@@ -373,7 +403,37 @@ class _ElevationChartState extends State<ElevationChart> {
               ),
             ],
           ),
-          SizedBox(height: 8),
+          // 添加滑块控件
+          Row(
+            children: [
+              Icon(Icons.zoom_out, size: 16),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: Theme.of(context).colorScheme.primary,
+                    inactiveTrackColor: Theme.of(context).colorScheme.surfaceVariant,
+                    thumbColor: Theme.of(context).colorScheme.primary,
+                    overlayColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                    trackHeight: 2.0,
+                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape: RoundSliderOverlayShape(overlayRadius: 16),
+                  ),
+                  child: Slider(
+                    value: _currentRangeValue,
+                    min: 0,
+                    max: 7,
+                    divisions: 7,
+                    onChanged: (value) {
+                      setState(() {
+                        _currentRangeValue = value;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              Icon(Icons.zoom_in, size: 16),
+            ],
+          ),
           Expanded(
             child: Stack(
               children: [
