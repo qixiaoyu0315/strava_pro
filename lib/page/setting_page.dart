@@ -21,10 +21,12 @@ import '../utils/date_utils.dart' as date_util;
 import '../page/map_cache_page.dart';
 import '../page/strava_api_page.dart';
 import '../main.dart';
+import '../utils/refresh_rate_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../service/app_update_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -92,6 +94,11 @@ class _SettingPageState extends State<SettingPage>
   Map<String, dynamic>? _updateInfo;
   Timer? _updateCheckTimer;
 
+  // 当前高刷新率模式
+  String _refreshRateMode = RefreshRateManager.kAuto;
+  // 设备是否支持高刷新率
+  bool _deviceSupportsHighRefreshRate = false;
+
   @override
   void initState() {
     super.initState();
@@ -116,22 +123,17 @@ class _SettingPageState extends State<SettingPage>
 
     _checkAuthStatus();
     _loadActivityCount();
-    _loadTotalDistance(); // 加载总公里数
-    _loadTotalElevation(); // 加载总爬升
-    _loadTotalKilojoules(); // 加载总能量
-    _loadStatsByActivityType(); // 加载按活动类型分组的统计数据
+    _loadTotalDistance();
+    _loadTotalElevation();
+    _loadTotalKilojoules();
+    _loadStatsByActivityType();
     _loadSyncStatus();
     
     // 获取当前应用版本信息
     _loadAppVersionInfo();
     
-    // 检查应用更新
-    _checkForUpdate();
-    
-    // 设置定期检查更新（每隔10分钟检查一次）
-    _updateCheckTimer = Timer.periodic(const Duration(minutes: 10), (_) {
-      _checkForUpdate();
-    });
+    // 只在设置界面检查更新，不再自动弹出提示
+    _checkForUpdateSilently();
   }
   
   @override
@@ -155,44 +157,57 @@ class _SettingPageState extends State<SettingPage>
     }
   }
   
-  // 检查应用更新
-  Future<void> _checkForUpdate({bool forceCheck = false}) async {
-    if (_isCheckingUpdate) return;
-    
-    // 记录用户点击"检查更新"的行为
-    Logger.d('用户点击检查更新按钮' + (forceCheck ? '(强制检查)' : ''), tag: 'AppUpdate');
-    
+  // 静默检查更新
+  Future<void> _checkForUpdateSilently() async {
     try {
+      if (_isCheckingUpdate) return;
+      
       setState(() {
         _isCheckingUpdate = true;
       });
       
-      final updateInfo = await _updateService.checkForUpdate(forceCheck: forceCheck);
+      _updateInfo = await _updateService.checkForUpdate();
+      if (mounted) {
+        setState(() {
+          _updateAvailable = _updateInfo != null;
+          _isCheckingUpdate = false;
+        });
+      }
+    } catch (e) {
+      Logger.e('检查更新失败', error: e, tag: 'AppUpdate');
+      if (mounted) {
+        setState(() {
+          _isCheckingUpdate = false;
+        });
+      }
+    }
+  }
+  
+  // 手动检查更新并显示结果
+  Future<void> _checkForUpdate({bool showResult = true}) async {
+    try {
+      if (_isCheckingUpdate) return;
+      
+      setState(() {
+        _isCheckingUpdate = true;
+      });
+      
+      _updateInfo = await _updateService.checkForUpdate();
       
       if (mounted) {
         setState(() {
-          _updateAvailable = updateInfo != null;
-          _updateInfo = updateInfo;
+          _updateAvailable = _updateInfo != null;
           _isCheckingUpdate = false;
         });
         
-        // 显示结果提示
-        if (updateInfo != null) {
-          // 有可用更新
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('发现新版本：${updateInfo['version']}，点击更新按钮进行下载'),
-              duration: Duration(seconds: 5),
-            ),
-          );
-        } else {
-          // 没有可用更新
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('当前已是最新版本'),
-              duration: Duration(seconds: 3),
-            ),
-          );
+        if (showResult) {
+          if (_updateAvailable && _updateInfo != null) {
+            _showUpdateDialog(_updateInfo!);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('当前已是最新版本')),
+            );
+          }
         }
       }
     } catch (e) {
@@ -201,15 +216,11 @@ class _SettingPageState extends State<SettingPage>
         setState(() {
           _isCheckingUpdate = false;
         });
-        
-        // 显示错误提示
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('检查更新失败：${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        if (showResult) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('检查更新失败: $e')),
+          );
+        }
       }
     }
   }
@@ -871,6 +882,56 @@ class _SettingPageState extends State<SettingPage>
     );
   }
 
+  // 加载高刷新率设置
+  Future<void> _loadRefreshRateSettings() async {
+    final refreshManager = RefreshRateManager.instance;
+    setState(() {
+      _refreshRateMode = refreshManager.currentMode;
+      _deviceSupportsHighRefreshRate = refreshManager.deviceSupportsHighRefreshRate;
+    });
+  }
+
+  // 设置高刷新率模式
+  Future<void> _setRefreshRateMode(String mode) async {
+    try {
+      await RefreshRateManager.instance.setMode(mode);
+      setState(() {
+        _refreshRateMode = mode;
+      });
+      _showToast('已设置刷新率模式: ${_getRefreshRateModeText(mode)}');
+    } catch (e) {
+      Logger.e('设置刷新率模式失败', error: e, tag: 'Settings');
+      _showToast('设置刷新率模式失败');
+    }
+  }
+  
+  // 显示Toast消息
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      timeInSecForIosWeb: 1,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+  }
+  
+  // 获取刷新率模式的友好文本
+  String _getRefreshRateModeText(String mode) {
+    switch (mode) {
+      case RefreshRateManager.kAuto:
+        return '自动';
+      case RefreshRateManager.kAlwaysOn:
+        return '始终开启';
+      case RefreshRateManager.kAlwaysOff:
+        return '始终关闭';
+      default:
+        return '未知';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -905,6 +966,9 @@ class _SettingPageState extends State<SettingPage>
         ],
         // 布局切换开关
         _buildLayoutSwitchCard(),
+        const SizedBox(height: 8),
+        // 高刷新率设置卡片
+        _buildRefreshRateCard(),
         const SizedBox(height: 8),
         // 地图设置卡片
         _buildMapSettingsCard(),
@@ -949,6 +1013,8 @@ class _SettingPageState extends State<SettingPage>
               children: [
                 _buildLayoutSwitchCard(),
                 const SizedBox(height: 8),
+                _buildRefreshRateCard(),
+                const SizedBox(height: 8),
                 _buildMapSettingsCard(),
                 const SizedBox(height: 8),
                 // 应用更新卡片
@@ -983,6 +1049,7 @@ class _SettingPageState extends State<SettingPage>
               children: [
                 // 左侧：头像和用户信息
                 Expanded(
+                  flex: 3,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1012,64 +1079,59 @@ class _SettingPageState extends State<SettingPage>
                   ),
                 ),
                 
-                // 右侧：统计数据，按2列排列
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // 第一行：活动数和总公里数
-                    Row(
-                      children: [
-                        // 活动数
-                        GestureDetector(
-                          onTap: () => _showActivityTypeStats(context, '活动数'),
-                          child: _buildStatItem(
-                            context,
-                            '活动数',
-                            _activityCount.toString(),
-                            Icons.directions_run,
-                          ),
+                // 右侧：统计数据，使用网格布局
+                Expanded(
+                  flex: 4,
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.2,
+                    children: [
+                      // 活动数
+                      GestureDetector(
+                        onTap: () => _showActivityTypeStats(context, '活动数'),
+                        child: _buildStatItem(
+                          context,
+                          '活动数',
+                          _activityCount.toString(),
+                          Icons.directions_run,
                         ),
-                        const SizedBox(width: 16),
-                        // 总公里数
-                        GestureDetector(
-                          onTap: () => _showActivityTypeStats(context, '总公里'),
-                          child: _buildStatItem(
-                            context,
-                            '总公里',
-                            '${_totalDistance.toStringAsFixed(1)} km',
-                            Icons.straighten,
-                          ),
+                      ),
+                      // 总公里数
+                      GestureDetector(
+                        onTap: () => _showActivityTypeStats(context, '总公里'),
+                        child: _buildStatItem(
+                          context,
+                          '总公里',
+                          '${_totalDistance.toStringAsFixed(1)} km',
+                          Icons.straighten,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // 第二行：总爬升和总能量
-                    Row(
-                      children: [
-                        // 总爬升
-                        GestureDetector(
-                          onTap: () => _showActivityTypeStats(context, '总爬升'),
-                          child: _buildStatItem(
-                            context,
-                            '总爬升',
-                            '${_totalElevation.toStringAsFixed(0)} m',
-                            Icons.trending_up,
-                          ),
+                      ),
+                      // 总爬升
+                      GestureDetector(
+                        onTap: () => _showActivityTypeStats(context, '总爬升'),
+                        child: _buildStatItem(
+                          context,
+                          '总爬升',
+                          '${_totalElevation.toStringAsFixed(0)} m',
+                          Icons.trending_up,
                         ),
-                        const SizedBox(width: 16),
-                        // 总能量
-                        GestureDetector(
-                          onTap: () => _showActivityTypeStats(context, '总能量'),
-                          child: _buildStatItem(
-                            context,
-                            '总能量',
-                            '${_totalKilojoules.toStringAsFixed(0)} kJ',
-                            Icons.bolt,
-                          ),
+                      ),
+                      // 总能量
+                      GestureDetector(
+                        onTap: () => _showActivityTypeStats(context, '总能量'),
+                        child: _buildStatItem(
+                          context,
+                          '总能量',
+                          '${_totalKilojoules.toStringAsFixed(0)} kJ',
+                          Icons.bolt,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1082,6 +1144,43 @@ class _SettingPageState extends State<SettingPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // 构建统计项小部件
+  Widget _buildStatItem(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -1661,29 +1760,6 @@ class _SettingPageState extends State<SettingPage>
     });
   }
 
-  // 构建统计项小部件
-  Widget _buildStatItem(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
-    );
-  }
-
   // 高级选项卡片
   Widget _buildAdvancedOptionsCard() {
     return Card(
@@ -2254,9 +2330,9 @@ class _SettingPageState extends State<SettingPage>
                 PopupMenuButton<String>(
                   onSelected: (value) async {
                     if (value == 'check') {
-                      _checkForUpdate();
+                      _checkForUpdate(showResult: true);
                     } else if (value == 'force_check') {
-                      _checkForUpdate(forceCheck: true);
+                      _checkForUpdate(showResult: true);
                     } else if (value == 'reset_ignore') {
                       await _updateService.resetIgnoredVersion();
                       Fluttertoast.showToast(msg: '已重置忽略的版本');
@@ -2356,5 +2432,123 @@ class _SettingPageState extends State<SettingPage>
         ),
       ),
     );
+  }
+
+  // 高刷新率设置卡片
+  Widget _buildRefreshRateCard() {
+    if (!_deviceSupportsHighRefreshRate) {
+      return Card(
+        elevation: 2,
+        child: ListTile(
+          leading: const Icon(Icons.screen_rotation),
+          title: const Text('高刷新率设置'),
+          subtitle: const Text('您的设备不支持高刷新率显示'),
+          enabled: false,
+        ),
+      );
+    }
+    
+    return Card(
+      elevation: 2,
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.screen_rotation),
+            title: const Text('高刷新率设置'),
+            subtitle: Text('当前模式: ${_getRefreshRateModeText(_refreshRateMode)}'),
+          ),
+          
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              children: [
+                _buildRefreshRateOption(
+                  '自动', 
+                  '根据电池状态和性能自动调整', 
+                  RefreshRateManager.kAuto
+                ),
+                const Divider(height: 1),
+                _buildRefreshRateOption(
+                  '始终开启', 
+                  '最流畅的体验，但耗电量更高', 
+                  RefreshRateManager.kAlwaysOn
+                ),
+                const Divider(height: 1),
+                _buildRefreshRateOption(
+                  '始终关闭', 
+                  '延长电池续航时间', 
+                  RefreshRateManager.kAlwaysOff
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+  
+  // 构建刷新率选项
+  Widget _buildRefreshRateOption(String title, String subtitle, String mode) {
+    return RadioListTile<String>(
+      title: Text(title),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      value: mode,
+      groupValue: _refreshRateMode,
+      onChanged: (String? value) {
+        if (value != null) {
+          _setRefreshRateMode(value);
+        }
+      },
+      dense: true,
+    );
+  }
+
+  // 显示更新对话框
+  void _showUpdateDialog(Map<String, dynamic> updateInfo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('发现新版本'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('最新版本：${updateInfo['version']}'),
+            if (updateInfo['description'] != null) ...[
+              SizedBox(height: 8),
+              Text('更新内容：'),
+              Text(updateInfo['description']),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('稍后再说'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _launchUpdate(updateInfo);
+            },
+            child: Text('立即更新'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 启动更新
+  void _launchUpdate(Map<String, dynamic> updateInfo) {
+    if (updateInfo['url'] != null) {
+      final url = updateInfo['url'] as String;
+      // 使用系统浏览器打开更新链接
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('更新链接无效')),
+      );
+    }
   }
 }

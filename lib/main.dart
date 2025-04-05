@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:strava_client/strava_client.dart';
 import 'utils/logger.dart';
 import 'utils/widget_manager.dart';
+import 'utils/route_image_cache_manager.dart';
+import 'utils/refresh_rate_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter/foundation.dart';
@@ -44,6 +46,12 @@ void main() async {
 
   // 初始化小组件服务
   await WidgetManager.initialize();
+
+  // 初始化路线图片缓存管理器
+  await RouteImageCacheManager.instance.initialize();
+  
+  // 初始化高刷新率管理器
+  await RefreshRateManager.instance.initialize();
 
   // 尝试更新小组件显示，默认显示固定路径的日历图片
   await WidgetManager.updateCalendarWidget().then((success) {

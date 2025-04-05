@@ -1121,7 +1121,15 @@ class ActivityService {
   Future<double> getTotalKilojoules() async {
     try {
       final db = await database;
-      final result = await db.rawQuery('SELECT SUM(kilojoules) as total_kilojoules FROM $tableName');
+      // 修改查询语句，确保包含所有活动类型的能量数据
+      final result = await db.rawQuery('''
+        SELECT COALESCE(SUM(CASE 
+          WHEN kilojoules IS NOT NULL AND kilojoules > 0 THEN kilojoules 
+          WHEN calories IS NOT NULL AND calories > 0 THEN calories * 4.184 
+          ELSE 0 
+        END), 0) as total_kilojoules 
+        FROM $tableName
+      ''');
       
       final totalKilojoules = result.first['total_kilojoules'] as double? ?? 0.0;
       

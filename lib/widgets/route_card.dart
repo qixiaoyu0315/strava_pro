@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'cached_route_image.dart';
 
 /// 路线卡片组件，在不同布局下显示路线信息
 class RouteCard extends StatelessWidget {
@@ -101,30 +102,23 @@ class RouteCard extends StatelessWidget {
 
   /// 构建地图背景
   Widget _buildMapBackground(bool isDarkMode) {
-    return Image.network(
-      routeData['mapUrl'] != '无地图链接'
-          ? isDarkMode
-              ? routeData['mapDarkUrl']!
-              : routeData['mapUrl']!
-          : 'https://via.placeholder.com/700x292',
+    final defaultImageUrl = 'https://via.placeholder.com/700x292';
+    final imageUrl = routeData['mapUrl'] != '无地图链接' ? routeData['mapUrl']! : defaultImageUrl;
+    final darkImageUrl = routeData['mapDarkUrl'] != '无地图链接' ? routeData['mapDarkUrl']! : defaultImageUrl;
+    
+    return CachedRouteImage(
+      imageUrl: imageUrl,
+      darkImageUrl: darkImageUrl,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => Container(
+      placeholder: Center(
+        child: CircularProgressIndicator(),
+      ),
+      errorBuilder: (context, error) => Container(
         color: Colors.grey.shade300,
         child: Center(
           child: Icon(Icons.broken_image, size: 50, color: Colors.grey),
         ),
       ),
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Center(
-          child: CircularProgressIndicator(
-            value: loadingProgress.expectedTotalBytes != null
-                ? loadingProgress.cumulativeBytesLoaded /
-                    loadingProgress.expectedTotalBytes!
-                : null,
-          ),
-        );
-      },
     );
   }
 
