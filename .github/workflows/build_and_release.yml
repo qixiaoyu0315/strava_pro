@@ -6,6 +6,10 @@ on:
       - 'v*'  # 只有推送标签时才触发
   workflow_dispatch:  # 允许手动触发
 
+# 添加权限设置
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -96,4 +100,5 @@ jobs:
             build/app/outputs/flutter-apk/strava_pro-*.apk
             build/app/outputs/bundle/release/strava_pro-*.aab
           draft: false
-          prerelease: false 
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }} 
