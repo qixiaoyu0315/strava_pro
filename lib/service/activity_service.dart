@@ -1080,4 +1080,97 @@ class ActivityService {
       rethrow;
     }
   }
+
+  /// 获取所有活动的总距离（公里）
+  Future<double> getTotalDistance() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery('SELECT SUM(distance) as total_distance FROM $tableName');
+      
+      // rawQuery返回的是Map列表，我们取第一个元素的total_distance字段
+      final totalDistanceInMeters = result.first['total_distance'] as double? ?? 0.0;
+      
+      // 转换为公里并返回，保留一位小数
+      final totalDistanceInKm = (totalDistanceInMeters / 1000.0);
+      
+      Logger.d('获取总距离: ${totalDistanceInKm.toStringAsFixed(1)} 公里', tag: 'ActivityService');
+      return totalDistanceInKm;
+    } catch (e) {
+      Logger.e('获取总距离失败: $e', tag: 'ActivityService');
+      return 0.0;
+    }
+  }
+
+  /// 获取所有活动的总爬升（米）
+  Future<double> getTotalElevation() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery('SELECT SUM(total_elevation_gain) as total_elevation FROM $tableName');
+      
+      final totalElevation = result.first['total_elevation'] as double? ?? 0.0;
+      
+      Logger.d('获取总爬升: ${totalElevation.toStringAsFixed(0)} 米', tag: 'ActivityService');
+      return totalElevation;
+    } catch (e) {
+      Logger.e('获取总爬升失败: $e', tag: 'ActivityService');
+      return 0.0;
+    }
+  }
+  
+  /// 获取所有活动的总能量（千焦）
+  Future<double> getTotalKilojoules() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery('SELECT SUM(kilojoules) as total_kilojoules FROM $tableName');
+      
+      final totalKilojoules = result.first['total_kilojoules'] as double? ?? 0.0;
+      
+      Logger.d('获取总能量: ${totalKilojoules.toStringAsFixed(0)} kJ', tag: 'ActivityService');
+      return totalKilojoules;
+    } catch (e) {
+      Logger.e('获取总能量失败: $e', tag: 'ActivityService');
+      return 0.0;
+    }
+  }
+  
+  /// 获取按活动类型分组的统计数据
+  Future<Map<String, Map<String, dynamic>>> getStatsByActivityType() async {
+    try {
+      final db = await database;
+      final activities = await db.query(tableName);
+      
+      final Map<String, Map<String, dynamic>> statsByType = {};
+      
+      for (final activity in activities) {
+        final type = activity['type'] as String? ?? '未知';
+        
+        if (!statsByType.containsKey(type)) {
+          statsByType[type] = {
+            'count': 0,
+            'distance': 0.0,
+            'total_elevation_gain': 0.0,
+            'kilojoules': 0.0,
+            'moving_time': 0,
+          };
+        }
+        
+        statsByType[type]!['count'] = (statsByType[type]!['count'] as int) + 1;
+        statsByType[type]!['distance'] = (statsByType[type]!['distance'] as double) + (activity['distance'] as double? ?? 0.0);
+        statsByType[type]!['total_elevation_gain'] = (statsByType[type]!['total_elevation_gain'] as double) + (activity['total_elevation_gain'] as double? ?? 0.0);
+        statsByType[type]!['kilojoules'] = (statsByType[type]!['kilojoules'] as double) + (activity['kilojoules'] as double? ?? 0.0);
+        statsByType[type]!['moving_time'] = (statsByType[type]!['moving_time'] as int) + (activity['moving_time'] as int? ?? 0);
+      }
+      
+      // 将米转换为公里
+      for (final type in statsByType.keys) {
+        statsByType[type]!['distance'] = (statsByType[type]!['distance'] as double) / 1000.0;
+      }
+      
+      Logger.d('获取按活动类型分组的统计数据: ${statsByType.length} 种类型', tag: 'ActivityService');
+      return statsByType;
+    } catch (e) {
+      Logger.e('获取按活动类型分组的统计数据失败: $e', tag: 'ActivityService');
+      return {};
+    }
+  }
 }

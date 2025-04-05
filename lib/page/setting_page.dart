@@ -71,6 +71,10 @@ class _SettingPageState extends State<SettingPage>
   String? _athleteName;
   String? _athleteAvatar;
   int _activityCount = 0;
+  double _totalDistance = 0.0; // 活动总公里数
+  double _totalElevation = 0.0; // 活动总爬升
+  double _totalKilojoules = 0.0; // 活动总能量
+  Map<String, Map<String, dynamic>> _statsByType = {}; // 按活动类型分组的统计数据
   Map<String, dynamic>? _syncStatusMap;
 
   // 在_SettingPageState类中添加字段
@@ -112,6 +116,10 @@ class _SettingPageState extends State<SettingPage>
 
     _checkAuthStatus();
     _loadActivityCount();
+    _loadTotalDistance(); // 加载总公里数
+    _loadTotalElevation(); // 加载总爬升
+    _loadTotalKilojoules(); // 加载总能量
+    _loadStatsByActivityType(); // 加载按活动类型分组的统计数据
     _loadSyncStatus();
     
     // 获取当前应用版本信息
@@ -645,6 +653,10 @@ class _SettingPageState extends State<SettingPage>
 
       // 更新活动计数和同步状态
       await _loadActivityCount();
+      await _loadTotalDistance(); // 更新总公里数
+      await _loadTotalElevation(); // 更新总爬升
+      await _loadTotalKilojoules(); // 更新总能量
+      await _loadStatsByActivityType(); // 更新按活动类型分组的统计数据
       await _loadSyncStatus();
 
       // 更新最后同步时间
@@ -725,6 +737,54 @@ class _SettingPageState extends State<SettingPage>
     }
   }
 
+  /// 加载活动总公里数
+  Future<void> _loadTotalDistance() async {
+    try {
+      final totalDistance = await _activityService.getTotalDistance();
+      setState(() {
+        _totalDistance = totalDistance;
+      });
+    } catch (e) {
+      Logger.e('加载活动总公里数失败: $e', tag: 'SettingPage');
+    }
+  }
+
+  /// 加载活动总爬升
+  Future<void> _loadTotalElevation() async {
+    try {
+      final totalElevation = await _activityService.getTotalElevation();
+      setState(() {
+        _totalElevation = totalElevation;
+      });
+    } catch (e) {
+      Logger.e('加载活动总爬升失败: $e', tag: 'SettingPage');
+    }
+  }
+  
+  /// 加载活动总能量
+  Future<void> _loadTotalKilojoules() async {
+    try {
+      final totalKilojoules = await _activityService.getTotalKilojoules();
+      setState(() {
+        _totalKilojoules = totalKilojoules;
+      });
+    } catch (e) {
+      Logger.e('加载活动总能量失败: $e', tag: 'SettingPage');
+    }
+  }
+  
+  /// 加载按活动类型分组的统计数据
+  Future<void> _loadStatsByActivityType() async {
+    try {
+      final statsByType = await _activityService.getStatsByActivityType();
+      setState(() {
+        _statsByType = statsByType;
+      });
+    } catch (e) {
+      Logger.e('加载按活动类型分组的统计数据失败: $e', tag: 'SettingPage');
+    }
+  }
+
   /// 加载同步状态
   Future<void> _loadSyncStatus() async {
     try {
@@ -767,6 +827,10 @@ class _SettingPageState extends State<SettingPage>
     try {
       await _activityService.resetDatabase();
       await _loadActivityCount();
+      await _loadTotalDistance();
+      await _loadTotalElevation();
+      await _loadTotalKilojoules();
+      await _loadStatsByActivityType();
       await _loadSyncStatus();
       Fluttertoast.showToast(msg: '数据库已重置，请重新同步数据');
     } catch (e) {
@@ -914,56 +978,215 @@ class _SettingPageState extends State<SettingPage>
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // 头像
-            CircleAvatar(
-              radius: 50,
-              backgroundImage: _athlete?.profile != null
-                  ? NetworkImage(_athlete!.profile!)
-                  : null,
-              child: _athlete?.profile == null
-                  ? Icon(Icons.person, size: 50)
-                  : null,
-            ),
-            const SizedBox(height: 8),
-            // 用户名
-            Text(
-              '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            // 用户所在城市和国家
-            if (_athlete?.city != null || _athlete?.country != null)
-              Text(
-                '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            const SizedBox(height: 8),
-            // 运动统计
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildStatItem(
-                  context,
-                  '活动数',
-                  _activityCount.toString(),
-                  Icons.directions_run,
+                // 左侧：头像和用户信息
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 头像
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundImage: _athlete?.profile != null
+                            ? NetworkImage(_athlete!.profile!)
+                            : null,
+                        child: _athlete?.profile == null
+                            ? Icon(Icons.person, size: 40)
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      // 用户名
+                      Text(
+                        '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      // 用户所在城市和国家
+                      if (_athlete?.city != null || _athlete?.country != null)
+                        Text(
+                          '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                    ],
+                  ),
                 ),
-                _buildStatItem(
-                  context,
-                  '同步状态',
-                  _isLoading ? '同步中...' : '已同步',
-                  Icons.sync,
+                
+                // 右侧：统计数据，按2列排列
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // 第一行：活动数和总公里数
+                    Row(
+                      children: [
+                        // 活动数
+                        GestureDetector(
+                          onTap: () => _showActivityTypeStats(context, '活动数'),
+                          child: _buildStatItem(
+                            context,
+                            '活动数',
+                            _activityCount.toString(),
+                            Icons.directions_run,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // 总公里数
+                        GestureDetector(
+                          onTap: () => _showActivityTypeStats(context, '总公里'),
+                          child: _buildStatItem(
+                            context,
+                            '总公里',
+                            '${_totalDistance.toStringAsFixed(1)} km',
+                            Icons.straighten,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // 第二行：总爬升和总能量
+                    Row(
+                      children: [
+                        // 总爬升
+                        GestureDetector(
+                          onTap: () => _showActivityTypeStats(context, '总爬升'),
+                          child: _buildStatItem(
+                            context,
+                            '总爬升',
+                            '${_totalElevation.toStringAsFixed(0)} m',
+                            Icons.trending_up,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // 总能量
+                        GestureDetector(
+                          onTap: () => _showActivityTypeStats(context, '总能量'),
+                          child: _buildStatItem(
+                            context,
+                            '总能量',
+                            '${_totalKilojoules.toStringAsFixed(0)} kJ',
+                            Icons.bolt,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            
             // 详细信息按钮
+            const SizedBox(height: 12),
             TextButton(
               onPressed: () => _showAthleteDetails(context),
               child: Text('查看详细信息'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // 显示活动类型统计数据对话框
+  void _showActivityTypeStats(BuildContext context, String statsType) {
+    // 如果没有数据，显示提示
+    if (_statsByType.isEmpty) {
+      Fluttertoast.showToast(msg: '暂无活动数据');
+      return;
+    }
+    
+    // 准备要显示的标题和单位
+    String title = '';
+    String unit = '';
+    String field = '';
+    
+    switch (statsType) {
+      case '活动数':
+        title = '活动类型统计';
+        field = 'count';
+        unit = '个';
+        break;
+      case '总公里':
+        title = '各类型活动距离';
+        field = 'distance';
+        unit = 'km';
+        break;
+      case '总爬升':
+        title = '各类型活动爬升';
+        field = 'total_elevation_gain';
+        unit = 'm';
+        break;
+      case '总能量':
+        title = '各类型活动能量消耗';
+        field = 'kilojoules';
+        unit = 'kJ';
+        break;
+      default:
+        title = '活动类型统计';
+        field = 'count';
+        unit = '个';
+    }
+    
+    // 构建统计数据列表
+    List<Widget> statItems = [];
+    
+    // 按数值大小排序
+    final sortedTypes = _statsByType.keys.toList()
+      ..sort((a, b) {
+        final valueA = _statsByType[a]?[field] ?? 0;
+        final valueB = _statsByType[b]?[field] ?? 0;
+        return (valueB is int ? valueB : (valueB as double))
+            .compareTo(valueA is int ? valueA : (valueA as double));
+      });
+    
+    for (final type in sortedTypes) {
+      final value = _statsByType[type]?[field];
+      if (value == null || (value is num && value <= 0)) continue;
+      
+      String displayValue;
+      if (value is int) {
+        displayValue = value.toString();
+      } else if (value is double) {
+        displayValue = field == 'distance' 
+            ? value.toStringAsFixed(1) 
+            : value.toStringAsFixed(0);
+      } else {
+        displayValue = value.toString();
+      }
+      
+      statItems.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(type, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('$displayValue $unit'),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // 显示对话框
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...statItems,
+            if (statItems.isEmpty)
+              const Text('暂无数据'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
       ),
     );
   }
@@ -1004,6 +1227,10 @@ class _SettingPageState extends State<SettingPage>
                 _buildDetailItem('关注者', '${_athlete!.followerCount!}'),
               if (_athlete?.friendCount != null)
                 _buildDetailItem('关注中', '${_athlete!.friendCount!}'),
+              _buildDetailItem('活动总数', '$_activityCount'),
+              _buildDetailItem('总公里数', '${_totalDistance.toStringAsFixed(1)} km'),
+              _buildDetailItem('总爬升', '${_totalElevation.toStringAsFixed(0)} m'),
+              _buildDetailItem('总能量', '${_totalKilojoules.toStringAsFixed(0)} kJ'),
               if (_athlete?.createdAt != null)
                 _buildDetailItem('创建时间', _formatDateTime(_athlete!.createdAt)),
               if (_athlete?.updatedAt != null)
