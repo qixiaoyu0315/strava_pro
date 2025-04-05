@@ -32,6 +32,61 @@ jobs:
         run: |
           chmod +x scripts/setup_java_path.sh
           ./scripts/setup_java_path.sh
+      
+      # 准备版本号递增脚本
+      - name: Prepare increment version script
+        run: |
+          if [ ! -f "android/app/increment_version.sh" ]; then
+            echo "创建版本号递增脚本"
+            cat > android/app/increment_version.sh << 'EOF'
+#!/bin/bash
+
+# 该脚本用于递增pubspec.yaml中的构建号
+# 适用于Android构建过程
+
+# 获取项目根目录路径（相对于android/app/目录）
+ROOT_DIR="../.."
+PUBSPEC_FILE="${ROOT_DIR}/pubspec.yaml"
+
+echo "检查pubspec.yaml文件: ${PUBSPEC_FILE}"
+
+if [ ! -f "$PUBSPEC_FILE" ]; then
+  echo "错误: 找不到pubspec.yaml文件"
+  exit 1
+fi
+
+# 获取当前版本
+CURRENT_VERSION=$(grep "version:" "$PUBSPEC_FILE" | sed -E 's/version: (.*)/\1/')
+echo "当前版本: $CURRENT_VERSION"
+
+# 分离语义版本和构建号
+if [[ $CURRENT_VERSION =~ ([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+) ]]; then
+  SEMANTIC_VERSION="${BASH_REMATCH[1]}"
+  BUILD_NUMBER="${BASH_REMATCH[2]}"
+  
+  # 增加构建号
+  NEW_BUILD_NUMBER=$((BUILD_NUMBER + 1))
+  NEW_VERSION="${SEMANTIC_VERSION}+${NEW_BUILD_NUMBER}"
+  
+  echo "更新版本号: $CURRENT_VERSION -> $NEW_VERSION"
+  
+  # 根据操作系统使用不同的sed命令
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/g" "$PUBSPEC_FILE"
+  else
+    # Linux或其他系统
+    sed -i "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/g" "$PUBSPEC_FILE"
+  fi
+  
+  echo "版本号已更新: $NEW_VERSION"
+else
+  echo "警告: 无法解析版本号格式: $CURRENT_VERSION，跳过更新"
+fi
+EOF
+          fi
+          chmod +x android/app/increment_version.sh
+          echo "版本号递增脚本已准备就绪"
 
       - name: Install dependencies
         run: flutter pub get
@@ -53,17 +108,50 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          # 确保目录存在
           mkdir -p android/app/keystore
+          
+          # 解码密钥库文件
+          echo "开始解码密钥库文件..."
           echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore/strava_pro.keystore
+          
+          # 检查文件是否创建成功
+          if [ -f "android/app/keystore/strava_pro.keystore" ]; then
+            echo "密钥库文件创建成功"
+            # 检查文件大小
+            ls -la android/app/keystore/strava_pro.keystore
+          else
+            echo "错误: 密钥库文件创建失败!"
+            exit 1
+          fi
+          
+          # 测试密钥库文件是否可用
+          echo "测试密钥库是否可用..."
+          if keytool -list -keystore android/app/keystore/strava_pro.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" > /dev/null 2>&1; then
+            echo "密钥库测试成功，密码正确"
+          else
+            echo "警告: 无法使用提供的密码打开密钥库，请检查密码是否正确"
+            # 不立即退出，让构建继续，以便查看更多错误信息
+          fi
 
       - name: Set signing key properties
         run: |
+          # 打印密码前几个字符，用于调试（注意不要打印完整密码）
+          echo "密钥库密码长度: ${#${{ secrets.KEYSTORE_PASSWORD }}}"
+          echo "密钥密码长度: ${#${{ secrets.KEY_PASSWORD }}}"
+          echo "密钥别名: ${{ secrets.KEY_ALIAS }}"
+          
+          # 创建properties文件
           cat > android/key.properties << EOF
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
           storeFile=keystore/strava_pro.keystore
           EOF
+          
+          echo "密钥配置文件已创建"
+          # 显示文件权限
+          ls -la android/key.properties
 
       - name: Test
         run: flutter test || true

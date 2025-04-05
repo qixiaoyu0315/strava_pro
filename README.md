@@ -21,6 +21,24 @@ https://developers.strava.com/
 
 该脚本会根据当前操作系统自动设置合适的Java路径。如果遇到Java路径问题，请先运行此脚本。
 
+### 1.4.验证和管理密钥库
+
+项目提供了工具脚本来管理签名密钥：
+
+```bash
+# 验证密钥库和密码是否正确
+./scripts/verify_keystore.sh android/app/keystore/strava_pro.keystore
+
+# 将密钥库编码为Base64以上传到GitHub Secrets
+./scripts/encode_keystore.sh android/app/keystore/strava_pro.keystore
+```
+
+如果在GitHub Actions中遇到构建错误"keystore password was incorrect"，请按照以下步骤操作：
+
+1. 使用`verify_keystore.sh`验证本地密钥库是否可以用正确密码打开
+2. 使用`encode_keystore.sh`重新生成Base64编码
+3. 更新GitHub Secrets中的`KEYSTORE_BASE64`、`KEYSTORE_PASSWORD`、`KEY_PASSWORD`和`KEY_ALIAS`
+
 ## 2.应用更新与发布
 
 ### 2.1 设置GitHub Actions自动构建
