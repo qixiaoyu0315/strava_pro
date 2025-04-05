@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/logger.dart';
 
 class AppUpdateService {
@@ -15,9 +16,10 @@ class AppUpdateService {
   static const String _repo = 'strava_pro';
   static const String _apiUrl = 'https://api.github.com/repos/$_owner/$_repo/releases/latest';
   static const String _releasesUrl = 'https://github.com/$_owner/$_repo/releases/latest';
+  static const String _ignoredVersionKey = 'ignored_update_version';
   
   // 检查是否有更新
-  Future<Map<String, dynamic>?> checkForUpdate() async {
+  Future<Map<String, dynamic>?> checkForUpdate({bool forceCheck = false}) async {
     try {
       // 获取当前应用版本
       final packageInfo = await PackageInfo.fromPlatform();
@@ -26,13 +28,21 @@ class AppUpdateService {
       
       Logger.d('当前应用版本: $currentVersion+$currentBuildNumber (仅比较语义版本 $currentVersion)', tag: 'AppUpdate');
       
+      // 检查是否有被忽略的版本
+      if (!forceCheck) {
+        final ignoredVersion = await _getIgnoredVersion();
+        if (ignoredVersion != null) {
+          Logger.d('发现已忽略的版本: $ignoredVersion', tag: 'AppUpdate');
+        }
+      }
+      
       // 请求GitHub API获取最新发布版本
       // 添加必要的请求头，避免GitHub API限制
       final response = await http.get(
         Uri.parse(_apiUrl),
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'strava_pro_app',  // 添加User-Agent头以避免403错误
+          'User-Agent': 'strava_pro_app/$currentVersion',  // 添加版本信息到User-Agent
           'X-GitHub-Api-Version': '2022-11-28',
         },
       );
@@ -52,6 +62,15 @@ class AppUpdateService {
             : latestVersion;
             
         Logger.d('GitHub最新版本: $cleanLatestVersion', tag: 'AppUpdate');
+        
+        // 检查是否已忽略此版本
+        if (!forceCheck) {
+          final ignoredVersion = await _getIgnoredVersion();
+          if (ignoredVersion != null && _getSemanticVersion(cleanLatestVersion) == ignoredVersion) {
+            Logger.d('版本 $ignoredVersion 已被用户忽略，跳过更新检查', tag: 'AppUpdate');
+            return null;
+          }
+        }
         
         // 处理版本检查和返回结果...
         return await _processVersionCheck(data, cleanLatestVersion, currentVersion, currentBuildNumber);
@@ -93,41 +112,24 @@ class AppUpdateService {
   ) async {
     // 版本格式处理改进：主要提取语义版本号部分
     String latestSemanticVersion;
-    int latestBuildNumber;
     
     // 尝试分离版本号和构建号
     List<String> versionParts = cleanLatestVersion.split('+');
     if (versionParts.length == 2) {
       // 标准格式：x.y.z+123
       latestSemanticVersion = versionParts[0];
-      latestBuildNumber = int.tryParse(versionParts[1]) ?? 0;
     } else {
       // 尝试其他格式：可能是纯语义版本号
       latestSemanticVersion = cleanLatestVersion;
-      
-      // 获取assets中的APK文件名，可能包含构建号
-      final assets = data['assets'] as List<dynamic>? ?? [];
-      int? buildFromAsset;
-      
-      for (var asset in assets) {
-        final name = asset['name'] as String? ?? '';
-        if (name.endsWith('.apk')) {
-          // 尝试从文件名提取构建号
-          final match = RegExp(r'.*?[\+_](\d+)\.apk$').firstMatch(name);
-          if (match != null && match.groupCount >= 1) {
-            buildFromAsset = int.tryParse(match.group(1) ?? '');
-            if (buildFromAsset != null) {
-              break;
-            }
-          }
-        }
-      }
-      
-      // 如果从资源中找到构建号，使用它；否则使用发布ID作为构建号
-      latestBuildNumber = buildFromAsset ?? (data['id'] as int? ?? 0);
     }
     
-    Logger.d('解析后版本: 语义版本=$latestSemanticVersion, 构建号=$latestBuildNumber', tag: 'AppUpdate');
+    Logger.d('版本比较: 本地版本=${currentVersion}, GitHub版本=${latestSemanticVersion}', tag: 'AppUpdate');
+    
+    // 如果版本号完全相同，直接返回null（没有更新）
+    if (currentVersion == latestSemanticVersion) {
+      Logger.d('版本号完全相同，无需更新', tag: 'AppUpdate');
+      return null;
+    }
     
     // 比较版本号（只比较语义版本号，忽略构建号）
     bool hasUpdate = false;
@@ -136,33 +138,26 @@ class AppUpdateService {
     List<String> currentParts = currentVersion.split('.');
     List<String> latestParts = latestSemanticVersion.split('.');
     
-    for (int i = 0; i < Math.min(currentParts.length, latestParts.length); i++) {
+    // 确保两个版本号都有足够的部分进行比较
+    while (currentParts.length < 3) currentParts.add('0');
+    while (latestParts.length < 3) latestParts.add('0');
+    
+    for (int i = 0; i < 3; i++) { // 通常只比较前三部分：主要版本、次要版本和补丁版本
       int currentPart = int.tryParse(currentParts[i]) ?? 0;
       int latestPart = int.tryParse(latestParts[i]) ?? 0;
       
-      Logger.d('比较版本部分: 当前[$i]=$currentPart, 最新[$i]=$latestPart', tag: 'AppUpdate');
+      Logger.d('比较版本部分[$i]: 本地=$currentPart, GitHub=$latestPart', tag: 'AppUpdate');
       
       if (latestPart > currentPart) {
         hasUpdate = true;
-        Logger.d('发现语义版本更新: $currentPart < $latestPart', tag: 'AppUpdate');
+        Logger.d('发现更新: $currentPart < $latestPart', tag: 'AppUpdate');
         break;
       } else if (latestPart < currentPart) {
-        Logger.d('当前语义版本更新: $currentPart > $latestPart', tag: 'AppUpdate');
+        Logger.d('本地版本更高: $currentPart > $latestPart', tag: 'AppUpdate');
         return null; // 本地版本更高
       }
+      // 如果相等则继续比较下一部分
     }
-    
-    // 只有在语义版本完全相同的情况下才考虑构建号（这一部分代码可选，取决于你的需求）
-    // 如果你只想比较语义版本号，可以直接删除下面这段代码
-    /*
-    if (!hasUpdate) {
-      Logger.d('语义版本相同，比较构建号: 当前=$currentBuildNumber, 最新=$latestBuildNumber', tag: 'AppUpdate');
-      if (latestBuildNumber > currentBuildNumber) {
-        hasUpdate = true;
-        Logger.d('发现构建号更新: $currentBuildNumber < $latestBuildNumber', tag: 'AppUpdate');
-      }
-    }
-    */
     
     if (hasUpdate) {
       // 拼接完整版本号用于显示
@@ -378,6 +373,20 @@ class AppUpdateService {
     }
   }
   
+  // 保存忽略的版本
+  Future<void> _saveIgnoredVersion(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_ignoredVersionKey, _getSemanticVersion(version));
+    Logger.d('已将版本 ${_getSemanticVersion(version)} 设置为忽略', tag: 'AppUpdate');
+  }
+  
+  // 重置忽略的版本
+  Future<void> resetIgnoredVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_ignoredVersionKey);
+    Logger.d('已重置忽略的版本', tag: 'AppUpdate');
+  }
+
   // 显示更新对话框
   void showUpdateDialog(BuildContext context, Map<String, dynamic> updateInfo) {
     final version = updateInfo['version'] as String;
@@ -453,6 +462,16 @@ class AppUpdateService {
                 ),
               ),
               actions: [
+                if (!isFallbackMode)
+                  TextButton(
+                    onPressed: () async {
+                      // 忽略这个版本
+                      await _saveIgnoredVersion(version);
+                      Fluttertoast.showToast(msg: '已忽略版本 $version');
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('忽略此版本'),
+                  ),
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
@@ -538,6 +557,22 @@ class AppUpdateService {
     } catch (e) {
       Logger.e('打开下载目录时出错', error: e, tag: 'AppUpdate');
       Fluttertoast.showToast(msg: '无法打开下载目录: $e');
+    }
+  }
+  
+  // 获取被忽略的版本
+  Future<String?> _getIgnoredVersion() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_ignoredVersionKey);
+  }
+  
+  // 获取语义版本
+  String _getSemanticVersion(String version) {
+    final parts = version.split('+');
+    if (parts.length > 0) {
+      return parts[0];
+    } else {
+      throw Exception('无法解析版本格式');
     }
   }
 }

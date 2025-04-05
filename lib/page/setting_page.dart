@@ -148,18 +148,18 @@ class _SettingPageState extends State<SettingPage>
   }
   
   // 检查应用更新
-  Future<void> _checkForUpdate() async {
+  Future<void> _checkForUpdate({bool forceCheck = false}) async {
     if (_isCheckingUpdate) return;
     
     // 记录用户点击"检查更新"的行为
-    Logger.d('用户点击检查更新按钮', tag: 'AppUpdate');
+    Logger.d('用户点击检查更新按钮' + (forceCheck ? '(强制检查)' : ''), tag: 'AppUpdate');
     
     try {
       setState(() {
         _isCheckingUpdate = true;
       });
       
-      final updateInfo = await _updateService.checkForUpdate();
+      final updateInfo = await _updateService.checkForUpdate(forceCheck: forceCheck);
       
       if (mounted) {
         setState(() {
@@ -2009,20 +2009,58 @@ class _SettingPageState extends State<SettingPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.system_update, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  '应用更新',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                Row(
+                  children: [
+                    Icon(Icons.system_update, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '应用更新',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+                // 更新选项按钮移到右侧
+                PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'check') {
+                      _checkForUpdate();
+                    } else if (value == 'force_check') {
+                      _checkForUpdate(forceCheck: true);
+                    } else if (value == 'reset_ignore') {
+                      await _updateService.resetIgnoredVersion();
+                      Fluttertoast.showToast(msg: '已重置忽略的版本');
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'check',
+                      child: Text('检查更新'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'force_check',
+                      child: Text('强制检查更新'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'reset_ignore',
+                      child: Text('重置忽略的版本'),
+                    ),
+                  ],
+                  icon: Icon(Icons.more_vert, 
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             // 当前版本信息
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text('当前版本: '),
                 Text('$_appVersion+$_buildNumber',
@@ -2030,12 +2068,15 @@ class _SettingPageState extends State<SettingPage>
               ],
             ),
             const SizedBox(height: 2),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text('版本号比较: '),
                 Text(_appVersion,
                     style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12)),
-                const Text(' (仅比较此部分，不比较构建号)', 
+                const Text(' (仅比较此部分)', 
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
               ],
             ),
@@ -2050,7 +2091,10 @@ class _SettingPageState extends State<SettingPage>
               const Center(child: Text('正在检查更新...')),
             ] else if (_updateAvailable && _updateInfo != null) ...[
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   const Text('最新版本: '),
                   Text(
@@ -2081,17 +2125,6 @@ class _SettingPageState extends State<SettingPage>
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () {
-                  Logger.d('用户点击检查更新按钮', tag: 'AppUpdate');
-                  _checkForUpdate();
-                },
-                child: const Text('检查更新'),
-              ),
-            ),
           ],
         ),
       ),

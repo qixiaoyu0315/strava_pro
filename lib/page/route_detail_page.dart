@@ -58,8 +58,10 @@ class _RouteDetailPageState extends State<RouteDetailPage>
   double? _visibleRangeStart;
   double? _visibleRangeEnd;
 
-  // 添加地图缓存管理器
-  // 这行已被移除
+  // 添加手势相关变量
+  int _touchCount = 0;
+  Timer? _longPressTimer;
+  bool _isExiting = false;
 
   @override
   void initState() {
@@ -80,7 +82,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
     });
 
     // 初始化地图缓存管理器 
-    // 这行替换了 _mapTileCacheManager = MapTileCacheManager();
+    // 这行已被移除
     MapTileCacheManager.instance.initialize().then((_) {
       if (mounted) {
         setState(() {
@@ -94,6 +96,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
 
   @override
   void dispose() {
+    _longPressTimer?.cancel();
     _positionStreamSubscription?.cancel();
     selectedPoint.dispose();
     currentLocation.dispose();
@@ -543,143 +546,147 @@ class _RouteDetailPageState extends State<RouteDetailPage>
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: points.isNotEmpty
-          ? FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: center,
-                initialZoom: 8.0,
-                onMapReady: () {
-                  // 计算路线的边界
-                  double minLat =
-                      points.map((p) => p.latitude).reduce(math.min);
-                  double maxLat =
-                      points.map((p) => p.latitude).reduce(math.max);
-                  double minLng =
-                      points.map((p) => p.longitude).reduce(math.min);
-                  double maxLng =
-                      points.map((p) => p.longitude).reduce(math.max);
+          ? Listener(
+              onPointerDown: (_) => _handleTouchCountChange(_touchCount + 1),
+              onPointerUp: (_) => _handleTouchCountChange(_touchCount - 1),
+              child: FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: center,
+                  initialZoom: 8.0,
+                  onMapReady: () {
+                    // 计算路线的边界
+                    double minLat =
+                        points.map((p) => p.latitude).reduce(math.min);
+                    double maxLat =
+                        points.map((p) => p.latitude).reduce(math.max);
+                    double minLng =
+                        points.map((p) => p.longitude).reduce(math.min);
+                    double maxLng =
+                        points.map((p) => p.longitude).reduce(math.max);
 
-                  // 创建边界矩形并添加边距
-                  final bounds = LatLngBounds.fromPoints([
-                    LatLng(minLat - 0.02, minLng - 0.02),
-                    LatLng(maxLat + 0.02, maxLng + 0.02)
-                  ]);
+                    // 创建边界矩形并添加边距
+                    final bounds = LatLngBounds.fromPoints([
+                      LatLng(minLat - 0.02, minLng - 0.02),
+                      LatLng(maxLat + 0.02, maxLng + 0.02)
+                    ]);
 
-                  // 调整地图以适应边界
-                  Future.delayed(Duration(milliseconds: 100), () {
-                    if (!mounted) return;
+                    // 调整地图以适应边界
+                    Future.delayed(Duration(milliseconds: 100), () {
+                      if (!mounted) return;
 
-                    _mapController.move(
-                      bounds.center,
-                      _mapController.camera.zoom,
-                    );
+                      _mapController.move(
+                        bounds.center,
+                        _mapController.camera.zoom,
+                      );
 
-                    // 计算合适的缩放级别
-                    if (!mounted) return;
+                      // 计算合适的缩放级别
+                      if (!mounted) return;
 
-                    final latZoom = _calculateZoomLevel(bounds.south,
-                        bounds.north, MediaQuery.of(context).size.height);
-                    final lngZoom = _calculateZoomLevel(bounds.west,
-                        bounds.east, MediaQuery.of(context).size.width);
+                      final latZoom = _calculateZoomLevel(bounds.south,
+                          bounds.north, MediaQuery.of(context).size.height);
+                      final lngZoom = _calculateZoomLevel(bounds.west,
+                          bounds.east, MediaQuery.of(context).size.width);
 
-                    _mapController.move(
-                      bounds.center,
-                      math.min(latZoom, lngZoom) - 0.5, // 减少0.5级缩放以留出边距
-                    );
-                  });
-                },
-              ),
-              children: [
-                // 使用缓存管理器创建离线优先的图层
-                MapTileCacheManager.instance.createOfflineTileLayer(),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: points,
-                      strokeWidth: 4.0,
-                      color: Colors.blue,
-                    ),
-                  ],
+                      _mapController.move(
+                        bounds.center,
+                        math.min(latZoom, lngZoom) - 0.5, // 减少0.5级缩放以留出边距
+                      );
+                    });
+                  },
                 ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: points.first,
-                      child: Icon(Icons.location_on,
-                          color: Colors.green, size: 40.0),
-                    ),
-                    Marker(
-                      point: points.last,
-                      child: Icon(Icons.flag, color: Colors.red, size: 40.0),
-                    ),
-                  ],
-                ),
-                ValueListenableBuilder<LatLng?>(
-                  valueListenable: currentLocation,
-                  builder: (context, location, child) {
-                    if (location == null) return const SizedBox();
-                    final isNearRoute = gpxPoints != null
-                        ? _isNearRoute(location, gpxPoints!)
-                        : false;
-                    return MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: location,
-                          child: Container(
-                            height: 32,
-                            width: 32,
-                            alignment: Alignment.center,
-                            child: Stack(
+                children: [
+                  // 使用缓存管理器创建离线优先的图层
+                  MapTileCacheManager.instance.createOfflineTileLayer(),
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: points,
+                        strokeWidth: 4.0,
+                        color: Colors.blue,
+                      ),
+                    ],
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: points.first,
+                        child: Icon(Icons.location_on,
+                            color: Colors.green, size: 40.0),
+                      ),
+                      Marker(
+                        point: points.last,
+                        child: Icon(Icons.flag, color: Colors.red, size: 40.0),
+                      ),
+                    ],
+                  ),
+                  ValueListenableBuilder<LatLng?>(
+                    valueListenable: currentLocation,
+                    builder: (context, location, child) {
+                      if (location == null) return const SizedBox();
+                      final isNearRoute = gpxPoints != null
+                          ? _isNearRoute(location, gpxPoints!)
+                          : false;
+                      return MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: location,
+                            child: Container(
+                              height: 32,
+                              width: 32,
                               alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isNearRoute
-                                          ? Colors.green
-                                          : Colors.red,
-                                      width: 3,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (isNearRoute
-                                                ? Colors.green
-                                                : Colors.red)
-                                            .withValues(alpha: .3),
-                                        spreadRadius: 4,
-                                        blurRadius: 4,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isNearRoute
+                                            ? Colors.green
+                                            : Colors.red,
+                                        width: 3,
                                       ),
-                                    ],
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: (isNearRoute
+                                                  ? Colors.green
+                                                  : Colors.red)
+                                              .withValues(alpha: .3),
+                                          spreadRadius: 4,
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                ValueListenableBuilder<LatLng?>(
-                  valueListenable: selectedPoint,
-                  builder: (context, point, child) {
-                    if (point == null) return const SizedBox();
-                    return MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: point,
-                          child: Icon(Icons.location_on,
-                              color: Colors.orange, size: 40.0),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
+                        ],
+                      );
+                    },
+                  ),
+                  ValueListenableBuilder<LatLng?>(
+                    valueListenable: selectedPoint,
+                    builder: (context, point, child) {
+                      if (point == null) return const SizedBox();
+                      return MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: point,
+                            child: Icon(Icons.location_on,
+                                color: Colors.orange, size: 40.0),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             )
           : Center(child: Text('没有可用的路线数据')),
     );
@@ -789,26 +796,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                 return _buildMainContent();
               },
             ),
-      floatingActionButton: gpxFilePath != null
-          ? FloatingActionButton(
-              onPressed: () async {
-                setState(() {
-                  isNavigationMode = !isNavigationMode;
-                });
-
-                if (isNavigationMode) {
-                  // 进入导航模式时检查权限并开始位置更新
-                  await _checkLocationPermission();
-                } else {
-                  _stopLocationUpdates();
-                }
-              },
-              backgroundColor: isNavigationMode ? Colors.red : Colors.blue,
-              foregroundColor: Colors.white,
-              child: Icon(isNavigationMode ? Icons.close : Icons.navigation),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -878,14 +865,14 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                             ),
                             // 右侧信息
                             Expanded(
-                              flex: 2, // 减少信息区域比例
+                              flex: 3, // 减少信息区域比例
                               child: SizedBox(
                                 height: availableHeight,
                                 child: Column(
                     children: [
                                     // 海拔和坡度信息（2/5）
                       Container(
-                                      height: availableHeight * 0.4,
+                                      height: availableHeight * 0.3,
                                       margin: EdgeInsets.only(bottom: 8),
                                       padding: EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -1087,13 +1074,13 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                           children: [
                             // 地图组件 (6份)
                             SizedBox(
-                              height: unit * 6, // 增加地图高度比例
+                              height: unit * 5, // 增加地图高度比例
                               child: _buildMap(points, center),
                             ),
                             SizedBox(height: 16),
                             // 海拔和坡度信息卡片 (1.5份)
                             Container(
-                              height: unit * 1.5, // 减少信息卡片高度
+                              height: unit * 1, // 减少信息卡片高度
                               margin: EdgeInsets.symmetric(horizontal: 8),
                               padding: EdgeInsets.symmetric(
                                   vertical: 8, horizontal: 16),
@@ -1210,7 +1197,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                             SizedBox(height: 16),
                             // 海拔图 (2.5份)
                             Container(
-                              height: unit * 2.5, // 减少海拔图高度
+                              height: unit * 3.5, // 减少海拔图高度
                               margin: EdgeInsets.symmetric(horizontal: 8),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).cardColor,
@@ -1585,6 +1572,34 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         },
       ),
     );
+  }
+
+  // 添加手势处理方法
+  void _handleTouchCountChange(int count) {
+    _touchCount = count;
+    
+    // 取消之前的定时器
+    _longPressTimer?.cancel();
+    
+    // 如果是双指触摸，开始计时
+    if (_touchCount == 2) {
+      _longPressTimer = Timer(const Duration(seconds: 3), () {
+        if (_touchCount == 2 && mounted && !_isExiting) {
+          setState(() {
+            _isExiting = true;
+            isNavigationMode = false;
+          });
+          _stopLocationUpdates();
+          
+          // 显示退出提示
+          Fluttertoast.showToast(
+            msg: '已退出导航模式',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.CENTER,
+          );
+        }
+      });
+    }
   }
 }
 
