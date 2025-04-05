@@ -550,7 +550,7 @@ class ActivityService {
             tag: 'ActivityService');
       }
 
-      const perPage = 100;
+      const perPage = 200;
       int currentPage = 1;
       int successCount = 0;
       int errorCount = 0;
@@ -1215,6 +1215,25 @@ class ActivityService {
     } catch (e) {
       Logger.e('获取总能量失败: $e', tag: 'ActivityService');
       return 0.0;
+    }
+  }
+  
+  /// 获取所有活动的总时间（秒）
+  Future<int> getTotalMovingTime() async {
+    try {
+      final db = await database;
+      final result = await db.rawQuery('''
+        SELECT SUM(moving_time) as total_moving_time 
+        FROM $tableName
+      ''');
+      
+      final totalMovingTime = result.first['total_moving_time'] as int? ?? 0;
+      
+      Logger.d('获取总时间: ${totalMovingTime} 秒', tag: 'ActivityService');
+      return totalMovingTime;
+    } catch (e) {
+      Logger.e('获取总时间失败: $e', tag: 'ActivityService');
+      return 0;
     }
   }
   

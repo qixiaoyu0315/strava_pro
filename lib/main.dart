@@ -201,9 +201,11 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   void _handleAuthenticationChanged(
       bool isAuthenticated, DetailedAthlete? athlete) {
     if (mounted) {
+      Logger.d('主应用收到认证状态变化: isAuthenticated=$isAuthenticated, athlete=${athlete?.firstname}', tag: 'Main');
       setState(() {
         _isAuthenticated = isAuthenticated;
         _athlete = athlete;
+        // 重新初始化所有页面以确保状态同步
         _initPages();
       });
     }
@@ -611,8 +613,8 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                               padding: EdgeInsets.symmetric(vertical: 24),
                             ),
                             NavigationRailDestination(
-                              icon: Icon(Icons.settings),
-                              label: Text('设置'),
+                              icon: Icon(Icons.person),
+                              label: Text('我的'),
                               padding: EdgeInsets.symmetric(vertical: 24),
                             ),
                           ],
@@ -645,8 +647,8 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                               label: '路线',
                             ),
                             BottomNavigationBarItem(
-                              icon: Icon(Icons.settings),
-                              label: '设置',
+                              icon: Icon(Icons.person),
+                              label: '我的',
                             ),
                           ],
                           currentIndex: _selectedIndex,

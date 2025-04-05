@@ -53,8 +53,8 @@ class RouteCard extends StatelessWidget {
               Positioned.fill(
                 child: Container(
                   color: isDarkMode 
-                      ? Colors.black.withOpacity(0.3) 
-                      : Colors.white.withOpacity(0.3),
+                      ? Colors.black.withOpacity(0.1) 
+                      : Colors.white.withOpacity(0.1),
                 ),
               ),
               

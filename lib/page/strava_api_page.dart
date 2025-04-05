@@ -102,12 +102,24 @@ class _StravaApiPageState extends State<StravaApiPage> {
           .stravaClient.athletes.getAuthenticatedAthlete();
       if (!mounted) return;
 
-      // 通知认证状态变化
+      // 确保通知认证状态变化
+      Logger.d('认证完成，通知父组件认证状态变化', tag: 'StravaApiPage');
       widget.onAuthenticationChanged?.call(true, athlete);
 
+      // 认证成功后显示提示
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('认证成功')),
+        const SnackBar(
+            content: Text('认证成功，现在可以返回设置页面使用数据同步功能'),
+            duration: Duration(seconds: 3),
+        ),
       );
+      
+      // 延迟一段时间后自动返回
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      });
     } catch (e, stackTrace) {
       Logger.e('认证过程中出错', error: e, stackTrace: stackTrace, tag: 'StravaApiPage');
       if (mounted) {

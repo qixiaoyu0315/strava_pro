@@ -76,6 +76,7 @@ class _SettingPageState extends State<SettingPage>
   double _totalDistance = 0.0; // 活动总公里数
   double _totalElevation = 0.0; // 活动总爬升
   double _totalKilojoules = 0.0; // 活动总能量
+  int _totalMovingTime = 0; // 活动总时间（秒）
   Map<String, Map<String, dynamic>> _statsByType = {}; // 按活动类型分组的统计数据
   Map<String, dynamic>? _syncStatusMap;
 
@@ -126,6 +127,7 @@ class _SettingPageState extends State<SettingPage>
     _loadTotalDistance();
     _loadTotalElevation();
     _loadTotalKilojoules();
+    _loadTotalMovingTime();
     _loadStatsByActivityType();
     _loadSyncStatus();
     
@@ -235,9 +237,22 @@ class _SettingPageState extends State<SettingPage>
         if (widget.isAuthenticated && widget.athlete != null) {
           _athlete = widget.athlete;
           token = StravaClientManager().token;
+          _isAuthenticated = true;
+          
+          // 加载相关数据
+          _loadLastSyncTime();
+          _loadLastActivitySyncTime();
+          _loadActivityCount();
+          _loadTotalDistance();
+          _loadTotalElevation();
+          _loadTotalKilojoules();
+          _loadTotalMovingTime();
+          _loadStatsByActivityType();
+          _loadSyncStatus();
         } else {
           _athlete = null;
           token = null;
+          _isAuthenticated = false;
         }
       });
     }
@@ -633,7 +648,11 @@ class _SettingPageState extends State<SettingPage>
   }
 
   Future<void> _syncActivities() async {
-    if (!_isAuthenticated) {
+    // 检查是否已认证
+    final manager = StravaClientManager();
+    final isAuth = await manager.isAuthenticated();
+    
+    if (!isAuth || manager.token == null) {
       Fluttertoast.showToast(msg: '请先登录 Strava');
       return;
     }
@@ -651,6 +670,11 @@ class _SettingPageState extends State<SettingPage>
     });
 
     try {
+      // 确保有运动员信息
+      if (_athlete == null) {
+        _athlete = await manager.stravaClient.athletes.getAuthenticatedAthlete();
+      }
+      
       // 使用 ActivityService 同步活动数据
       await _activityService.syncActivities(
           onProgress: (current, total, status) {
@@ -667,6 +691,7 @@ class _SettingPageState extends State<SettingPage>
       await _loadTotalDistance(); // 更新总公里数
       await _loadTotalElevation(); // 更新总爬升
       await _loadTotalKilojoules(); // 更新总能量
+      await _loadTotalMovingTime(); // 更新总时间
       await _loadStatsByActivityType(); // 更新按活动类型分组的统计数据
       await _loadSyncStatus();
 
@@ -699,24 +724,50 @@ class _SettingPageState extends State<SettingPage>
     try {
       final apiKey = await _apiKeyModel.getApiKey();
       if (apiKey != null) {
-        // 暂时注释掉获取用户信息的逻辑
-        // final athlete = await StravaClientManager()
-        //     .stravaClient
-        //     .athletes
-        //     .getAthlete(0); // 0 表示获取当前登录用户
-        // setState(() {
-        //   _isAuthenticated = true;
-        //   _athleteName = athlete.firstname;
-        //   _athleteAvatar = athlete.profile;
-        // });
+        final manager = StravaClientManager();
+        final isAuth = await manager.isAuthenticated();
+        
+        if (isAuth && manager.token != null) {
+          // 如果已认证，尝试获取运动员信息
+          try {
+            final athlete = await manager.stravaClient.athletes.getAuthenticatedAthlete();
+            setState(() {
+              _isAuthenticated = true;
+              _athlete = athlete;
+              token = manager.token;
+            });
+            
+            // 加载相关数据
+            _loadLastSyncTime();
+            _loadLastActivitySyncTime();
+            _loadActivityCount();
+            _loadTotalDistance();
+            _loadTotalElevation();
+            _loadTotalKilojoules();
+            _loadTotalMovingTime();
+            _loadStatsByActivityType();
+            _loadSyncStatus();
+          } catch (e) {
+            Logger.e('获取运动员信息失败: $e', tag: 'SettingPage');
+            setState(() {
+              _isAuthenticated = true;
+              _athleteName = '用户'; 
+              _athleteAvatar = null;
+            });
+          }
+        } else {
+          setState(() {
+            _isAuthenticated = false;
+            _athleteName = null;
+            _athleteAvatar = null;
+          });
+        }
+      } else {
         setState(() {
-          _isAuthenticated = true;
-          _athleteName = '用户'; // 暂时设置为默认值
-          _athleteAvatar = null; // 暂时设置为 null
+          _isAuthenticated = false;
+          _athleteName = null;
+          _athleteAvatar = null;
         });
-
-        // 尝试获取运动员信息并更新创建时间
-        _updateAthleteCreatedTime();
       }
     } catch (e) {
       Logger.e('检查认证状态失败: $e', tag: 'SettingPage');
@@ -784,6 +835,18 @@ class _SettingPageState extends State<SettingPage>
     }
   }
   
+  /// 加载活动总时间
+  Future<void> _loadTotalMovingTime() async {
+    try {
+      final totalMovingTime = await _activityService.getTotalMovingTime();
+      setState(() {
+        _totalMovingTime = totalMovingTime;
+      });
+    } catch (e) {
+      Logger.e('加载活动总时间失败: $e', tag: 'SettingPage');
+    }
+  }
+  
   /// 加载按活动类型分组的统计数据
   Future<void> _loadStatsByActivityType() async {
     try {
@@ -841,6 +904,7 @@ class _SettingPageState extends State<SettingPage>
       await _loadTotalDistance();
       await _loadTotalElevation();
       await _loadTotalKilojoules();
+      await _loadTotalMovingTime();
       await _loadStatsByActivityType();
       await _loadSyncStatus();
       Fluttertoast.showToast(msg: '数据库已重置，请重新同步数据');
@@ -936,7 +1000,12 @@ class _SettingPageState extends State<SettingPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('设置'),
+        title: const Text('我的'),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(16),
+          ),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -1338,7 +1407,7 @@ class _SettingPageState extends State<SettingPage>
               _buildDetailItem('活动总数', '$_activityCount'),
               _buildDetailItem('总公里数', '${_totalDistance.toStringAsFixed(1)} km'),
               _buildDetailItem('总爬升', '${_totalElevation.toStringAsFixed(0)} m'),
-              _buildDetailItem('总能量', '${_totalKilojoules.toStringAsFixed(0)} kJ'),
+              _buildDetailItem('总时间', '${_formatDuration(_totalMovingTime)}'),
               if (_athlete?.createdAt != null)
                 _buildDetailItem('创建时间', _formatDateTime(_athlete!.createdAt)),
               if (_athlete?.updatedAt != null)
@@ -2557,5 +2626,12 @@ class _SettingPageState extends State<SettingPage>
         SnackBar(content: Text('更新链接无效')),
       );
     }
+  }
+
+  /// 将秒数格式化为小时:分钟
+  String _formatDuration(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    return '$hours小时${minutes}分钟';
   }
 }

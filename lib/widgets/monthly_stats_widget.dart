@@ -113,8 +113,6 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
     
     // 计算时间的小时和分钟
     final totalMovingTimeMinutes = (_stats['totalMovingTime'] as int) ~/ 60;
-    final hours = totalMovingTimeMinutes ~/ 60;
-    final minutes = totalMovingTimeMinutes % 60;
     
     // 活动类型分类计数
     Map<String, Map<String, dynamic>> activityTypes = 
@@ -150,7 +148,7 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
               _buildStatItem(
                 context,
                 '总时间',
-                '$hours小时$minutes分钟',
+                '$totalMovingTimeMinutes分钟',
                 Icons.access_time,
               ),
             ],
@@ -174,9 +172,9 @@ class _MonthlyStatsWidgetState extends State<MonthlyStatsWidget> {
               ),
               _buildStatItem(
                 context,
-                '总能量',
-                '${kilojouleFormat.format(_stats['totalKilojoules'])}千焦',
-                Icons.local_fire_department,
+                '活动时间',
+                '$totalMovingTimeMinutes分钟',
+                Icons.access_time,
               ),
             ],
           ),
