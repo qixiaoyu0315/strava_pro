@@ -10,6 +10,17 @@ https://developers.strava.com/
 
  strava_client: ^2.1.3
 
+### 1.3.配置Java环境
+
+在不同开发环境中，Java路径可能不同。项目提供了自动配置脚本：
+
+```bash
+# 运行此脚本自动配置Java路径
+./scripts/setup_java_path.sh
+```
+
+该脚本会根据当前操作系统自动设置合适的Java路径。如果遇到Java路径问题，请先运行此脚本。
+
 ## 2.应用更新与发布
 
 ### 2.1 设置GitHub Actions自动构建

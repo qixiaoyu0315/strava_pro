@@ -26,6 +26,12 @@ jobs:
         with:
           flutter-version: '3.27.2'
           channel: 'stable'
+          
+      # 配置正确的Java路径
+      - name: Configure Java path
+        run: |
+          chmod +x scripts/setup_java_path.sh
+          ./scripts/setup_java_path.sh
 
       - name: Install dependencies
         run: flutter pub get

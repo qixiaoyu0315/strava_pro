@@ -2,4 +2,5 @@ org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryErro
 android.useAndroidX=true
 android.enableJetifier=true
 # 注释掉固定的Java路径，让系统自动检测
-org.gradle.java.home=/opt/homebrew/opt/openjdk@17
+# org.gradle.java.home=/opt/homebrew/opt/openjdk@17
+# org.gradle.java.home=C:\\Program Files\\Java\\jdks-18.0.2.1
