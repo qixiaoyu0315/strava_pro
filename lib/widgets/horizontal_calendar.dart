@@ -41,7 +41,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     _selectedDate = widget.selectedDate ?? now;
     _displayedMonth = widget.initialMonth ?? DateTime(now.year, now.month);
 
@@ -80,7 +80,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
   // 获取指定月份的索引
   int _getMonthIndex(DateTime month) {
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     final startDate = DateTime(now.year - 2, now.month);
     return (month.year - startDate.year) * 12 + (month.month - startDate.month);
   }
@@ -89,7 +89,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
   void _loadMonthSvgData(int monthIndex) {
     if (_monthSvgCaches.containsKey(monthIndex)) return;
 
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     final startDate = DateTime(now.year - 2, now.month);
     final targetMonth = DateTime(
       startDate.year,
@@ -124,7 +124,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
   // 横屏布局：左侧日历，右侧统计
   Widget _buildLandscapeLayout() {
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     final startDate = DateTime(now.year - 2, now.month);
 
     return LayoutBuilder(
@@ -211,7 +211,7 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
 
   // 竖屏布局：上方日历，下方统计
   Widget _buildPortraitLayout() {
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     final startDate = DateTime(now.year - 2, now.month);
 
     return LayoutBuilder(

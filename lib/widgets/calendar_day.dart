@@ -35,7 +35,7 @@ class CalendarDay extends StatelessWidget {
   });
 
   bool get _isToday {
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     return date.year == now.year &&
         date.month == now.month &&
         date.day == now.day;
@@ -54,8 +54,9 @@ class CalendarDay extends StatelessWidget {
   }
 
   Widget _buildSvgIcon(bool isSelected) {
+    final localDate = date.toLocal();
     final dateStr =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
     final svgPath = '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
 
     if (!hasSvg) {

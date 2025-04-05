@@ -128,8 +128,8 @@ class AthleteModel {
   Future<void> updateLastSyncTime() async {
     try {
       final db = await database;
-      // 使用ISO8601字符串格式
-      final now = DateTime.now().toUtc().toIso8601String();
+      // 使用本地时间的ISO8601字符串格式
+      final now = DateTime.now().toLocal().toIso8601String();
 
       // 首先检查是否有记录
       final List<Map<String, dynamic>> count =
@@ -354,7 +354,7 @@ class AthleteModel {
             Logger.d('已修复最后活动同步时间', tag: 'DatabaseFix');
           } else {
             // 如果两者都为空，设置为当前时间
-            final now = DateTime.now().toUtc().toIso8601String();
+            final now = DateTime.now().toLocal().toIso8601String();
             await db.update(
               'athlete',
               {'last_sync_time': now, 'last_activity_sync_time': now},

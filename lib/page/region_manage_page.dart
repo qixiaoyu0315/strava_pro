@@ -126,7 +126,7 @@ class _RegionManagePageState extends State<RegionManagePage> {
   // 格式化日期时间
   String _formatDateTime(String dateTimeStr) {
     try {
-      final dateTime = DateTime.parse(dateTimeStr);
+      final dateTime = DateTime.parse(dateTimeStr).toLocal();
       return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
     } catch (e) {
       return dateTimeStr;

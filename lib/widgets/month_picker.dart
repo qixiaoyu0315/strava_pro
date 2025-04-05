@@ -23,8 +23,8 @@ class _MonthPickerState extends State<MonthPicker> {
     "7月", "8月", "9月", "10月", "11月", "12月"
   ];
   
-  final int _startYear = DateTime.now().year - 2;
-  final int _endYear = DateTime.now().year + 2;
+  final int _startYear = DateTime.now().toLocal().year - 2;
+  final int _endYear = DateTime.now().toLocal().year + 2;
   
   @override
   void initState() {

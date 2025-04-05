@@ -23,8 +23,8 @@ class CalendarUtils {
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
 
     for (int day = 1; day <= daysInMonth; day++) {
-      final dateStr =
-          '${month.year}-${month.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final date = DateTime(month.year, month.month, day).toLocal();
+      final dateStr = formatDateToString(date);
       monthCache[dateStr] = await doesSvgExist(dateStr);
     }
 
@@ -33,7 +33,8 @@ class CalendarUtils {
 
   /// 格式化日期为字符串
   static String formatDateToString(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final localDate = date.toLocal();
+    return '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
   }
 
   /// 获取SVG文件路径

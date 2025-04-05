@@ -1043,92 +1043,52 @@ class _SettingPageState extends State<SettingPage>
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 头像和用户信息并排显示
             Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 左侧：头像和用户信息
+                // 头像
+                CircleAvatar(
+                  radius: 32,
+                  backgroundImage: _athlete?.profile != null
+                      ? NetworkImage(_athlete!.profile!)
+                      : null,
+                  child: _athlete?.profile == null
+                      ? Icon(Icons.person, size: 32)
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                // 用户信息
                 Expanded(
-                  flex: 3,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 头像
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundImage: _athlete?.profile != null
-                            ? NetworkImage(_athlete!.profile!)
-                            : null,
-                        child: _athlete?.profile == null
-                            ? Icon(Icons.person, size: 40)
-                            : null,
-                      ),
-                      const SizedBox(height: 8),
                       // 用户名
                       Text(
                         '${_athlete?.firstname ?? ''} ${_athlete?.lastname ?? ''}',
                         style: Theme.of(context).textTheme.titleLarge,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       // 用户所在城市和国家
                       if (_athlete?.city != null || _athlete?.country != null)
                         Text(
                           '${_athlete?.city ?? ''} ${_athlete?.country ?? ''}',
                           style: Theme.of(context).textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                    ],
-                  ),
-                ),
-                
-                // 右侧：统计数据，使用网格布局
-                Expanded(
-                  flex: 4,
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.2,
-                    children: [
-                      // 活动数
-                      GestureDetector(
-                        onTap: () => _showActivityTypeStats(context, '活动数'),
-                        child: _buildStatItem(
-                          context,
-                          '活动数',
-                          _activityCount.toString(),
-                          Icons.directions_run,
+                      const SizedBox(height: 4),
+                      // 查看详细信息按钮
+                      TextButton(
+                        onPressed: () => _showAthleteDetails(context),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                      ),
-                      // 总公里数
-                      GestureDetector(
-                        onTap: () => _showActivityTypeStats(context, '总公里'),
-                        child: _buildStatItem(
-                          context,
-                          '总公里',
-                          '${_totalDistance.toStringAsFixed(1)} km',
-                          Icons.straighten,
-                        ),
-                      ),
-                      // 总爬升
-                      GestureDetector(
-                        onTap: () => _showActivityTypeStats(context, '总爬升'),
-                        child: _buildStatItem(
-                          context,
-                          '总爬升',
-                          '${_totalElevation.toStringAsFixed(0)} m',
-                          Icons.trending_up,
-                        ),
-                      ),
-                      // 总能量
-                      GestureDetector(
-                        onTap: () => _showActivityTypeStats(context, '总能量'),
-                        child: _buildStatItem(
-                          context,
-                          '总能量',
-                          '${_totalKilojoules.toStringAsFixed(0)} kJ',
-                          Icons.bolt,
-                        ),
+                        child: Text('查看详细信息'),
                       ),
                     ],
                   ),
@@ -1136,11 +1096,60 @@ class _SettingPageState extends State<SettingPage>
               ],
             ),
             
-            // 详细信息按钮
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => _showAthleteDetails(context),
-              child: Text('查看详细信息'),
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+            
+            // 统计数据，使用网格布局
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.5,
+              children: [
+                // 活动数
+                GestureDetector(
+                  onTap: () => _showActivityTypeStats(context, '活动数'),
+                  child: _buildStatItem(
+                    context,
+                    '活动数',
+                    _activityCount.toString(),
+                    Icons.directions_run,
+                  ),
+                ),
+                // 总公里数
+                GestureDetector(
+                  onTap: () => _showActivityTypeStats(context, '总公里'),
+                  child: _buildStatItem(
+                    context,
+                    '总公里',
+                    '${_totalDistance.toStringAsFixed(1)} km',
+                    Icons.straighten,
+                  ),
+                ),
+                // 总爬升
+                GestureDetector(
+                  onTap: () => _showActivityTypeStats(context, '总爬升'),
+                  child: _buildStatItem(
+                    context,
+                    '总爬升',
+                    '${_totalElevation.toStringAsFixed(0)} m',
+                    Icons.trending_up,
+                  ),
+                ),
+                // 总能量
+                GestureDetector(
+                  onTap: () => _showActivityTypeStats(context, '总能量'),
+                  child: _buildStatItem(
+                    context,
+                    '总能量',
+                    '${_totalKilojoules.toStringAsFixed(0)} kJ',
+                    Icons.bolt,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1382,19 +1391,17 @@ class _SettingPageState extends State<SettingPage>
   }
 
   // 通用的日期时间格式化方法
-  String _formatDateTime(dynamic dateTime,
-      {String format = 'yyyy-MM-dd HH:mm', String defaultText = '未设置'}) {
-    if (dateTime == null ||
-        (dateTime is String && (dateTime == 'null' || dateTime.isEmpty))) {
+  String _formatDateTime(dynamic dateTime, {String format = 'yyyy-MM-dd HH:mm:ss', String defaultText = '--'}) {
+    if (dateTime == null) {
       return defaultText;
     }
 
     try {
       DateTime dt;
       if (dateTime is String) {
-        dt = DateTime.parse(dateTime);
+        dt = DateTime.parse(dateTime).toLocal();
       } else if (dateTime is DateTime) {
-        dt = dateTime;
+        dt = dateTime.toLocal();
       } else {
         return dateTime.toString();
       }

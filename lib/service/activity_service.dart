@@ -535,12 +535,12 @@ class ActivityService {
       }
 
       // 使用当前时间作为结束时间
-      final now = DateTime.now().toUtc();
+      final now = DateTime.now();
 
       // 获取运动员创建时间作为起始时间
       DateTime startTime;
       if (syncStatus['athlete_created_at'] != null) {
-        startTime = DateTime.parse(syncStatus['athlete_created_at'].toString());
+        startTime = DateTime.parse(syncStatus['athlete_created_at'].toString()).toLocal();
         Logger.d('使用运动员创建时间作为起始时间: ${startTime.toIso8601String()}',
             tag: 'ActivityService');
       } else {
@@ -767,8 +767,8 @@ class ActivityService {
         'total_photo_count': activity.totalPhotoCount,
         'has_kudoed': activity.hasKudoed == true ? 1 : 0,
         'suffer_score': activity.sufferScore,
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
+        'created_at': DateTime.now().toLocal().toIso8601String(),
+        'updated_at': DateTime.now().toLocal().toIso8601String(),
       };
 
       // 移除所有值为null的键
@@ -806,7 +806,7 @@ class ActivityService {
       final db = await database;
       final result = await db.query(
         tableName,
-        where: "start_date LIKE ?",
+        where: "start_date_local LIKE ?",
         whereArgs: ['$date%'],
       );
       return result;
@@ -826,10 +826,10 @@ class ActivityService {
       final monthStr = month.toString().padLeft(2, '0');
       final datePrefix = '$year-$monthStr';
 
-      // 查询该月所有活动
+      // 查询该月所有活动，使用本地时间
       final activities = await db.query(
         tableName,
-        where: "start_date LIKE ?",
+        where: "start_date_local LIKE ?",
         whereArgs: ['$datePrefix%'],
       );
 
@@ -860,8 +860,8 @@ class ActivityService {
         stats['totalMovingTime'] = (stats['totalMovingTime'] as int) +
             (activity['moving_time'] as int? ?? 0);
 
-        // 提取活动日期并记录活跃日
-        final startDate = DateTime.parse(activity['start_date'] as String);
+        // 提取活动日期并记录活跃日（使用本地时间）
+        final startDate = DateTime.parse(activity['start_date_local'] as String);
         (stats['activeDays'] as Set<int>).add(startDate.day);
 
         // 按活动类型分类统计
@@ -1030,34 +1030,34 @@ class ActivityService {
   Future<Map<String, bool>> getSvgCache() async {
     final Map<String, bool> svgCache = {};
     try {
-      // 获取数据库中所有活动的起始日期
+      // 获取数据库中所有活动的起始日期（使用本地时间）
       final db = await database;
       final List<Map<String, dynamic>> activities = await db.query(
         tableName,
-        columns: ['start_date'],
-        where: 'start_date IS NOT NULL',
+        columns: ['start_date_local'],
+        where: 'start_date_local IS NOT NULL',
       );
 
       Logger.d('正在为 ${activities.length} 个活动生成SVG缓存', tag: 'ActivityService');
 
       // 对于每个活动，检查对应日期的SVG文件是否存在
       for (var activity in activities) {
-        if (activity['start_date'] != null) {
+        if (activity['start_date_local'] != null) {
           try {
-            final startDate = DateTime.parse(activity['start_date']);
+            final startDate = DateTime.parse(activity['start_date_local']).toLocal();
             final dateStr = CalendarUtils.formatDateToString(startDate);
             svgCache[dateStr] = await CalendarUtils.doesSvgExist(dateStr);
           } catch (e) {
-            Logger.e('处理活动日期出错: ${activity['start_date']}',
+            Logger.e('处理活动日期出错: ${activity['start_date_local']}',
                 error: e, tag: 'ActivityService');
           }
         }
       }
 
       // 获取当前月和前后各两个月的SVG状态，确保日历显示完整
-      final now = DateTime.now();
+      final now = DateTime.now().toLocal();
       for (int i = -2; i <= 2; i++) {
-        final month = DateTime(now.year, now.month + i);
+        final month = DateTime(now.year, now.month + i).toLocal();
         final monthCache = await CalendarUtils.preloadSvgForMonth(month);
         svgCache.addAll(monthCache);
       }
@@ -1123,11 +1123,19 @@ class ActivityService {
       final db = await database;
       // 修改查询语句，确保包含所有活动类型的能量数据
       final result = await db.rawQuery('''
-        SELECT COALESCE(SUM(CASE 
-          WHEN kilojoules IS NOT NULL AND kilojoules > 0 THEN kilojoules 
-          WHEN calories IS NOT NULL AND calories > 0 THEN calories * 4.184 
-          ELSE 0 
-        END), 0) as total_kilojoules 
+        SELECT SUM(
+          CASE 
+            WHEN type = 'Ride' AND kilojoules > 0 THEN kilojoules
+            WHEN type = 'VirtualRide' AND kilojoules > 0 THEN kilojoules
+            WHEN type = 'Run' AND moving_time > 0 THEN moving_time * 0.9 * 4.184
+            WHEN type = 'VirtualRun' AND moving_time > 0 THEN moving_time * 0.9 * 4.184
+            WHEN type = 'Walk' AND moving_time > 0 THEN moving_time * 0.5 * 4.184
+            WHEN type = 'Hike' AND moving_time > 0 THEN moving_time * 0.7 * 4.184
+            WHEN type = 'Swim' AND moving_time > 0 THEN moving_time * 0.8 * 4.184
+            WHEN moving_time > 0 THEN moving_time * 0.6 * 4.184
+            ELSE 0 
+          END
+        ) as total_kilojoules 
         FROM $tableName
       ''');
       
