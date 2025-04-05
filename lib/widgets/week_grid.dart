@@ -34,8 +34,9 @@ class WeekGrid extends StatelessWidget {
   }
 
   bool _hasSvg(DateTime day) {
+    final localDay = day.toLocal();
     final dateStr =
-        '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+        '${localDay.year}-${localDay.month.toString().padLeft(2, '0')}-${localDay.day.toString().padLeft(2, '0')}';
     return svgCache[dateStr] ?? false;
   }
 

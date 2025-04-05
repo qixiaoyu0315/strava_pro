@@ -164,11 +164,8 @@ class _VerticalCalendarState extends State<VerticalCalendar>
     // 安全调用回调
     widget.onDateSelected?.call(date);
     
-    // 获取所选日期的年-月-日格式
-    final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    
     // 查询该日期的活动数据
-    final activities = await _activityService.getActivitiesByDate(dateString);
+    final activities = await _activityService.getActivitiesByDate(date);
     
     if (!mounted) return;
     

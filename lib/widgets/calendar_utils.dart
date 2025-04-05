@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../utils/logger.dart';
+import '../utils/date_utils.dart';
 
 /// 日历相关工具类，提供SVG文件存在性检查和预加载功能
 class CalendarUtils {
@@ -24,7 +25,7 @@ class CalendarUtils {
 
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(month.year, month.month, day).toLocal();
-      final dateStr = formatDateToString(date);
+      final dateStr = DateUtils.formatStandardDate(date);
       monthCache[dateStr] = await doesSvgExist(dateStr);
     }
 
@@ -33,12 +34,11 @@ class CalendarUtils {
 
   /// 格式化日期为字符串
   static String formatDateToString(DateTime date) {
-    final localDate = date.toLocal();
-    return '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
+    return DateUtils.formatStandardDate(date);
   }
 
   /// 获取SVG文件路径
   static String getSvgPath(String dateStr) {
-    return '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
+    return '$_svgPath/$dateStr.svg';
   }
 }

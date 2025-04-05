@@ -1953,7 +1953,7 @@ class _SettingPageState extends State<SettingPage>
 
           try {
             // 提取日期，格式为"yyyy-MM-dd"
-            final startDate = DateTime.parse(activity['start_date'].toString());
+            final startDate = DateTime.parse(activity['start_date'].toString()).toLocal();
             final dateStr =
                 '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
 

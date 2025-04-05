@@ -800,15 +800,23 @@ class ActivityService {
     }
   }
 
-  /// 按日期获取活动数据
-  Future<List<Map<String, dynamic>>> getActivitiesByDate(String date) async {
+  /// 根据日期获取活动列表
+  Future<List<Map<String, dynamic>>> getActivitiesByDate(DateTime date) async {
     try {
       final db = await database;
-      final result = await db.query(
-        tableName,
-        where: "start_date_local LIKE ?",
-        whereArgs: ['$date%'],
+      
+      // 确保使用本地日期
+      final localDate = date.toLocal();
+      
+      // 格式化日期为YYYY-MM-DD格式，使用本地时区
+      final dateStr = "${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}";
+      
+      // 在查询中匹配本地日期的前缀部分
+      final result = await db.rawQuery(
+        'SELECT * FROM $tableName WHERE start_date_local LIKE ? ORDER BY start_date_local DESC',
+        ['$dateStr%']
       );
+      
       return result;
     } catch (e) {
       Logger.e('按日期获取活动数据失败: $e', tag: 'ActivityService');
@@ -1070,13 +1078,74 @@ class ActivityService {
     }
   }
 
-  /// 保存活动数据到数据库
+  /// 保存活动数据
   Future<void> saveActivity(SummaryActivity activity) async {
     try {
+      // 确保所有日期是本地时间
+      final startDate = activity.startDate != null 
+          ? DateTime.parse(activity.startDate!).toLocal().toIso8601String()
+          : null;
+      final startDateLocal = activity.startDateLocal != null 
+          ? DateTime.parse(activity.startDateLocal!).toLocal().toIso8601String()
+          : null;
+          
+      // 创建一个新的活动对象，包含本地化后的日期
+      final updatedActivity = SummaryActivity(
+        id: activity.id,
+        resourceState: activity.resourceState,
+        name: activity.name,
+        distance: activity.distance,
+        movingTime: activity.movingTime,
+        elapsedTime: activity.elapsedTime,
+        totalElevationGain: activity.totalElevationGain,
+        type: activity.type,
+        workoutType: activity.workoutType,
+        externalId: activity.externalId,
+        uploadId: activity.uploadId,
+        startDate: startDate,
+        startDateLocal: startDateLocal,
+        timezone: activity.timezone,
+        utcOffset: activity.utcOffset,
+        startLatlng: activity.startLatlng,
+        endLatlng: activity.endLatlng,
+        locationCity: activity.locationCity,
+        locationState: activity.locationState,
+        locationCountry: activity.locationCountry,
+        achievementCount: activity.achievementCount,
+        kudosCount: activity.kudosCount,
+        commentCount: activity.commentCount,
+        athleteCount: activity.athleteCount,
+        photoCount: activity.photoCount,
+        map: activity.map,
+        trainer: activity.trainer,
+        commute: activity.commute,
+        manual: activity.manual,
+        private: activity.private,
+        flagged: activity.flagged,
+        gearId: activity.gearId,
+        fromAcceptedTag: activity.fromAcceptedTag,
+        averageSpeed: activity.averageSpeed,
+        maxSpeed: activity.maxSpeed,
+        averageCadence: activity.averageCadence,
+        averageWatts: activity.averageWatts,
+        weightedAverageWatts: activity.weightedAverageWatts,
+        kilojoules: activity.kilojoules,
+        deviceWatts: activity.deviceWatts,
+        hasHeartrate: activity.hasHeartrate,
+        averageHeartrate: activity.averageHeartrate,
+        maxHeartrate: activity.maxHeartrate,
+        maxWatts: activity.maxWatts,
+        prCount: activity.prCount,
+        totalPhotoCount: activity.totalPhotoCount,
+        hasKudoed: activity.hasKudoed,
+        sufferScore: activity.sufferScore,
+        athlete: activity.athlete,
+      );
+      
       final db = await database;
-      await _insertOrUpdateActivity(db, activity);
+      await _insertOrUpdateActivity(db, updatedActivity);
     } catch (e) {
-      Logger.e('保存活动数据失败: $e', tag: 'ActivityService');
+      Logger.e('保存活动失败: $e', tag: 'ActivityService');
       rethrow;
     }
   }
