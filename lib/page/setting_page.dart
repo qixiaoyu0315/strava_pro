@@ -1778,13 +1778,27 @@ class _SettingPageState extends State<SettingPage>
           final deviceInfoPlugin = DeviceInfoPlugin();
           final androidInfo = await deviceInfoPlugin.androidInfo;
           final sdkInt = androidInfo.version.sdkInt;
+          
+          // 添加安装包权限
+          permissions.add(Permission.requestInstallPackages);
+          
           if (sdkInt >= 33) { // Android 13+
             permissions.addAll([
               Permission.photos,
               Permission.videos,
               Permission.audio,
             ]);
+            
+            // Android 13及以上需要额外权限
+            if (sdkInt >= 33) {
+              permissions.add(Permission.manageExternalStorage);
+            }
+          } else {
+            // 旧版Android需要存储权限
+            permissions.add(Permission.storage);
           }
+          
+          Logger.d('Android SDK版本: $sdkInt，已添加相应权限', tag: 'Permissions');
         } catch (e) {
           Logger.e('获取设备信息失败', error: e, tag: 'Permissions');
         }

@@ -243,9 +243,35 @@ class AppUpdateService {
     }
     
     try {
-      // 获取临时目录用于保存APK
-      final directory = await getTemporaryDirectory();
-      final savePath = '${directory.path}/strava_pro_update.apk';
+      // 获取外部存储目录用于保存APK，确保有足够的权限
+      Directory? directory;
+      String savePath = '';
+      
+      try {
+        if (Platform.isAndroid) {
+          // 在Android上，尝试使用外部存储的Download目录
+          directory = Directory('/storage/emulated/0/Download');
+          if (!(await directory.exists())) {
+            // 如果不存在，尝试创建
+            await directory.create(recursive: true);
+          }
+          savePath = '${directory.path}/strava_pro_update.apk';
+          Logger.d('保存APK到下载目录: $savePath', tag: 'AppUpdate');
+        } else {
+          // 其他平台使用临时目录
+          directory = await getTemporaryDirectory();
+          savePath = '${directory.path}/strava_pro_update.apk';
+          Logger.d('保存APK到临时目录: $savePath', tag: 'AppUpdate');
+        }
+      } catch (e) {
+        // 如果获取外部存储失败，回退到应用缓存目录
+        Logger.w('无法访问下载目录，使用应用缓存目录', error: e, tag: 'AppUpdate');
+        directory = await getTemporaryDirectory();
+        savePath = '${directory.path}/strava_pro_update.apk';
+      }
+      
+      // 显示开始下载的消息
+      Logger.d('开始从 $url 下载APK到 $savePath', tag: 'AppUpdate');
       
       // 使用Dio下载文件
       final dio = Dio();
@@ -254,25 +280,91 @@ class AppUpdateService {
         savePath,
         onReceiveProgress: (received, total) {
           if (total != -1 && onProgress != null) {
-            onProgress(received / total);
+            final progress = received / total;
+            onProgress(progress);
+            if (progress % 0.1 < 0.01) { // 每10%记录一次日志
+              Logger.d('下载进度: ${(progress * 100).toStringAsFixed(1)}%', tag: 'AppUpdate');
+            }
           }
         },
       );
       
-      // 安装APK - 暂时禁用
+      Logger.d('APK下载完成: $savePath', tag: 'AppUpdate');
+      
+      // 安装APK
       if (Platform.isAndroid) {
-        // 由于install_plugin问题，暂时禁用APK安装
-        // final result = await InstallPlugin.installApk(savePath);
-        // Logger.d('APK安装结果: $result', tag: 'AppUpdate');
-        
-        // 替代方案：使用系统默认方式打开APK文件
-        final apkUri = Uri.file(savePath);
-        if (await canLaunchUrl(apkUri)) {
-          await launchUrl(apkUri);
-          if (onSuccess != null) onSuccess();
-          return true;
+        final apkFile = File(savePath);
+        if (await apkFile.exists()) {
+          Logger.d('APK文件存在，准备启动安装', tag: 'AppUpdate');
+          
+          try {
+            // 使用FileProvider创建内容URI
+            Uri contentUri;
+            
+            // 使用特定的URI格式，确保能够访问文件
+            String uriStr = 'content://com.example.strava_pro.fileprovider';
+            
+            if (savePath.startsWith('/storage/emulated/0/Download')) {
+              // 如果是下载目录，使用external-path
+              uriStr += '/external_files/${savePath.replaceFirst('/storage/emulated/0/', '')}';
+              Logger.d('使用external-path创建URI: $uriStr', tag: 'AppUpdate');
+            } else {
+              // 如果是缓存目录，使用cache-path
+              uriStr += '/cache/${savePath.split('/').last}';
+              Logger.d('使用cache-path创建URI: $uriStr', tag: 'AppUpdate');
+            }
+            
+            contentUri = Uri.parse(uriStr);
+            
+            Logger.d('尝试使用FileProvider URI打开APK: $contentUri', tag: 'AppUpdate');
+            if (await canLaunchUrl(contentUri)) {
+              final launched = await launchUrl(
+                contentUri,
+                mode: LaunchMode.externalApplication,
+              );
+              
+              if (launched) {
+                Logger.d('成功启动APK安装程序', tag: 'AppUpdate');
+                if (onSuccess != null) onSuccess();
+                return true;
+              } else {
+                throw Exception('无法启动安装程序');
+              }
+            } else {
+              // 回退到传统的文件URI方式
+              Logger.w('无法使用FileProvider，尝试直接使用文件URI', tag: 'AppUpdate');
+              
+              final fileUri = Uri.file(savePath);
+              if (await canLaunchUrl(fileUri)) {
+                final launched = await launchUrl(
+                  fileUri,
+                  mode: LaunchMode.externalApplication,
+                );
+                
+                if (launched) {
+                  Logger.d('使用文件URI成功启动APK安装程序', tag: 'AppUpdate');
+                  if (onSuccess != null) onSuccess();
+                  return true;
+                } else {
+                  throw Exception('无法使用文件URI启动安装程序');
+                }
+              } else {
+                throw Exception('无法打开文件URI');
+              }
+            }
+          } catch (e) {
+            final error = '无法安装APK: $e';
+            Logger.e(error, tag: 'AppUpdate');
+            
+            // 向用户提供备用选项
+            Logger.d('向用户提供手动安装选项', tag: 'AppUpdate');
+            if (onError != null) onError('无法自动安装APK，请手动前往下载目录安装:\n$savePath');
+            return false;
+          }
         } else {
-          if (onError != null) onError('无法打开APK文件');
+          final error = 'APK文件不存在: $savePath';
+          Logger.e(error, tag: 'AppUpdate');
+          if (onError != null) onError(error);
           return false;
         }
       } else {
@@ -311,6 +403,7 @@ class AppUpdateService {
       builder: (context) {
         bool isDownloading = false;
         double progress = 0.0;
+        String? errorMessage;
         
         return StatefulBuilder(
           builder: (context, setState) {
@@ -340,6 +433,22 @@ class AppUpdateService {
                       const SizedBox(height: 8),
                       Text('下载进度: ${(progress * 100).toStringAsFixed(1)}%'),
                     ],
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      const SizedBox(height: 8),
+                      if (Platform.isAndroid && errorMessage!.contains('下载目录'))
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: () => _openDownloadFolder(),
+                            icon: const Icon(Icons.folder_open),
+                            label: const Text('打开下载目录'),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -366,6 +475,7 @@ class AppUpdateService {
                           // 常规下载流程
                           setState(() {
                             isDownloading = true;
+                            errorMessage = null;
                           });
                           
                           await downloadAndInstallUpdate(
@@ -382,6 +492,7 @@ class AppUpdateService {
                             onError: (error) {
                               setState(() {
                                 isDownloading = false;
+                                errorMessage = error;
                               });
                               Fluttertoast.showToast(msg: '更新失败: $error');
                             },
@@ -398,6 +509,36 @@ class AppUpdateService {
         );
       },
     );
+  }
+  
+  // 打开下载文件夹
+  Future<void> _openDownloadFolder() async {
+    try {
+      if (Platform.isAndroid) {
+        final directory = '/storage/emulated/0/Download';
+        final directoryUri = Uri.parse('content://com.android.externalstorage.documents/document/primary%3ADownload');
+        
+        Logger.d('尝试打开下载目录: $directoryUri', tag: 'AppUpdate');
+        
+        if (await canLaunchUrl(directoryUri)) {
+          await launchUrl(directoryUri);
+          Logger.d('成功打开下载目录', tag: 'AppUpdate');
+        } else {
+          // 尝试其他方式
+          final fileUri = Uri.directory(directory);
+          if (await canLaunchUrl(fileUri)) {
+            await launchUrl(fileUri);
+            Logger.d('使用file URI打开下载目录', tag: 'AppUpdate');
+          } else {
+            Logger.e('无法打开下载目录', tag: 'AppUpdate');
+            Fluttertoast.showToast(msg: '无法打开下载目录，请手动导航到"下载"文件夹');
+          }
+        }
+      }
+    } catch (e) {
+      Logger.e('打开下载目录时出错', error: e, tag: 'AppUpdate');
+      Fluttertoast.showToast(msg: '无法打开下载目录: $e');
+    }
   }
 }
 
