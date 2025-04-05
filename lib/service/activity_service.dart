@@ -475,9 +475,10 @@ class ActivityService {
   }
 
   /// 更新同步状态
-  Future<void> updateSyncStatus(int currentPage, int totalActivities) async {
+  Future<void> updateSyncStatus(
+      {required int lastPage, required int totalActivities}) async {
     try {
-      Logger.d('更新同步状态: 页数=$currentPage, 总活动数=$totalActivities',
+      Logger.d('更新同步状态: 页数=$lastPage, 总活动数=$totalActivities',
           tag: 'ActivityService');
       final db = await database;
 
@@ -488,7 +489,7 @@ class ActivityService {
       await db.update(
         syncTableName,
         {
-          'last_page': currentPage,
+          'last_page': lastPage,
           'last_sync_time': DateTime.now().toIso8601String(),
           'total_activities': totalActivities
         },
@@ -509,16 +510,14 @@ class ActivityService {
       {Function(double current, double total, String status)?
           onProgress}) async {
     try {
-      Logger.d('开始同步活动数据 - 使用摘要数据模式', tag: 'ActivityService');
+      Logger.d('开始同步活动数据 - 使用全量同步模式', tag: 'ActivityService');
       final db = await database;
 
       // 确保数据库表存在
       bool syncTableExists = await _ensureSyncTableExists(db);
       if (!syncTableExists) {
         Logger.d('同步状态表不存在，尝试重置数据库', tag: 'ActivityService');
-        // 如果表不存在，可能是因为数据库版本问题，尝试重置数据库
         await resetDatabase();
-        // 获取新的数据库连接
         final newDb = await database;
         syncTableExists = await _ensureSyncTableExists(newDb);
         if (!syncTableExists) {
@@ -527,32 +526,13 @@ class ActivityService {
       }
 
       // 获取同步状态
-      final syncStatusList = await db.query(syncTableName);
-      Map<String, dynamic> syncStatus;
-
-      if (syncStatusList.isEmpty) {
-        Logger.d('同步状态不存在，初始化同步状态', tag: 'ActivityService');
-        syncStatus = {
-          'last_page': 0,
-          'last_sync_time': DateTime.now().toIso8601String(),
-          'athlete_created_at': null,
-          'total_activities': 0
-        };
-        await db.insert(syncTableName, syncStatus);
-      } else {
-        syncStatus = syncStatusList.first;
+      final syncStatus = await getSyncStatus();
+      
+      // 检查之前是否有同步失败导致的异常状态，如果存在，先重置同步状态
+      if (syncStatus['last_page'] > 0) {
+        Logger.d('检测到之前的同步状态，重置同步状态', tag: 'ActivityService');
+        await resetSyncStatus();
       }
-
-      int currentPage = (syncStatus['last_page'] as int?) ?? 0;
-      currentPage++; // 从下一页开始
-
-      // 获取总活动数
-      final activities = await db.query(tableName);
-      int totalActivities = activities.length;
-      int initialActivityCount = totalActivities;
-
-      Logger.d('当前同步状态: 页数=$currentPage, 总活动数=$totalActivities',
-          tag: 'ActivityService');
 
       // 使用当前时间作为结束时间
       final now = DateTime.now().toUtc();
@@ -570,28 +550,40 @@ class ActivityService {
             tag: 'ActivityService');
       }
 
-      bool hasMoreActivities = true;
-      int perPage = 50; // 每页50条数据
+      const perPage = 100;
+      int currentPage = 1;
       int successCount = 0;
       int errorCount = 0;
-      int totalPages = 0;
+      bool hasMoreActivities = true;
       Stopwatch stopwatch = Stopwatch()..start();
 
-      // 循环获取活动数据，直到没有更多数据
-      while (hasMoreActivities) {
-        totalPages++;
-        Logger.d('获取第 $currentPage 页活动数据，每页 $perPage 条',
-            tag: 'ActivityService');
+      // 获取数据库中最新的活动ID
+      final latestDbActivity = await db.query(
+        tableName,
+        orderBy: 'activity_id DESC',
+        limit: 1,
+      );
 
-        // 更新进度
+      int? latestDbActivityId;
+      if (latestDbActivity.isNotEmpty) {
+        latestDbActivityId = latestDbActivity.first['activity_id'] as int;
+        Logger.d('数据库中最新的活动ID: $latestDbActivityId', tag: 'ActivityService');
+      }
+
+      // 循环获取所有页面的活动
+      while (hasMoreActivities) {
+        Logger.d('获取第 $currentPage 页活动数据，每页 $perPage 条', tag: 'ActivityService');
+
         if (onProgress != null) {
-          onProgress(successCount.toDouble(),
-              (successCount + perPage).toDouble(), '获取第 $currentPage 页活动数据...');
+          onProgress(
+            (currentPage - 1) * perPage.toDouble(),
+            currentPage * perPage.toDouble(),
+            '获取第 $currentPage 页活动数据...',
+          );
         }
 
         try {
-          // 获取活动列表
-          final pageActivities = await StravaClientManager()
+          final activities = await StravaClientManager()
               .stravaClient
               .activities
               .listLoggedInAthleteActivities(
@@ -601,109 +593,80 @@ class ActivityService {
                 perPage,
               );
 
-          if (pageActivities.isEmpty) {
-            Logger.d('第 $currentPage 页没有活动数据，同步完成', tag: 'ActivityService');
+          if (activities.isEmpty) {
+            Logger.d('没有更多活动数据，同步完成', tag: 'ActivityService');
             hasMoreActivities = false;
             break;
           }
 
-          Logger.d(
-              '从 Strava API 获取到第 $currentPage 页的 ${pageActivities.length} 个活动',
+          Logger.d('从 Strava API 获取到第 $currentPage 页的 ${activities.length} 个活动',
               tag: 'ActivityService');
 
-          int pageSuccessCount = 0;
-          int pageErrorCount = 0;
-
-          for (var activity in pageActivities) {
-            try {
-              // 直接保存 SummaryActivity 数据，不再获取详细信息
-              if (successCount % 10 == 0) {
-                Logger.d('处理活动 ${activity.id} - ${activity.name}',
-                    tag: 'ActivityService');
-              }
-
-              // 更新进度
-              if (onProgress != null) {
-                onProgress(
-                    successCount.toDouble(),
-                    (successCount + pageActivities.length).toDouble(),
-                    '处理活动: ${activity.name ?? activity.id}');
-              }
-
-              // 直接保存活动数据，不获取详细信息
-              await _insertOrUpdateActivity(db, activity);
-              successCount++;
-              pageSuccessCount++;
-
-              // 每处理10个活动，更新一次同步状态
-              if (successCount % 10 == 0) {
-                totalActivities = await _getActivityCount(db);
-                await updateSyncStatus(currentPage, totalActivities);
-
-                // 更新进度
+          // 遍历活动，检查是否需要保存
+          int newActivityCount = 0;
+          for (var activity in activities) {
+            if (latestDbActivityId == null || activity.id! > latestDbActivityId) {
+              try {
+                await saveActivity(activity);
+                successCount++;
+                newActivityCount++;
                 if (onProgress != null) {
                   onProgress(
-                      successCount.toDouble(),
-                      (successCount +
-                              (pageActivities.length -
-                                  pageActivities.indexOf(activity) -
-                                  1))
-                          .toDouble(),
-                      '已同步 $successCount 个活动...');
+                    (currentPage - 1) * perPage.toDouble() + activities.indexOf(activity),
+                    currentPage * perPage.toDouble(),
+                    '正在保存新活动数据 ($successCount)...',
+                  );
                 }
+              } catch (e) {
+                Logger.e('保存活动 ${activity.id} 失败: $e', tag: 'ActivityService');
+                errorCount++;
               }
-            } catch (e) {
-              errorCount++;
-              pageErrorCount++;
-              Logger.e('处理活动 ${activity.id} 时出错: ${e.toString()}',
-                  error: e, tag: 'ActivityService');
+            } else {
+              Logger.d('活动 ${activity.id} 已存在', tag: 'ActivityService');
             }
           }
 
-          Logger.d(
-              '第 $currentPage 页处理完成: 成功=$pageSuccessCount, 失败=$pageErrorCount',
-              tag: 'ActivityService');
+          // 如果当前页没有新活动，记录日志但继续获取下一页，直到API返回空数据
+          if (newActivityCount == 0) {
+            Logger.d('当前页面没有新活动，继续检查下一页', tag: 'ActivityService');
+          }
 
-          // 更新当前页码和同步状态
-          totalActivities = await _getActivityCount(db);
-          await updateSyncStatus(currentPage, totalActivities);
           currentPage++;
+          
+          // 每同步完一页，更新一次同步状态
+          await updateSyncStatus(
+            lastPage: 0, // 修改为0，确保每次同步从第一页开始
+            totalActivities: await _getActivityCount(db),
+          );
+
         } catch (e) {
-          Logger.e('获取第 $currentPage 页活动数据失败: ${e.toString()}',
-              error: e, tag: 'ActivityService');
-          // 发生错误时，保存当前同步状态，以便下次从这里继续
-          await updateSyncStatus(currentPage - 1, totalActivities);
-          throw Exception('获取第 $currentPage 页活动数据失败: ${e.toString()}');
+          Logger.e('获取第 $currentPage 页活动数据失败: $e', tag: 'ActivityService');
+          hasMoreActivities = false;
+          break;
         }
       }
 
-      // 停止计时
+      // 最终更新同步状态
+      final totalActivities = await _getActivityCount(db);
+      await updateSyncStatus(
+        lastPage: 0, // 修改为0，确保每次同步从第一页开始
+        totalActivities: totalActivities,
+      );
+
       stopwatch.stop();
-      int elapsedSeconds = stopwatch.elapsedMilliseconds ~/ 1000;
-
-      // 验证同步结果
-      totalActivities = await _getActivityCount(db);
-      int newActivities = totalActivities - initialActivityCount;
-
       Logger.d(
-          '同步完成，耗时：${elapsedSeconds}秒，共处理 $successCount 个活动，新增 $newActivities 个，'
-          '失败 $errorCount 个，共查询 $totalPages 页，数据库中现有 $totalActivities 个活动',
+          '同步完成 - 成功: $successCount, 失败: $errorCount, 总页数: ${currentPage - 1}, 总活动数: $totalActivities, 耗时: ${stopwatch.elapsed.inSeconds}秒',
           tag: 'ActivityService');
 
-      // 最终更新进度
       if (onProgress != null) {
-        onProgress(1.0, 1.0, '同步完成，共同步 $successCount 个活动，新增 $newActivities 个');
+        onProgress(
+          successCount.toDouble(),
+          successCount.toDouble(),
+          '同步完成，共同步 $successCount 个新活动，数据库共有 $totalActivities 个活动',
+        );
       }
-
-      // 更新最终的同步状态
-      await updateSyncStatus(currentPage - 1, totalActivities);
-
-      if (errorCount > 0) {
-        throw Exception('同步过程中有 $errorCount 个活动处理失败');
-      }
-    } catch (e, stackTrace) {
-      Logger.e('同步活动数据失败: ${e.toString()}',
-          error: e, stackTrace: stackTrace, tag: 'ActivityService');
+    } catch (e) {
+      Logger.e('同步活动数据失败: $e', tag: 'ActivityService');
       rethrow;
     }
   }
@@ -1104,6 +1067,17 @@ class ActivityService {
     } catch (e) {
       Logger.e('生成SVG缓存出错', error: e, tag: 'ActivityService');
       return {};
+    }
+  }
+
+  /// 保存活动数据到数据库
+  Future<void> saveActivity(SummaryActivity activity) async {
+    try {
+      final db = await database;
+      await _insertOrUpdateActivity(db, activity);
+    } catch (e) {
+      Logger.e('保存活动数据失败: $e', tag: 'ActivityService');
+      rethrow;
     }
   }
 }
