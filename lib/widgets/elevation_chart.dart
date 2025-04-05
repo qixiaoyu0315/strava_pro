@@ -6,6 +6,7 @@ import 'package:great_circle_distance_calculator/great_circle_distance_calculato
 import 'dart:io';
 import 'dart:async';
 import '../utils/logger.dart';
+import 'dart:math' as math;
 
 class ElevationPoint {
   final double distance; // 距离（公里）
@@ -274,6 +275,29 @@ class _ElevationChartState extends State<ElevationChart> {
       minX = 0;
       maxX = widget.data.totalDistance;
     }
+
+    // 计算当前可视范围内的最大和最小海拔
+    double minElevation = double.infinity;
+    double maxElevation = double.negativeInfinity;
+    
+    for (var point in widget.data.points) {
+      if (point.x >= minX && point.x <= maxX) {
+        if (point.y < minElevation) minElevation = point.y;
+        if (point.y > maxElevation) maxElevation = point.y;
+      }
+    }
+    
+    // 如果没有找到有效值，使用整体范围
+    if (minElevation == double.infinity || maxElevation == double.negativeInfinity) {
+      minElevation = 0;
+      maxElevation = widget.data.maxElevation;
+    }
+    
+    // 添加上下边距
+    final elevationRange = maxElevation - minElevation;
+    final padding = elevationRange * 0.1; // 10%的边距
+    minElevation = math.max(0, minElevation - padding);
+    maxElevation = maxElevation + padding;
     
     // 检查当前位置是否在可视范围内
     bool isCurrentPointInRange = true;
@@ -358,7 +382,7 @@ class _ElevationChartState extends State<ElevationChart> {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: true,
-                      horizontalInterval: (widget.data.maxElevation + 10) / 5,
+                      horizontalInterval: (maxElevation - minElevation) / 5,
                       verticalInterval: (maxX - minX) / 5,
                     ),
                     titlesData: FlTitlesData(
@@ -384,7 +408,7 @@ class _ElevationChartState extends State<ElevationChart> {
                       leftTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          interval: (widget.data.maxElevation + 10) / 5,
+                          interval: (maxElevation - minElevation) / 5,
                           reservedSize: 40,
                           getTitlesWidget: (value, meta) {
                             return Text('${value.toInt()}');
@@ -401,8 +425,8 @@ class _ElevationChartState extends State<ElevationChart> {
                     ),
                     minX: minX,
                     maxX: maxX,
-                    minY: 0,
-                    maxY: widget.data.maxElevation + 10,
+                    minY: minElevation,
+                    maxY: maxElevation,
                     lineBarsData: [
                       LineChartBarData(
                         spots: widget.data.points,
