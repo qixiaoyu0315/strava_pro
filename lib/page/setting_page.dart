@@ -69,6 +69,7 @@ class _SettingPageState extends State<SettingPage>
   // 新增显示模式相关变量
   bool _isFullscreenMode = false; // 是否使用全屏模式
   bool _routeFullscreenOverlay = false; // 是否启用路线导航全屏覆盖模式
+  bool _useRainbowColors = false; // 是否启用彩虹线条模式
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -266,6 +267,7 @@ class _SettingPageState extends State<SettingPage>
       _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
       _isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
       _routeFullscreenOverlay = prefs.getBool('routeFullscreenOverlay') ?? false;
+      _useRainbowColors = prefs.getBool('useRainbowColors') ?? false;
     });
 
     // 根据设置应用全屏模式
@@ -277,6 +279,7 @@ class _SettingPageState extends State<SettingPage>
     await prefs.setBool('isHorizontalLayout', _isHorizontalLayout);
     await prefs.setBool('isFullscreenMode', _isFullscreenMode);
     await prefs.setBool('routeFullscreenOverlay', _routeFullscreenOverlay);
+    await prefs.setBool('useRainbowColors', _useRainbowColors);
     widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
 
@@ -1830,6 +1833,30 @@ class _SettingPageState extends State<SettingPage>
               AppSettingsManager().updateRouteFullscreenOverlay(value);
               // 清除缓存，强制下次获取最新设置
               AppSettingsManager().clearCache();
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            title: const Text('彩虹线条模式'),
+            subtitle: const Text('日历图中按星期几显示不同颜色的SVG图'),
+            value: _useRainbowColors,
+            secondary: Icon(Icons.color_lens, color: Theme.of(context).colorScheme.primary),
+            onChanged: (bool value) {
+              setState(() {
+                _useRainbowColors = value;
+              });
+              _saveSettings();
+              
+              // 更新全局缓存，确保立即生效
+              AppSettingsManager().updateRainbowColors(value);
+              // 清除缓存，强制下次获取最新设置
+              AppSettingsManager().clearCache();
+              
+              // 提示已完成设置
+              Fluttertoast.showToast(
+                msg: "彩虹线条模式已${value ? '开启' : '关闭'}",
+                toastLength: Toast.LENGTH_SHORT,
+              );
             },
           ),
         ],

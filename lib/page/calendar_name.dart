@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../widgets/vertical_calendar.dart';
 import '../widgets/horizontal_calendar.dart';
 import '../widgets/calendar_utils.dart';
+import '../utils/app_settings_manager.dart';
 
 class CalendarPage extends StatefulWidget {
   final bool isHorizontalLayout;
@@ -20,6 +22,7 @@ class _CalendarPageState extends State<CalendarPage>
   late AnimationController _animationController;
   final Map<String, bool> _svgCache = {}; // 缓存 SVG 存在状态
   bool _isInitialized = false;
+  StreamSubscription<String>? _settingsSubscription;
 
   @override
   void initState() {
@@ -33,6 +36,23 @@ class _CalendarPageState extends State<CalendarPage>
 
     // 初始化SVG缓存
     _initializeCalendar();
+    
+    // 监听设置变更事件
+    _settingsSubscription = AppSettingsManager().events.listen((event) {
+      // 当彩虹线条设置更改时，自动刷新页面
+      if (event == AppSettingsManager.EVENT_RAINBOW_COLORS_CHANGED) {
+        // 强制重新渲染日历页面
+        if (mounted) {
+          // 显示刷新指示器
+          setState(() {
+            _isInitialized = false;
+          });
+          
+          // 重新初始化日历
+          _initializeCalendar();
+        }
+      }
+    });
   }
 
   @override
@@ -47,6 +67,9 @@ class _CalendarPageState extends State<CalendarPage>
 
   Future<void> _initializeCalendar() async {
     if (!mounted) return;
+    
+    // 清空缓存，确保获取最新状态
+    _svgCache.clear();
 
     // 预加载当前月份和前两个月的SVG，仅在垂直布局时需要
     if (!widget.isHorizontalLayout) {
@@ -70,6 +93,7 @@ class _CalendarPageState extends State<CalendarPage>
     });
 
     // 开始播放动画
+    _animationController.reset();
     _animationController.forward();
   }
 
@@ -82,12 +106,19 @@ class _CalendarPageState extends State<CalendarPage>
     if (!_isInitialized) {
       return Scaffold(
         body: Center(
-          child: ScaleTransition(
-            scale: CurvedAnimation(
-              parent: _animationController,
-              curve: Curves.elasticOut,
-            ),
-            child: const CircularProgressIndicator(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ScaleTransition(
+                scale: CurvedAnimation(
+                  parent: _animationController,
+                  curve: Curves.elasticOut,
+                ),
+                child: const CircularProgressIndicator(),
+              ),
+              const SizedBox(height: 16),
+              const Text('正在刷新日历...')
+            ],
           ),
         ),
       );
@@ -101,12 +132,12 @@ class _CalendarPageState extends State<CalendarPage>
           switchOutCurve: Curves.easeInOut,
           child: widget.isHorizontalLayout
               ? HorizontalCalendar(
-                  key: const ValueKey('horizontal'),
+                  key: ValueKey('horizontal-${DateTime.now().millisecondsSinceEpoch}'),
                   svgCache: _svgCache,
                   onDateSelected: _onDateSelected,
                 )
               : VerticalCalendar(
-                  key: const ValueKey('vertical'),
+                  key: ValueKey('vertical-${DateTime.now().millisecondsSinceEpoch}'),
                   svgCache: _svgCache,
                   onDateSelected: _onDateSelected,
                 ),
@@ -118,6 +149,7 @@ class _CalendarPageState extends State<CalendarPage>
   @override
   void dispose() {
     _animationController.dispose();
+    _settingsSubscription?.cancel();
     super.dispose();
   }
 }

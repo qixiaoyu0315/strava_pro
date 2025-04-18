@@ -4,6 +4,7 @@ class AppSettings {
   final bool useDynamicRefreshRate;
   final int displayMode;
   final bool routeFullscreenOverlay; // 路线导航全屏覆盖模式
+  final bool useRainbowColors; // 日历SVG彩虹线条模式
 
   AppSettings({
     this.isHorizontalLayout = false,
@@ -11,6 +12,7 @@ class AppSettings {
     this.useDynamicRefreshRate = true,
     this.displayMode = 0,
     this.routeFullscreenOverlay = false, // 默认为false，使用常规布局
+    this.useRainbowColors = false, // 默认为false，使用单色
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class AppSettings {
       useDynamicRefreshRate: json['useDynamicRefreshRate'] ?? true,
       displayMode: json['displayMode'] ?? 0,
       routeFullscreenOverlay: json['routeFullscreenOverlay'] ?? false,
+      useRainbowColors: json['useRainbowColors'] ?? false,
     );
   }
 
@@ -30,6 +33,7 @@ class AppSettings {
       'useDynamicRefreshRate': useDynamicRefreshRate,
       'displayMode': displayMode,
       'routeFullscreenOverlay': routeFullscreenOverlay,
+      'useRainbowColors': useRainbowColors,
     };
   }
 
@@ -39,6 +43,7 @@ class AppSettings {
     bool? useDynamicRefreshRate,
     int? displayMode,
     bool? routeFullscreenOverlay,
+    bool? useRainbowColors,
   }) {
     return AppSettings(
       isHorizontalLayout: isHorizontalLayout ?? this.isHorizontalLayout,
@@ -46,6 +51,7 @@ class AppSettings {
       useDynamicRefreshRate: useDynamicRefreshRate ?? this.useDynamicRefreshRate,
       displayMode: displayMode ?? this.displayMode,
       routeFullscreenOverlay: routeFullscreenOverlay ?? this.routeFullscreenOverlay,
+      useRainbowColors: useRainbowColors ?? this.useRainbowColors,
     );
   }
 } 
