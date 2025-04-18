@@ -1182,7 +1182,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
               children: [
                 // 海拔图 - 半透明背景
                 Container(
-                  height: 120,
+                  height: 200, // 增加高度，使图表更加优美
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(16),
@@ -1193,19 +1193,47 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                     child: elevationData != null
                         ? ValueListenableBuilder<int?>(
                             valueListenable: currentSegmentIndex,
-                            builder: (context, segmentIndex, child) {
-                              return ValueListenableBuilder<double?>(
+                            builder:
+                                (context, segmentIndex, child) {
+                              return ValueListenableBuilder<
+                                  double?>(
                                 valueListenable: currentMinDistance,
-                                builder: (context, minDistance, child) {
-                                  return ElevationChart(
-                                    data: elevationData!,
-                                    onPointSelected: (point) {
-                                      selectedPoint.value = point.position;
-                                    },
-                                    currentSegmentIndex: minDistance != null &&
-                                            minDistance <= 50
-                                        ? segmentIndex
-                                        : null,
+                                builder:
+                                    (context, minDistance, child) {
+                                  return Stack(
+                                    children: [
+                                      // 主海拔图
+                                      ElevationChart(
+                                        data: elevationData!,
+                                        onPointSelected: (point) {
+                                          selectedPoint.value =
+                                              point.position;
+                                        },
+                                        currentSegmentIndex:
+                                            minDistance != null &&
+                                                    minDistance <= 50
+                                                ? segmentIndex
+                                                : null,
+                                      ),
+                                      // 叠加一个半透明渐变层，增加美观度
+                                      Positioned.fill(
+                                        child: IgnorePointer(
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.white.withOpacity(0.0),
+                                                  Colors.white.withOpacity(0.05),
+                                                ],
+                                                stops: const [0.7, 1.0],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   );
                                 },
                               );
@@ -1219,8 +1247,15 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor.withOpacity(0.8),
+                    color: Theme.of(context).cardColor.withOpacity(0.85),
                     borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
                   child: ValueListenableBuilder<Position?>(
                     valueListenable: currentPosition,
@@ -1230,36 +1265,12 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           // 海拔信息
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.height,
-                                      color: Theme.of(context).colorScheme.primary,
-                                      size: 20),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    '海拔',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
+                          _buildInfoColumn(
+                            context: context,
+                            icon: Icons.height,
+                            label: '海拔',
+                            value: '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           Container(
                             height: 36,
@@ -1268,41 +1279,20 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                 .dividerColor
                                 .withOpacity(0.3),
                           ),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.trending_up,
-                                      color: Theme.of(context).colorScheme.secondary,
-                                      size: 20),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    '坡度',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                gradient != null
-                                    ? '${gradient.toStringAsFixed(1)}%'
-                                    : '--',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: gradient != null
-                                      ? _getGradientColor(gradient)
-                                      : Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
+                          // 坡度信息
+                          _buildInfoColumn(
+                            context: context,
+                            icon: Icons.trending_up,
+                            label: '坡度',
+                            value: gradient != null
+                                ? '${gradient.toStringAsFixed(1)}%'
+                                : '--',
+                            color: Theme.of(context).colorScheme.secondary,
+                            valueColor: gradient != null
+                                ? _getGradientColor(gradient)
+                                : null,
                           ),
+                          // 如果需要，可以添加更多信息列
                         ],
                       );
                     },
@@ -1392,8 +1382,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                   '${position?.altitude.toStringAsFixed(1) ?? '--'} 米',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    fontWeight:
-                                        FontWeight.bold,
+                                    fontWeight: FontWeight.bold,
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurface,
@@ -1456,11 +1445,12 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                       },
                     ),
                   ),
-                  SizedBox(height: 16),
-                  // 海拔图 (2.5份)
+                  SizedBox(height: 8), // 减少间距
+                  // 海拔图
                   Container(
-                    height: availableHeight * 0.5, // 增加海拔图高度
-                    margin: EdgeInsets.symmetric(horizontal: 8),
+                    height: availableHeight * 0.65, // 增加海拔图高度比例
+                    margin: EdgeInsets.symmetric(horizontal: 4),
+                    padding: EdgeInsets.fromLTRB(4, 8, 4, 4), // 添加内边距，避免图表贴边
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(15),
@@ -1478,7 +1468,7 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                       children: [
                         Expanded(
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(12),
                             child: elevationData != null
                                 ? ValueListenableBuilder<int?>(
                                     valueListenable: currentSegmentIndex,
@@ -1489,17 +1479,39 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                         valueListenable: currentMinDistance,
                                         builder:
                                             (context, minDistance, child) {
-                                          return ElevationChart(
-                                            data: elevationData!,
-                                            onPointSelected: (point) {
-                                              selectedPoint.value =
-                                                  point.position;
-                                            },
-                                            currentSegmentIndex:
-                                                minDistance != null &&
-                                                        minDistance <= 50
-                                                    ? segmentIndex
-                                                    : null,
+                                          return Stack(
+                                            children: [
+                                              ElevationChart(
+                                                data: elevationData!,
+                                                onPointSelected: (point) {
+                                                  selectedPoint.value =
+                                                      point.position;
+                                                },
+                                                currentSegmentIndex:
+                                                    minDistance != null &&
+                                                            minDistance <= 50
+                                                        ? segmentIndex
+                                                        : null,
+                                              ),
+                                              // 叠加一个半透明渐变层，增加美观度
+                                              Positioned.fill(
+                                                child: IgnorePointer(
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        begin: Alignment.topCenter,
+                                                        end: Alignment.bottomCenter,
+                                                        colors: [
+                                                          Colors.white.withOpacity(0.0),
+                                                          Colors.white.withOpacity(0.05),
+                                                        ],
+                                                        stops: const [0.7, 1.0],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           );
                                         },
                                       );
@@ -1509,24 +1521,6 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  Spacer(),
-                  // 退出导航按钮
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        _exitNavigationMode();
-                      },
-                      icon: Icon(Icons.stop),
-                      label: Text('结束导航'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                      ),
                     ),
                   ),
                 ],
@@ -1735,17 +1729,40 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                                     valueListenable: currentMinDistance,
                                     builder:
                                         (context, minDistance, child) {
-                                      return ElevationChart(
-                                        data: elevationData!,
-                                        onPointSelected: (point) {
-                                          selectedPoint.value =
-                                              point.position;
-                                        },
-                                        currentSegmentIndex:
-                                            minDistance != null &&
-                                                    minDistance <= 50
-                                                ? segmentIndex
-                                                : null,
+                                      return Stack(
+                                        children: [
+                                          // 主海拔图
+                                          ElevationChart(
+                                            data: elevationData!,
+                                            onPointSelected: (point) {
+                                              selectedPoint.value =
+                                                  point.position;
+                                            },
+                                            currentSegmentIndex:
+                                                minDistance != null &&
+                                                        minDistance <= 50
+                                                    ? segmentIndex
+                                                    : null,
+                                          ),
+                                          // 叠加一个半透明渐变层，增加美观度
+                                          Positioned.fill(
+                                            child: IgnorePointer(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.topCenter,
+                                                    end: Alignment.bottomCenter,
+                                                    colors: [
+                                                      Colors.white.withOpacity(0.0),
+                                                      Colors.white.withOpacity(0.05),
+                                                    ],
+                                                    stops: const [0.7, 1.0],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       );
                                     },
                                   );
@@ -1762,6 +1779,43 @@ class _RouteDetailPageState extends State<RouteDetailPage>
         ],
       );
     }
+  }
+
+  Widget _buildInfoColumn({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    Color? valueColor,
+  }) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: valueColor ?? Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
   }
 }
 
