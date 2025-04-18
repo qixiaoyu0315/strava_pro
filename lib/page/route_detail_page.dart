@@ -6,6 +6,7 @@ import '../service/strava_client_manager.dart';
 import 'package:strava_client/strava_client.dart' as strava;
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -578,37 +579,30 @@ class _RouteDetailPageState extends State<RouteDetailPage>
                           Marker(
                             point: location,
                             child: Container(
-                              height: 32,
-                              width: 32,
+                              height: 80, // 增加容器高度
+                              width: 80,  // 增加容器宽度
                               alignment: Alignment.center,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isNearRoute
-                                            ? Colors.green
-                                            : Colors.red,
-                                        width: 3,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: (isNearRoute
-                                                  ? Colors.green
-                                                  : Colors.red)
-                                              .withOpacity(.3),
-                                          spreadRadius: 4,
-                                          blurRadius: 4,
+                              child: ValueListenableBuilder<Position?>(
+                                valueListenable: currentPosition,
+                                builder: (context, position, child) {
+                                  // 获取设备朝向
+                                  final heading = position?.heading ?? 0.0;
+                                  
+                                  return PulsingMarker(
+                                    child: Transform.rotate(
+                                      angle: (heading * math.pi) / 180, // 将朝向角度转换为弧度
+                                      child: CustomPaint(
+                                        size: Size(48, 48), // 将箭头大小增加一倍
+                                        painter: NavigationArrowPainter(
+                                          color: isNearRoute ? Colors.green : Colors.red,
+                                          hasShadow: true,
                                         ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    color: isNearRoute ? Colors.green : Colors.red,
+                                    size: 64.0, // 增加脉动效果的整体大小
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -1822,4 +1816,151 @@ class _RouteDetailPageState extends State<RouteDetailPage>
 Future<strava.Route> getRoute(String idStr) async {
   int routeId = int.parse(idStr);
   return await StravaClientManager().stravaClient.routes.getRoute(routeId);
+}
+
+// 自定义导航箭头绘制器
+class NavigationArrowPainter extends CustomPainter {
+  final Color color;
+  final bool hasShadow;
+  
+  NavigationArrowPainter({
+    required this.color,
+    this.hasShadow = false,
+  });
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill
+      ..strokeCap = StrokeCap.round;
+    
+    // 计算中心点
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    // 绘制阴影
+    if (hasShadow) {
+      final shadowPaint = Paint()
+        ..color = color.withOpacity(0.3)
+        ..style = PaintingStyle.fill
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4);
+      
+      // 绘制阴影路径
+      final shadowPath = ui.Path()
+        ..moveTo(center.dx, center.dy - size.height * 0.4) // 顶点
+        ..lineTo(center.dx + size.width * 0.25, center.dy + size.height * 0.2) // 右侧点
+        ..lineTo(center.dx, center.dy + size.height * 0.1) // 底部中间点
+        ..lineTo(center.dx - size.width * 0.25, center.dy + size.height * 0.2) // 左侧点
+        ..close();
+      
+      canvas.drawPath(shadowPath, shadowPaint);
+    }
+    
+    // 绘制导航箭头
+    final path = ui.Path()
+      ..moveTo(center.dx, center.dy - size.height * 0.4) // 顶点
+      ..lineTo(center.dx + size.width * 0.25, center.dy + size.height * 0.2) // 右侧点
+      ..lineTo(center.dx, center.dy + size.height * 0.1) // 底部中间点
+      ..lineTo(center.dx - size.width * 0.25, center.dy + size.height * 0.2) // 左侧点
+      ..close();
+    
+    canvas.drawPath(path, paint);
+    
+    // 绘制内部白色区域，增加对比度
+    final innerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    
+    final innerPath = ui.Path()
+      ..moveTo(center.dx, center.dy - size.height * 0.2) // 顶点
+      ..lineTo(center.dx + size.width * 0.12, center.dy + size.height * 0.1) // 右侧点
+      ..lineTo(center.dx, center.dy) // 底部中间点
+      ..lineTo(center.dx - size.width * 0.12, center.dy + size.height * 0.1) // 左侧点
+      ..close();
+    
+    canvas.drawPath(innerPath, innerPaint);
+  }
+  
+  @override
+  bool shouldRepaint(NavigationArrowPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.hasShadow != hasShadow;
+  }
+}
+
+// 脉动标记小部件
+class PulsingMarker extends StatefulWidget {
+  final Widget child;
+  final Color color;
+  final double size;
+  
+  const PulsingMarker({
+    Key? key,
+    required this.child,
+    required this.color,
+    this.size = 30.0,
+  }) : super(key: key);
+  
+  @override
+  State<PulsingMarker> createState() => _PulsingMarkerState();
+}
+
+class _PulsingMarkerState extends State<PulsingMarker> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+    
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            // 外部脉动圆圈
+            Container(
+              width: widget.size * (0.8 + _animation.value * 0.4),
+              height: widget.size * (0.8 + _animation.value * 0.4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.color.withOpacity(0.3 * (1 - _animation.value)),
+              ),
+            ),
+            // 中间圆圈
+            Container(
+              width: widget.size * 0.6,
+              height: widget.size * 0.6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.color.withOpacity(0.2),
+              ),
+            ),
+            // 子组件（箭头）
+            widget.child,
+          ],
+        );
+      },
+    );
+  }
 }
