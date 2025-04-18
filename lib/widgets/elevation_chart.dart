@@ -354,12 +354,92 @@ class _ElevationChartState extends State<ElevationChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '海拔高度',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.bold,
-                ),
+              Expanded(
+                child: widget.currentSegmentIndex != null && widget.currentSegmentIndex! < widget.data.elevationPoints.length
+                  ? LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWideLayout = constraints.maxWidth > 350;
+                        final pointData = widget.data.elevationPoints[widget.currentSegmentIndex!];
+                        final gradientText = _getGradientText(pointData.gradient);
+                        final gradientColor = _getGradientColor(pointData.gradient);
+                        
+                        if (isWideLayout) {
+                          // 宽屏布局 - 所有信息在一行
+                          return Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '距离: ${pointData.distance.toStringAsFixed(1)}km  ' +
+                                  '海拔: ${pointData.elevation.toStringAsFixed(0)}m  ' +
+                                  '坡度: $gradientText',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: gradientColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          );
+                        } else {
+                          // 窄屏布局 - 使用更紧凑的格式
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    '${pointData.distance.toStringAsFixed(1)}km · ${pointData.elevation.toStringAsFixed(0)}m',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    '坡度: $gradientText',
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: gradientColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                      },
+                    )
+                  : Text(
+                      '海拔高度',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
               ),
               Row(
                 children: [
@@ -537,12 +617,11 @@ class _ElevationChartState extends State<ElevationChart> {
                       enabled: true,
                       touchTooltipData: LineTouchTooltipData(
                         tooltipRoundedRadius: 8,
-                        tooltipPadding: const EdgeInsets.all(8),
-                        tooltipBorder: BorderSide(
-                          color: Theme.of(context).colorScheme.outline,
-                          width: 1,
-                        ),
-                        tooltipMargin: 8,
+                        tooltipPadding: const EdgeInsets.all(0),  // 减小内边距
+                        tooltipMargin: 0,  // 减小外边距
+                        fitInsideHorizontally: true,  // 确保tooltip在图表内水平显示
+                        fitInsideVertically: true,    // 确保tooltip在图表内垂直显示
+                        getTooltipColor: (_) => Colors.transparent,  // 透明背景
                         getTooltipItems: (touchedSpots) {
                           return touchedSpots.map((spot) {
                             // 找到最接近的点
@@ -564,21 +643,14 @@ class _ElevationChartState extends State<ElevationChart> {
                                 widget.data.elevationPoints[closestIndex];
                             final gradientColor =
                                 _getGradientColor(pointData.gradient);
-                            final gradientText =
-                                _getGradientText(pointData.gradient);
 
                             return LineTooltipItem(
-                              '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
-                              '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
-                              '坡度: $gradientText',
+                              '',  // 移除折线图中的信息显示
                               TextStyle(
                                 color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                               ),
                               children: [
-                                TextSpan(
-                                  text: '\n',
-                                ),
                                 TextSpan(
                                   text: '●',
                                   style: TextStyle(
