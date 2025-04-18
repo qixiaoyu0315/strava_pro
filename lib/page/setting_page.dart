@@ -27,6 +27,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../service/app_update_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/app_settings_manager.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -67,6 +68,7 @@ class _SettingPageState extends State<SettingPage>
 
   // 新增显示模式相关变量
   bool _isFullscreenMode = false; // 是否使用全屏模式
+  bool _routeFullscreenOverlay = false; // 是否启用路线导航全屏覆盖模式
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -263,6 +265,7 @@ class _SettingPageState extends State<SettingPage>
     setState(() {
       _isHorizontalLayout = prefs.getBool('isHorizontalLayout') ?? true;
       _isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
+      _routeFullscreenOverlay = prefs.getBool('routeFullscreenOverlay') ?? false;
     });
 
     // 根据设置应用全屏模式
@@ -273,6 +276,7 @@ class _SettingPageState extends State<SettingPage>
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isHorizontalLayout', _isHorizontalLayout);
     await prefs.setBool('isFullscreenMode', _isFullscreenMode);
+    await prefs.setBool('routeFullscreenOverlay', _routeFullscreenOverlay);
     widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
 
@@ -1809,6 +1813,23 @@ class _SettingPageState extends State<SettingPage>
                   builder: (context) => const MapCachePage(),
                 ),
               );
+            },
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            title: const Text('路线导航全屏覆盖模式'),
+            subtitle: const Text('海拔和坡度信息覆盖在全屏地图上显示'),
+            value: _routeFullscreenOverlay,
+            onChanged: (bool value) {
+              setState(() {
+                _routeFullscreenOverlay = value;
+              });
+              _saveSettings();
+              
+              // 更新全局缓存，确保立即生效
+              AppSettingsManager().updateRouteFullscreenOverlay(value);
+              // 清除缓存，强制下次获取最新设置
+              AppSettingsManager().clearCache();
             },
           ),
         ],
