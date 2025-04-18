@@ -1,6 +1,7 @@
 import 'package:strava_client/strava_client.dart';
 import 'strava_client_manager.dart';
 import '../model/athlete_model.dart';
+import '../utils/logger.dart';
 
 /// 路线服务类，处理路线数据相关操作
 class RouteService {
@@ -9,7 +10,10 @@ class RouteService {
   /// 获取运动员信息
   /// 返回运动员详细信息
   Future<DetailedAthlete> getAthleteInfo() async {
-    return await StravaClientManager().stravaClient.athletes.getAuthenticatedAthlete();
+    // 使用safeApiCall方法处理token刷新
+    return await StravaClientManager().safeApiCall<DetailedAthlete>(() async {
+      return await StravaClientManager().stravaClient.athletes.getAuthenticatedAthlete();
+    });
   }
   
   /// 获取运动员路线列表
@@ -27,11 +31,11 @@ class RouteService {
         final athlete = await getAthleteInfo();
         // 保存到数据库中
         await _athleteModel.saveAthlete(athlete);
-        // 使用获取到的ID
-        final routes = await StravaClientManager()
-            .stravaClient
-            .routes
-            .listAthleteRoutes(athlete.id, page, perPage);
+        
+        // 使用safeApiCall方法处理token刷新
+        final routes = await StravaClientManager().safeApiCall<List<dynamic>>(() async {
+          return await StravaClientManager().stravaClient.routes.listAthleteRoutes(athlete.id, page, perPage);
+        });
             
         for (var route in routes) {
           routeList.add(_convertRouteToMap(route));
@@ -39,16 +43,18 @@ class RouteService {
       } else {
         // 使用数据库中存储的运动员ID
         final athleteId = athleteData['id'] as int;
-        final routes = await StravaClientManager()
-            .stravaClient
-            .routes
-            .listAthleteRoutes(athleteId, page, perPage);
+        
+        // 使用safeApiCall方法处理token刷新
+        final routes = await StravaClientManager().safeApiCall<List<dynamic>>(() async {
+          return await StravaClientManager().stravaClient.routes.listAthleteRoutes(athleteId, page, perPage);
+        });
             
         for (var route in routes) {
           routeList.add(_convertRouteToMap(route));
         }
       }
     } catch (e) {
+      Logger.e('获取路线列表失败', error: e, tag: 'RouteService');
       rethrow; // 将异常向上传递，让调用者处理
     }
     
