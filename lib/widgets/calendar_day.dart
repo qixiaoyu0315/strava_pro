@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 import '../utils/logger.dart';
 import '../utils/app_settings_manager.dart';
+import '../model/app_settings.dart';
 
 class CalendarDay extends StatelessWidget {
   final DateTime date;
@@ -73,7 +74,7 @@ class CalendarDay extends StatelessWidget {
     }
   }
 
-  Widget _buildSvgIcon(bool isSelected, bool useRainbowColors) {
+  Widget _buildSvgIcon(bool isSelected, bool useRainbowColors, int customColorValue) {
     final localDate = date.toLocal();
     final dateStr =
         '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
@@ -88,12 +89,20 @@ class CalendarDay extends StatelessWidget {
     }
 
     try {
+      Color svgColor;
+      if (isSelected) {
+        svgColor = Colors.white;
+      } else if (useRainbowColors) {
+        svgColor = _getRainbowColor(date.weekday, false);
+      } else {
+        // 使用用户自定义颜色
+        svgColor = Color(customColorValue);
+      }
+      
       return SvgPicture.file(
         File(svgPath),
         colorFilter: ColorFilter.mode(
-          useRainbowColors 
-              ? _getRainbowColor(date.weekday, isSelected)
-              : isSelected ? Colors.white : Colors.green,
+          svgColor,
           BlendMode.srcIn,
         ),
         fit: BoxFit.contain,
@@ -110,11 +119,12 @@ class CalendarDay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      // 获取彩虹线条模式设置
-      future: AppSettingsManager().getSettings().then((settings) => settings.useRainbowColors),
+    return FutureBuilder<AppSettings>(
+      // 获取设置
+      future: AppSettingsManager().getSettings(),
       builder: (context, snapshot) {
-        final useRainbowColors = snapshot.data ?? false;
+        final useRainbowColors = snapshot.data?.useRainbowColors ?? false;
+        final customColorValue = snapshot.data?.svgColor ?? 0xFF00C853;
         
         Widget dayWidget = GestureDetector(
           onTap: () => onTap(date),
@@ -143,7 +153,7 @@ class CalendarDay extends StatelessWidget {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                    child: _buildSvgIcon(isSelected, useRainbowColors),
+                    child: _buildSvgIcon(isSelected, useRainbowColors, customColorValue),
                   ),
                 ),
               ],

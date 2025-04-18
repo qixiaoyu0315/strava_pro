@@ -28,6 +28,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../service/app_update_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_settings_manager.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class SettingPage extends StatefulWidget {
   final Function(bool)? onLayoutChanged;
@@ -70,6 +71,7 @@ class _SettingPageState extends State<SettingPage>
   bool _isFullscreenMode = false; // 是否使用全屏模式
   bool _routeFullscreenOverlay = false; // 是否启用路线导航全屏覆盖模式
   bool _useRainbowColors = false; // 是否启用彩虹线条模式
+  int _svgColor = 0xFF00C853; // SVG颜色值，默认为绿色
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
@@ -268,6 +270,7 @@ class _SettingPageState extends State<SettingPage>
       _isFullscreenMode = prefs.getBool('isFullscreenMode') ?? false;
       _routeFullscreenOverlay = prefs.getBool('routeFullscreenOverlay') ?? false;
       _useRainbowColors = prefs.getBool('useRainbowColors') ?? false;
+      _svgColor = prefs.getInt('svgColor') ?? 0xFF00C853;
     });
 
     // 根据设置应用全屏模式
@@ -280,6 +283,7 @@ class _SettingPageState extends State<SettingPage>
     await prefs.setBool('isFullscreenMode', _isFullscreenMode);
     await prefs.setBool('routeFullscreenOverlay', _routeFullscreenOverlay);
     await prefs.setBool('useRainbowColors', _useRainbowColors);
+    await prefs.setInt('svgColor', _svgColor);
     widget.onLayoutChanged?.call(_isHorizontalLayout);
   }
 
@@ -1805,24 +1809,17 @@ class _SettingPageState extends State<SettingPage>
       child: Column(
         children: [
           ListTile(
-            leading: const Icon(Icons.map),
-            title: const Text('地图瓦片下载'),
-            subtitle: const Text('下载地图瓦片用于离线浏览'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MapCachePage(),
-                ),
-              );
-            },
+            title: const Text(
+              '地图设置',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: const Text('地图显示和交互设置'),
           ),
-          const Divider(height: 1),
           SwitchListTile(
             title: const Text('路线导航全屏覆盖模式'),
-            subtitle: const Text('海拔和坡度信息覆盖在全屏地图上显示'),
+            subtitle: const Text('在导航时使用全屏地图视图'),
             value: _routeFullscreenOverlay,
+            secondary: Icon(Icons.fullscreen, color: Theme.of(context).colorScheme.primary),
             onChanged: (bool value) {
               setState(() {
                 _routeFullscreenOverlay = value;
@@ -1859,6 +1856,23 @@ class _SettingPageState extends State<SettingPage>
               );
             },
           ),
+          // 非彩虹模式下显示颜色选择器入口
+          if (!_useRainbowColors)
+            ListTile(
+              title: const Text('SVG颜色设置'),
+              subtitle: const Text('设置单色模式下的SVG颜色'),
+              leading: Icon(Icons.palette, color: Theme.of(context).colorScheme.primary),
+              trailing: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Color(_svgColor),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.grey),
+                ),
+              ),
+              onTap: _openColorPicker,
+            ),
         ],
       ),
     );
@@ -2684,5 +2698,61 @@ class _SettingPageState extends State<SettingPage>
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     return '$hours小时${minutes}分钟';
+  }
+
+  // 打开颜色选择器对话框
+  void _openColorPicker() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        Color currentColor = Color(_svgColor);
+        return AlertDialog(
+          title: const Text('选择SVG颜色'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: currentColor,
+              onColorChanged: (Color color) {
+                currentColor = color;
+              },
+              pickerAreaHeightPercent: 0.8,
+              enableAlpha: false,
+              displayThumbColor: true,
+              paletteType: PaletteType.hsv,
+              portraitOnly: true,
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _svgColor = currentColor.value;
+                });
+                _saveSettings();
+                
+                // 更新全局缓存，确保立即生效
+                AppSettingsManager().updateSvgColor(currentColor.value);
+                // 清除缓存，强制下次获取最新设置
+                AppSettingsManager().clearCache();
+                
+                // 提示已完成设置
+                Fluttertoast.showToast(
+                  msg: "SVG颜色已更新",
+                  toastLength: Toast.LENGTH_SHORT,
+                );
+                
+                Navigator.of(context).pop();
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
