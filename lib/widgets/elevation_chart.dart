@@ -145,21 +145,9 @@ class _ElevationChartState extends State<ElevationChart> {
     if (oldWidget.data.totalDistance != widget.data.totalDistance) {
       _calculateRangeValues();
     }
-    // 当位置发生变化时重置计时器
     if (widget.currentSegmentIndex != _lastSegmentIndex &&
         widget.currentSegmentIndex != null) {
       _lastSegmentIndex = widget.currentSegmentIndex;
-      setState(() {
-        _showTooltip = true;
-      });
-      _tooltipTimer?.cancel();
-      _tooltipTimer = Timer(Duration(seconds: 5), () {
-        if (mounted) {
-          setState(() {
-            _showTooltip = false;
-          });
-        }
-      });
     }
   }
 
@@ -354,67 +342,80 @@ class _ElevationChartState extends State<ElevationChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: widget.currentSegmentIndex != null && widget.currentSegmentIndex! < widget.data.elevationPoints.length
-                  ? LayoutBuilder(
+              // 左侧三等分信息区域（距离、海拔、坡度）
+              widget.currentSegmentIndex != null && widget.currentSegmentIndex! < widget.data.elevationPoints.length
+                ? Expanded(
+                    flex: 3,
+                    child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final isWideLayout = constraints.maxWidth > 350;
                         final pointData = widget.data.elevationPoints[widget.currentSegmentIndex!];
                         final gradientText = _getGradientText(pointData.gradient);
                         final gradientColor = _getGradientColor(pointData.gradient);
                         
-                        if (isWideLayout) {
-                          // 宽屏布局 - 所有信息在一行
-                          return Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  '距离: ${pointData.distance.toStringAsFixed(1)}km  ' +
-                                  '海拔: ${pointData.elevation.toStringAsFixed(0)}m  ' +
-                                  '坡度: $gradientText',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: gradientColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ],
-                          );
-                        } else {
-                          // 窄屏布局 - 使用更紧凑的格式
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                        // 单行布局 - 平均分配信息到一行
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // 距离信息
+                            Expanded(
+                              flex: 1,
+                              child: Row(
                                 children: [
-                                  Text(
-                                    '${pointData.distance.toStringAsFixed(1)}km · ${pointData.elevation.toStringAsFixed(0)}m',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.bold,
+                                  Icon(Icons.straighten, size: 14),
+                                  SizedBox(width: 2),
+                                  Flexible(
+                                    child: Text(
+                                      '${pointData.distance.toStringAsFixed(1)}km',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                              Row(
+                            ),
+                            // 海拔信息
+                            Expanded(
+                              flex: 1,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    '坡度: $gradientText',
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
+                                  Icon(Icons.height, size: 14),
+                                  SizedBox(width: 2),
+                                  Flexible(
+                                    child: Text(
+                                      '${pointData.elevation.toStringAsFixed(0)}m',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // 坡度信息
+                            Expanded(
+                              flex: 1,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Icon(Icons.trending_up, size: 14),
+                                  SizedBox(width: 2),
+                                  Flexible(
+                                    child: Text(
+                                      gradientText,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 4),
@@ -428,58 +429,61 @@ class _ElevationChartState extends State<ElevationChart> {
                                   ),
                                 ],
                               ),
-                            ],
-                          );
-                        }
+                            ),
+                          ],
+                        );
                       },
-                    )
-                  : Text(
+                    ),
+                  )
+                : Expanded(
+                    flex: 3,
+                    child: Text(
                       '海拔高度',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-              ),
-              Row(
-                children: [
-                  // 当当前位置不在可视范围内时显示指示器
-                  if (widget.currentSegmentIndex != null && !isCurrentPointInRange)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      margin: EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.warning_amber_rounded, 
-                               color: Colors.orange, size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            widget.data.points[widget.currentSegmentIndex!].x > maxX
-                                ? '位置超出右侧范围'
-                                : '位置在视图左侧',
-                            style: TextStyle(
-                              color: Colors.orange,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Text(
-                    _getRangeText(),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
                   ),
-                ],
+                
+              // 右侧一等分（全程显示 + 警告提示）
+              Expanded(
+                flex: 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // 当当前位置不在可视范围内时显示指示器（小图标）
+                    if (widget.currentSegmentIndex != null && !isCurrentPointInRange)
+                      Padding(
+                        padding: EdgeInsets.only(right: 4),
+                        child: Tooltip(
+                          message: widget.data.points[widget.currentSegmentIndex!].x > maxX
+                              ? '位置超出右侧范围'
+                              : '位置在视图左侧',
+                          child: Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.orange,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    // 显示范围文本
+                    Row(
+                      children: [
+                        Icon(Icons.zoom_out_map, size: 14),
+                        SizedBox(width: 2),
+                        Text(
+                          _getRangeText(),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -711,21 +715,6 @@ class _ElevationChartState extends State<ElevationChart> {
                       color: Colors.orange,
                       size: 24,
                     ),
-                  ),
-                // 只有当当前点在可视范围内时才显示提示框
-                if (widget.currentSegmentIndex != null &&
-                    widget.currentSegmentIndex! < widget.data.elevationPoints.length &&
-                    _showTooltip &&
-                    isCurrentPointInRange)
-                  Positioned(
-                    left: ((widget.data.points[widget.currentSegmentIndex!].x - minX) /
-                            (maxX - minX)) *
-                        (MediaQuery.of(context).size.width - 32 - 32),
-                    top: 0,
-                    child: _buildTooltip(
-                        context,
-                        widget
-                            .data.elevationPoints[widget.currentSegmentIndex!]),
                   ),
               ],
             ),
