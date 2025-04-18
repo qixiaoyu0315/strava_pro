@@ -621,11 +621,11 @@ class _ElevationChartState extends State<ElevationChart> {
                       enabled: true,
                       touchTooltipData: LineTouchTooltipData(
                         tooltipRoundedRadius: 8,
-                        tooltipPadding: const EdgeInsets.all(0),  // 减小内边距
-                        tooltipMargin: 0,  // 减小外边距
+                        tooltipPadding: const EdgeInsets.all(8),  // 恢复内边距
+                        tooltipMargin: 8,  // 恢复外边距
                         fitInsideHorizontally: true,  // 确保tooltip在图表内水平显示
                         fitInsideVertically: true,    // 确保tooltip在图表内垂直显示
-                        getTooltipColor: (_) => Colors.transparent,  // 透明背景
+                        getTooltipColor: (_) => Theme.of(context).colorScheme.surface,  // 设置为表面颜色
                         getTooltipItems: (touchedSpots) {
                           return touchedSpots.map((spot) {
                             // 找到最接近的点
@@ -647,14 +647,22 @@ class _ElevationChartState extends State<ElevationChart> {
                                 widget.data.elevationPoints[closestIndex];
                             final gradientColor =
                                 _getGradientColor(pointData.gradient);
+                            final gradientText =
+                                _getGradientText(pointData.gradient);
 
                             return LineTooltipItem(
-                              '',  // 移除折线图中的信息显示
+                              '距离: ${pointData.distance.toStringAsFixed(1)} km\n'
+                              '海拔: ${pointData.elevation.toStringAsFixed(0)} m\n'
+                              '坡度: $gradientText',
                               TextStyle(
                                 color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
+                                fontSize: 12,
                               ),
                               children: [
+                                TextSpan(
+                                  text: '\n',
+                                ),
                                 TextSpan(
                                   text: '●',
                                   style: TextStyle(
@@ -669,7 +677,8 @@ class _ElevationChartState extends State<ElevationChart> {
                       ),
                       touchCallback:
                           (FlTouchEvent event, LineTouchResponse? response) {
-                        if (event is FlTapUpEvent &&
+                        // 只在点击事件时调用onPointSelected
+                        if ((event is FlTapUpEvent || event is FlLongPressEnd) &&
                             response?.lineBarSpots != null &&
                             response!.lineBarSpots!.isNotEmpty) {
                           final spot = response.lineBarSpots!.first;
