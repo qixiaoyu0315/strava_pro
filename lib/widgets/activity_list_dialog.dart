@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../page/activity_detail_page.dart';
 
 class ActivityListDialog extends StatelessWidget {
   final DateTime date;
@@ -80,12 +81,12 @@ class ActivityListDialog extends StatelessWidget {
                   // 关闭弹窗
                   Navigator.of(context).pop();
                   
-                  // 这里可以添加跳转到活动详情页的逻辑
-                  // Navigator.of(context).push(MaterialPageRoute(
-                  //   builder: (context) => ActivityDetailPage(
-                  //     activityId: activity['activity_id'].toString(),
-                  //   ),
-                  // ));
+                  // 跳转到活动详情页
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => ActivityDetailPage(
+                      activityId: activity['activity_id'].toString(),
+                    ),
+                  ));
                 },
               ),
             );
