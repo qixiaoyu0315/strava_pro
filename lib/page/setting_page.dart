@@ -1530,33 +1530,16 @@ class _SettingPageState extends State<SettingPage>
                 ),
               ),
             const SizedBox(height: 16.0),
-            // 同步按钮和生成SVG按钮
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _syncActivities,
-                    icon: const Icon(Icons.sync),
-                    label: const Text('同步活动'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8.0),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _generateAllSVG,
-                    icon: const Icon(Icons.route),
-                    label: const Text('生成路线'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
+            // 合并后的同步按钮
+            ElevatedButton.icon(
+              onPressed: _isLoading ? null : _syncActivitiesAndGenerateSVG,
+              icon: const Icon(Icons.sync),
+              label: const Text('同步活动并生成路线'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+              ),
             ),
             const SizedBox(height: 16.0),
             // 日历导出区域
@@ -1565,6 +1548,141 @@ class _SettingPageState extends State<SettingPage>
         ),
       ),
     );
+  }
+
+  // 合并同步活动和生成SVG的功能
+  Future<void> _syncActivitiesAndGenerateSVG() async {
+    if (_isLoading) {
+      Fluttertoast.showToast(msg: '请等待当前操作完成');
+      return;
+    }
+
+    try {
+      // 1. 先同步活动
+      setState(() {
+        _isLoading = true;
+        _syncProgress = 0.0;
+        _syncStatus = '正在同步活动数据...';
+        _syncMessage = '开始同步活动数据...';
+      });
+
+      await _activityService.syncActivities(
+        onProgress: (current, total, status) {
+          if (mounted) {
+            setState(() {
+              _syncProgress = current / total;
+              _syncStatus = status;
+            });
+          }
+        },
+      );
+
+      // 2. 同步完成后自动生成SVG
+      setState(() {
+        _syncProgress = 0.0;
+        _syncStatus = '准备生成SVG...';
+        _syncMessage = '正在准备生成SVG...';
+      });
+
+      // 获取所有活动数据
+      final activities = await _activityService.getAllActivities();
+      int total = activities.length;
+      int current = 0;
+      int success = 0;
+      int skipped = 0;
+      int error = 0;
+
+      for (var activity in activities) {
+        current++;
+
+        // 更新进度
+        if (mounted) {
+          setState(() {
+            _syncProgress = current / total;
+            _syncStatus = '处理: ${activity['name'] ?? activity['id']} ($current/$total)';
+          });
+        }
+
+        // 检查是否有map_polyline
+        final polyline = activity['map_polyline'] as String?;
+        final id = activity['id']?.toString() ?? '';
+
+        if (polyline == null || polyline.isEmpty) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          // 提取日期，格式为"yyyy-MM-dd"
+          final startDate = DateTime.parse(activity['start_date'].toString()).toLocal();
+          final dateStr =
+              '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+
+          // 设置SVG输出路径
+          String svgPath;
+          if (Platform.isAndroid) {
+            svgPath = '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
+          } else {
+            final dir = await getApplicationDocumentsDirectory();
+            svgPath = '${dir.path}/strava_pro/svg/$dateStr.svg';
+          }
+
+          // 确保目录存在
+          final file = File(svgPath);
+          final directory = file.parent;
+          if (!await directory.exists()) {
+            await directory.create(recursive: true);
+          }
+
+          // 生成SVG文件
+          await PolylineToSVG.generateAndSaveSVG(
+            polyline,
+            svgPath,
+            strokeWidth: 6.0,
+          );
+
+          success++;
+        } catch (e) {
+          Logger.e('为活动 $id 生成SVG失败: $e', error: e, tag: 'SVG');
+          error++;
+        }
+
+        // 每处理10个活动，暂停一下，避免阻塞UI
+        if (current % 10 == 0) {
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+      }
+
+      // 更新最终状态
+      if (mounted) {
+        setState(() {
+          _syncMessage = '同步和路线图生成完成: 成功=$success, 跳过=$skipped, 失败=$error';
+          _isLoading = false;
+        });
+        
+        // 刷新统计数据
+        await _loadLastSyncTime();
+        await _loadLastActivitySyncTime();
+        await _loadActivityCount();
+        await _loadTotalDistance();
+        await _loadTotalElevation();
+        await _loadTotalKilojoules();
+        await _loadTotalMovingTime();
+        await _loadStatsByActivityType();
+        await _loadSyncStatus();
+        
+        Fluttertoast.showToast(msg: '同步和路线图生成完成');
+      }
+    } catch (e) {
+      Logger.e('同步活动和生成SVG失败: $e', error: e, tag: 'Sync');
+      if (mounted) {
+        setState(() {
+          _syncMessage = '同步失败: $e';
+          _isLoading = false;
+        });
+        Fluttertoast.showToast(msg: '同步失败: $e');
+      }
+    }
   }
 
   // 日历导出区域组件
@@ -2037,128 +2155,6 @@ class _SettingPageState extends State<SettingPage>
     } catch (e) {
       Logger.e('数据库调试和修复失败', error: e, tag: 'DatabaseInit');
     }
-  }
-
-  // 生成SVG路线图
-  Future<void> _generateAllSVG() async {
-    if (_isLoading) {
-      Fluttertoast.showToast(msg: '请等待当前操作完成');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _syncProgress = 0.0;
-      _syncStatus = '准备生成SVG...';
-      _syncMessage = '正在准备生成SVG...';
-    });
-
-    // 将生成SVG的过程放在后台执行
-    Future.delayed(Duration.zero, () async {
-      try {
-        // 获取所有活动数据
-        final activities = await _activityService.getAllActivities();
-        int total = activities.length;
-        int current = 0;
-        int success = 0;
-        int skipped = 0;
-        int error = 0;
-
-        for (var activity in activities) {
-          current++;
-
-          // 更新进度
-          if (mounted) {
-            setState(() {
-              _syncProgress = current / total;
-              _syncStatus =
-                  '处理: ${activity['name'] ?? activity['id']} ($current/$total)';
-            });
-          }
-
-          // 检查是否有map_polyline
-          final polyline = activity['map_polyline'] as String?;
-          final id = activity['id']?.toString() ?? '';
-
-          if (polyline == null || polyline.isEmpty) {
-            skipped++;
-            continue;
-          }
-
-          try {
-            // 提取日期，格式为"yyyy-MM-dd"
-            final startDate = DateTime.parse(activity['start_date'].toString()).toLocal();
-            final dateStr =
-                '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
-
-            // 设置SVG输出路径
-            String svgPath;
-            if (Platform.isAndroid) {
-              svgPath =
-                  '/storage/emulated/0/Download/strava_pro/svg/$dateStr.svg';
-            } else {
-              final dir = await getApplicationDocumentsDirectory();
-              svgPath = '${dir.path}/strava_pro/svg/$dateStr.svg';
-            }
-
-            // 确保目录存在
-            final file = File(svgPath);
-            final directory = file.parent;
-            if (!await directory.exists()) {
-              await directory.create(recursive: true);
-            }
-
-            // 生成SVG文件
-            await PolylineToSVG.generateAndSaveSVG(
-              polyline,
-              svgPath,
-              strokeWidth: 6.0,
-            );
-
-            success++;
-          } catch (e) {
-            Logger.e('为活动 $id 生成SVG失败: $e', error: e, tag: 'SVG');
-            error++;
-          }
-
-          // 每处理10个活动，暂停一下，避免阻塞UI
-          if (current % 10 == 0) {
-            await Future.delayed(const Duration(milliseconds: 50));
-          }
-        }
-
-        // 更新最终状态
-        if (mounted) {
-          setState(() {
-            _syncMessage = '路线图生成完成: 成功=$success, 跳过=$skipped, 失败=$error';
-          });
-          Fluttertoast.showToast(msg: '路线图生成完成');
-        }
-      } catch (e) {
-        Logger.e('生成SVG失败: $e', error: e, tag: 'SVG');
-        if (mounted) {
-          setState(() {
-            _syncMessage = '生成SVG失败: $e';
-          });
-          Fluttertoast.showToast(msg: '生成SVG失败: $e');
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _syncStatus = '操作完成';
-          });
-        }
-      }
-    });
-
-    // 立即释放UI，让用户可以做其他操作
-    setState(() {
-      _isLoading = false;
-      _syncMessage = '路线图生成在后台进行中...';
-    });
-
-    Fluttertoast.showToast(msg: '路线图生成已在后台开始');
   }
 
   // 权限管理卡片
