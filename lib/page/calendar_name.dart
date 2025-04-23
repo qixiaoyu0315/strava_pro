@@ -133,12 +133,12 @@ class _CalendarPageState extends State<CalendarPage>
           switchOutCurve: Curves.easeInOut,
           child: widget.isHorizontalLayout
               ? HorizontalCalendar(
-                  key: ValueKey('horizontal-${DateTime.now().millisecondsSinceEpoch}'),
+                  key: const ValueKey('horizontal-calendar'),
                   svgCache: _svgCache,
                   onDateSelected: _onDateSelected,
                 )
               : VerticalCalendar(
-                  key: ValueKey('vertical-${DateTime.now().millisecondsSinceEpoch}'),
+                  key: const ValueKey('vertical-calendar'),
                   svgCache: _svgCache,
                   onDateSelected: _onDateSelected,
                 ),

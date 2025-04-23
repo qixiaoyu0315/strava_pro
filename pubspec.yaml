@@ -1,7 +1,7 @@
 name: strava_pro
 description: "A new Flutter project."
 publish_to: "none"
-version: 0.4.16+56
+version: 0.4.16+58
 
 environment:
   sdk: ^3.6.1
