@@ -41,7 +41,8 @@ class _CalendarPageState extends State<CalendarPage>
     _settingsSubscription = AppSettingsManager().events.listen((event) {
       // 当彩虹线条设置或SVG颜色更改时，自动刷新页面
       if (event == AppSettingsManager.EVENT_RAINBOW_COLORS_CHANGED ||
-          event == AppSettingsManager.EVENT_SVG_COLOR_CHANGED) {
+          event == AppSettingsManager.EVENT_SVG_COLOR_CHANGED ||
+          event == AppSettingsManager.EVENT_ACTIVITIES_SYNCED) {
         // 强制重新渲染日历页面
         if (mounted) {
           // 显示刷新指示器

@@ -18,6 +18,7 @@ class AppSettingsManager {
   static const String EVENT_LAYOUT_CHANGED = 'layout_changed';
   static const String EVENT_FULLSCREEN_CHANGED = 'fullscreen_changed';
   static const String EVENT_SETTINGS_CHANGED = 'settings_changed';
+  static const String EVENT_ACTIVITIES_SYNCED = 'activities_synced';
   
   // 提供一个getter来获取事件流
   Stream<String> get events => _eventController.stream;
@@ -111,5 +112,10 @@ class AppSettingsManager {
   /// 关闭事件流
   void dispose() {
     _eventController.close();
+  }
+  
+  /// 通知活动同步完成
+  void notifyActivitiesSynced() {
+    _eventController.add(EVENT_ACTIVITIES_SYNCED);
   }
 } 

@@ -1671,6 +1671,9 @@ class _SettingPageState extends State<SettingPage>
         await _loadStatsByActivityType();
         await _loadSyncStatus();
         
+        // 通知日历页面刷新
+        AppSettingsManager().notifyActivitiesSynced();
+        
         Fluttertoast.showToast(msg: '同步和路线图生成完成');
       }
     } catch (e) {
